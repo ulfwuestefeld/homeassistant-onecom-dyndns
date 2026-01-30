@@ -49,4 +49,3 @@ schema:
   ssl_staging: bool
   ssl_renewal_days: int(1,60)?
   ssl_check_interval: int(1,24)?
-image: "ghcr.io/home-assistant/{arch}-addon-onecom-dyndns"
