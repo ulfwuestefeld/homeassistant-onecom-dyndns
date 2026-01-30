@@ -258,7 +258,7 @@ class OneComAPI:
         except ValueError as e:
             raise OneComAPIError(f"Invalid JSON response: {e}")
 
-    def _find_record_id(self, subdomain: str, records: dict) -> Optional[str]:
+    def _find_record_id(self, subdomain: str, records: dict) -> Optional[tuple]:
         """Find the record ID for a given subdomain.
 
         Args:
@@ -266,7 +266,7 @@ class OneComAPI:
             records: The DNS records dictionary
 
         Returns:
-            The record ID if found, None otherwise.
+            Tuple of (record_id, record_type) if found, None otherwise.
         """
         result = records.get("result", {})
         data = result.get("data", [])
@@ -282,12 +282,13 @@ class OneComAPI:
 
             _LOGGER.debug(f"Found record: type={record_type}, prefix='{prefix}', dns_type={dns_type}")
 
-            if record_type == "dns_service_records":
+            # Accept both dns_service_records and dns_custom_records
+            if record_type in ["dns_service_records", "dns_custom_records"]:
                 # Match subdomain or root domain (@)
                 if prefix == target_prefix or (not subdomain and prefix in ["", "@"]):
                     if dns_type == "A":
-                        _LOGGER.debug(f"Match found! Record ID: {record.get('id')}")
-                        return record.get("id")
+                        _LOGGER.debug(f"Match found! Record ID: {record.get('id')}, type: {record_type}")
+                        return (record.get("id"), record_type)
 
         _LOGGER.debug(f"No matching record found for '{target_prefix}'")
         return None
@@ -312,19 +313,21 @@ class OneComAPI:
 
         # Get current records to find the record ID
         records = self._get_dns_records()
-        record_id = self._find_record_id(subdomain, records)
+        result = self._find_record_id(subdomain, records)
 
-        if not record_id:
+        if not result:
             raise OneComAPIError(
                 f"DNS record for '{subdomain or 'root domain'}' not found. "
                 "Please create the record manually in the One.com control panel first."
             )
 
+        record_id, record_type = result
+
         # Prepare update request
         update_url = f"{self.ADMIN_URL}/api/domains/{self.domain}/dns/custom_records/{record_id}"
 
         update_data = {
-            "type": "dns_service_records",
+            "type": record_type,  # Use the actual record type from the API
             "id": record_id,
             "attributes": {
                 "type": "A",

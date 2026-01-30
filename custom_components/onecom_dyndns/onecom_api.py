@@ -219,7 +219,7 @@ class OneComAPI:
         except ValueError as e:
             raise OneComAPIError(f"Invalid JSON response: {e}")
 
-    def _find_record_id(self, subdomain: str, records: dict) -> Optional[str]:
+    def _find_record_id(self, subdomain: str, records: dict) -> Optional[tuple]:
         """Find the record ID for a given subdomain."""
         result = records.get("result", {})
         data = result.get("data", [])
@@ -227,13 +227,15 @@ class OneComAPI:
         target_prefix = subdomain if subdomain else "@"
 
         for record in data:
-            if record.get("type") == "dns_service_records":
+            record_type = record.get("type")
+            # Accept both dns_service_records and dns_custom_records
+            if record_type in ["dns_service_records", "dns_custom_records"]:
                 attributes = record.get("attributes", {})
                 prefix = attributes.get("prefix", "")
 
                 if prefix == target_prefix or (not subdomain and prefix in ["", "@"]):
                     if attributes.get("type") == "A":
-                        return record.get("id")
+                        return (record.get("id"), record_type)
 
         return None
 
