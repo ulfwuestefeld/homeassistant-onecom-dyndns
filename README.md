@@ -21,7 +21,7 @@ A Home Assistant add-on that automatically updates DNS A records at One.com when
 1. Open Home Assistant
 2. Go to **Settings** → **Add-ons** → **Add-on Store**
 3. Click the three dots in the top right → **Repositories**
-4. Add this repository URL: `https://github.com/your-username/homeassistant-onecom-dyndns`
+4. Add this repository URL: `https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns`
 5. Click **Add** → **Close**
 
 ### Install the Add-on
