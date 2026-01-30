@@ -1,0 +1,11 @@
+update_dns:
+  name: Update DNS
+  description: Force an immediate DNS update with the current IP address
+
+renew_certificate:
+  name: Renew Certificate
+  description: Force SSL certificate renewal (only works if SSL is enabled)
+
+check_ip:
+  name: Check IP
+  description: Check the current public IP address and update state

@@ -1,0 +1,134 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "One.com Anmeldung",
+        "description": "Geben Sie Ihre One.com Kontodaten ein. [Dokumentation]({docs_url})",
+        "data": {
+          "username": "E-Mail-Adresse",
+          "password": "Passwort"
+        },
+        "data_description": {
+          "username": "Ihre One.com Konto E-Mail-Adresse",
+          "password": "Ihr One.com Konto Passwort"
+        }
+      },
+      "domain": {
+        "title": "Domain auswählen",
+        "description": "Wählen Sie die Domain aus, die Sie verwalten möchten",
+        "data": {
+          "domain": "Domain"
+        }
+      },
+      "domain_manual": {
+        "title": "Domain eingeben",
+        "description": "Geben Sie die Domain ein, die Sie verwalten möchten (z.B. beispiel.de)",
+        "data": {
+          "domain": "Domain"
+        }
+      },
+      "subdomains": {
+        "title": "Subdomains auswählen",
+        "description": "Wählen Sie aus, welche DNS-Einträge für {domain} aktualisiert werden sollen",
+        "data": {
+          "subdomains": "Subdomains"
+        },
+        "data_description": {
+          "subdomains": "Wählen Sie die Subdomains, deren IP-Adresse aktualisiert werden soll"
+        }
+      },
+      "options": {
+        "title": "Aktualisierungseinstellungen",
+        "description": "Konfigurieren Sie, wie oft nach IP-Änderungen geprüft werden soll",
+        "data": {
+          "update_interval": "Aktualisierungsintervall",
+          "ip_service": "IP-Erkennungsdienst",
+          "ssl_enabled": "SSL-Zertifikate aktivieren"
+        },
+        "data_description": {
+          "update_interval": "Wie oft nach IP-Adressänderungen geprüft werden soll (in Minuten)",
+          "ip_service": "Dienst zur Erkennung Ihrer öffentlichen IP-Adresse",
+          "ssl_enabled": "Automatisch SSL-Zertifikate über Let's Encrypt beziehen und erneuern"
+        }
+      },
+      "ssl": {
+        "title": "SSL-Zertifikat Konfiguration",
+        "description": "Konfigurieren Sie die automatische SSL-Zertifikatserstellung für {domain}",
+        "data": {
+          "ssl_email": "E-Mail für Let's Encrypt",
+          "ssl_domains": "Zertifikat-Domains",
+          "ssl_staging": "Staging-Server verwenden",
+          "ssl_renewal_days": "Erneuerungstage",
+          "ssl_check_interval": "Prüfintervall"
+        },
+        "data_description": {
+          "ssl_email": "E-Mail-Adresse für Let's Encrypt Kontobenachrichtigungen",
+          "ssl_domains": "Domains, die im SSL-Zertifikat enthalten sein sollen",
+          "ssl_staging": "Let's Encrypt Staging-Server für Tests verwenden (Zertifikate werden nicht vertraut)",
+          "ssl_renewal_days": "Zertifikat so viele Tage vor Ablauf erneuern",
+          "ssl_check_interval": "Wie oft prüfen, ob eine Zertifikatserneuerung erforderlich ist (in Stunden)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Ungültiger Benutzername oder Passwort",
+      "cannot_connect": "Verbindung zu One.com konnte nicht hergestellt werden",
+      "unknown": "Ein unbekannter Fehler ist aufgetreten",
+      "ssl_email_required": "E-Mail ist für SSL-Zertifikate erforderlich"
+    },
+    "abort": {
+      "already_configured": "Diese Domain ist bereits konfiguriert"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "One.com DynDNS Optionen",
+        "description": "Aktualisierungseinstellungen und SSL-Optionen konfigurieren",
+        "data": {
+          "update_interval": "Aktualisierungsintervall",
+          "ip_service": "IP-Erkennungsdienst",
+          "ssl_enabled": "SSL-Zertifikate aktivieren",
+          "ssl_email": "SSL E-Mail",
+          "ssl_staging": "Staging-Server verwenden",
+          "ssl_renewal_days": "Erneuerungstage"
+        }
+      }
+    }
+  },
+  "services": {
+    "update_dns": {
+      "name": "DNS aktualisieren",
+      "description": "DNS-Aktualisierung mit der aktuellen IP-Adresse erzwingen"
+    },
+    "renew_certificate": {
+      "name": "Zertifikat erneuern",
+      "description": "SSL-Zertifikatserneuerung erzwingen"
+    },
+    "check_ip": {
+      "name": "IP prüfen",
+      "description": "Aktuelle öffentliche IP-Adresse prüfen"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "current_ip": {
+        "name": "Aktuelle IP"
+      },
+      "last_update": {
+        "name": "Letzte Aktualisierung"
+      },
+      "certificate_expiry": {
+        "name": "Zertifikat Ablauf"
+      }
+    },
+    "binary_sensor": {
+      "dns_status": {
+        "name": "DNS Status"
+      },
+      "certificate_valid": {
+        "name": "Zertifikat gültig"
+      }
+    }
+  }
+}

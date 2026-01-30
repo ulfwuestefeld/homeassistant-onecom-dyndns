@@ -1,0 +1,52 @@
+# Home Assistant Add-On: One.com DynDNS Updater
+# https://developers.home-assistant.io/docs/add-ons/configuration
+
+name: "One.com DynDNS Updater"
+description: "Dynamic DNS updater for One.com domains with automatic SSL certificates"
+version: "1.1.0"
+slug: "onecom_dyndns"
+url: "https://github.com/your-repo/onecom-dyndns"
+arch:
+  - armhf
+  - armv7
+  - aarch64
+  - amd64
+  - i386
+init: false
+homeassistant_api: false
+host_network: true
+map:
+  - config:rw
+  - ssl:rw
+options:
+  username: ""
+  password: ""
+  domain: ""
+  subdomains:
+    - ""
+  update_interval: 5
+  ip_service: "ipify"
+  log_level: "info"
+  ssl_enabled: false
+  ssl_email: ""
+  ssl_domains: []
+  ssl_staging: false
+  ssl_renewal_days: 30
+  ssl_check_interval: 12
+schema:
+  username: str
+  password: password
+  domain: str
+  subdomains:
+    - str
+  update_interval: int(1,60)
+  ip_service: list(ipify|ifconfig|icanhazip)
+  log_level: list(debug|info|warning|error)
+  ssl_enabled: bool
+  ssl_email: email?
+  ssl_domains:
+    - str?
+  ssl_staging: bool
+  ssl_renewal_days: int(1,60)?
+  ssl_check_interval: int(1,24)?
+image: "ghcr.io/home-assistant/{arch}-addon-onecom-dyndns"

@@ -1,0 +1,12 @@
+# One.com DynDNS Updater Dependencies
+requests>=2.28.0
+
+# SSL/ACME Dependencies
+acme>=2.0.0
+josepy>=1.13.0
+cryptography>=41.0.0
+
+# Testing Dependencies (dev only)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+responses>=0.22.0

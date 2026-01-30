@@ -1,0 +1,40 @@
+configuration:
+  username:
+    name: Username
+    description: Your One.com account email address
+  password:
+    name: Password
+    description: Your One.com account password
+  domain:
+    name: Domain
+    description: The domain to update (e.g., example.com)
+  subdomains:
+    name: Subdomains
+    description: List of subdomains to update. Use empty string for root domain.
+  update_interval:
+    name: Update Interval
+    description: How often to check for IP changes (in minutes)
+  ip_service:
+    name: IP Detection Service
+    description: Service to use for detecting your public IP address
+  log_level:
+    name: Log Level
+    description: Logging verbosity level
+  ssl_enabled:
+    name: Enable SSL
+    description: Enable automatic SSL certificate generation via Let's Encrypt
+  ssl_email:
+    name: SSL Email
+    description: Email address for Let's Encrypt account (required for SSL)
+  ssl_domains:
+    name: SSL Domains
+    description: Domains to include in the certificate. Leave empty to use main domain and subdomains.
+  ssl_staging:
+    name: SSL Staging Mode
+    description: Use Let's Encrypt staging server for testing (certificates won't be trusted)
+  ssl_renewal_days:
+    name: SSL Renewal Days
+    description: Renew certificate this many days before expiration
+  ssl_check_interval:
+    name: SSL Check Interval
+    description: How often to check for certificate renewal (in hours)

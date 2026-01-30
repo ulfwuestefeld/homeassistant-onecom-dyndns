@@ -1,0 +1,113 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "One.com Login",
+        "description": "Enter your One.com account credentials. [Documentation]({docs_url})",
+        "data": {
+          "username": "Email Address",
+          "password": "Password"
+        },
+        "data_description": {
+          "username": "Your One.com account email address",
+          "password": "Your One.com account password"
+        }
+      },
+      "domain": {
+        "title": "Select Domain",
+        "description": "Select the domain you want to manage",
+        "data": {
+          "domain": "Domain"
+        }
+      },
+      "domain_manual": {
+        "title": "Enter Domain",
+        "description": "Enter the domain you want to manage (e.g., example.com)",
+        "data": {
+          "domain": "Domain"
+        }
+      },
+      "subdomains": {
+        "title": "Select Subdomains",
+        "description": "Select which DNS records to update for {domain}",
+        "data": {
+          "subdomains": "Subdomains"
+        },
+        "data_description": {
+          "subdomains": "Select the subdomains whose IP address should be updated"
+        }
+      },
+      "options": {
+        "title": "Update Settings",
+        "description": "Configure how often to check for IP changes",
+        "data": {
+          "update_interval": "Update Interval",
+          "ip_service": "IP Detection Service",
+          "ssl_enabled": "Enable SSL Certificates"
+        },
+        "data_description": {
+          "update_interval": "How often to check for IP address changes (in minutes)",
+          "ip_service": "Service used to detect your public IP address",
+          "ssl_enabled": "Automatically obtain and renew SSL certificates via Let's Encrypt"
+        }
+      },
+      "ssl": {
+        "title": "SSL Certificate Configuration",
+        "description": "Configure automatic SSL certificate generation for {domain}",
+        "data": {
+          "ssl_email": "Email for Let's Encrypt",
+          "ssl_domains": "Certificate Domains",
+          "ssl_staging": "Use Staging Server",
+          "ssl_renewal_days": "Renewal Days",
+          "ssl_check_interval": "Check Interval"
+        },
+        "data_description": {
+          "ssl_email": "Email address for Let's Encrypt account notifications",
+          "ssl_domains": "Domains to include in the SSL certificate",
+          "ssl_staging": "Use Let's Encrypt staging server for testing (certificates won't be trusted)",
+          "ssl_renewal_days": "Renew certificate this many days before expiration",
+          "ssl_check_interval": "How often to check if certificate renewal is needed (in hours)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid username or password",
+      "cannot_connect": "Could not connect to One.com",
+      "unknown": "An unknown error occurred",
+      "ssl_email_required": "Email is required for SSL certificates"
+    },
+    "abort": {
+      "already_configured": "This domain is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "One.com DynDNS Options",
+        "description": "Configure update settings and SSL options",
+        "data": {
+          "update_interval": "Update Interval",
+          "ip_service": "IP Detection Service",
+          "ssl_enabled": "Enable SSL Certificates",
+          "ssl_email": "SSL Email",
+          "ssl_staging": "Use Staging Server",
+          "ssl_renewal_days": "Renewal Days"
+        }
+      }
+    }
+  },
+  "services": {
+    "update_dns": {
+      "name": "Update DNS",
+      "description": "Force an immediate DNS update with the current IP address"
+    },
+    "renew_certificate": {
+      "name": "Renew Certificate",
+      "description": "Force SSL certificate renewal"
+    },
+    "check_ip": {
+      "name": "Check IP",
+      "description": "Check the current public IP address"
+    }
+  }
+}
