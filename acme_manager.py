@@ -185,6 +185,7 @@ class ACMEManager:
                 email=self.email,
                 terms_of_service_agreed=True
             )
+            _LOGGER.debug("Calling new_account...")
             regr = acme_client.new_account(new_reg)
             _LOGGER.info(f"ACME account ready (URI: {regr.uri})")
             
@@ -192,12 +193,17 @@ class ACMEManager:
             self._regr = regr
             
             # Re-create client with registration for authenticated requests
+            _LOGGER.debug("Updating client with registration...")
             self._get_client(regr)
             _LOGGER.debug("Client updated with account registration")
             
             return regr
 
         except Exception as e:
+            import traceback
+            _LOGGER.error(f"Exception type: {type(e).__name__}")
+            _LOGGER.error(f"Exception args: {e.args}")
+            _LOGGER.error(f"Traceback: {traceback.format_exc()}")
             raise ACMEManagerError(f"Failed to register ACME account: {e}")
 
     def _perform_dns_challenge(
