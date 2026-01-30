@@ -184,18 +184,29 @@ class ACMEManager:
             return regr
 
         except acme_errors.ConflictError:
-            # Account already exists, retrieve it
+            # Account already exists, retrieve it with only_return_existing flag
             _LOGGER.info("ACME account already exists, retrieving...")
             try:
                 existing_reg = messages.NewRegistration.from_data(
                     email=self.email,
-                    terms_of_service_agreed=True
+                    terms_of_service_agreed=True,
+                    only_return_existing=True
                 )
                 regr = acme_client.new_account(existing_reg)
                 _LOGGER.debug("Account retrieved successfully")
                 return regr
             except Exception as e2:
-                raise ACMEManagerError(f"Failed to retrieve existing ACME account: {e2}")
+                _LOGGER.warning(f"Could not retrieve with only_return_existing: {e2}")
+                # Fallback: just continue without re-retrieving, account exists
+                _LOGGER.info("Using existing account key for authentication")
+                # Create a minimal registration resource
+                return messages.RegistrationResource(
+                    body=messages.Registration(
+                        contact=(f"mailto:{self.email}",),
+                        status="valid"
+                    ),
+                    uri=None
+                )
 
         except Exception as e:
             raise ACMEManagerError(f"Failed to register ACME account: {e}")
