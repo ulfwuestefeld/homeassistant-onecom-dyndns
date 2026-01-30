@@ -320,7 +320,9 @@ class ACMEManager:
         Returns:
             True if challenge was successful.
         """
-        acme_client = self._get_client()
+        # Use the already-configured client with registration
+        if not self._client:
+            raise ACMEManagerError("ACME client not initialized")
 
         # Get the validation token
         response, validation = challenge.response_and_validation(self._account_key)
@@ -386,12 +388,12 @@ class ACMEManager:
             time.sleep(5)
 
             # Answer the challenge
-            acme_client.answer_challenge(challenge, response)
+            self._client.answer_challenge(challenge, response)
 
             # Poll for authorization status
             deadline = datetime.now() + timedelta(minutes=5)
             while datetime.now() < deadline:
-                authz_response = acme_client.poll(authz)
+                authz_response = self._client.poll(authz)
                 authz = authz_response
 
                 status = authz.body.status.name
@@ -445,7 +447,7 @@ class ACMEManager:
             raise ACMEManagerError("No domains specified")
 
         _LOGGER.debug("Getting ACME client...")
-        acme_client = self._get_client()
+        self._get_client()
 
         # Ensure account is registered
         _LOGGER.debug("Registering/retrieving ACME account...")
@@ -478,8 +480,8 @@ class ACMEManager:
 
             csr = csr_builder.sign(csr_key, hashes.SHA256(), default_backend())
 
-            # Request new order
-            order = acme_client.new_order(csr.public_bytes(serialization.Encoding.PEM))
+            # Request new order using self._client (which has the registration)
+            order = self._client.new_order(csr.public_bytes(serialization.Encoding.PEM))
 
             # Process each authorization
             for authz in order.authorizations:
@@ -502,7 +504,7 @@ class ACMEManager:
 
             # Finalize the order
             _LOGGER.info("Finalizing certificate order...")
-            order = acme_client.poll_and_finalize(order)
+            order = self._client.poll_and_finalize(order)
 
             # Get the certificate
             cert_pem = order.fullchain_pem
