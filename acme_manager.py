@@ -396,8 +396,14 @@ class ACMEManager:
             # Poll for authorization status
             deadline = datetime.now() + timedelta(minutes=5)
             while datetime.now() < deadline:
-                authz_response = self._client.poll(authz)
-                authz = authz_response
+                # poll() returns (updated_authz, response) tuple in acme 2.x
+                poll_result = self._client.poll(authz)
+                
+                # Handle both tuple return (new) and single value (old)
+                if isinstance(poll_result, tuple):
+                    authz = poll_result[0]
+                else:
+                    authz = poll_result
 
                 status = authz.body.status.name
                 _LOGGER.debug(f"Authorization status: {status}")
