@@ -3,7 +3,7 @@
 
 name: "One.com DynDNS Updater"
 description: "Dynamic DNS updater for One.com domains with automatic SSL certificates"
-version: "0.0.6"
+version: "0.0.7"
 slug: "homeassistant-onecom-dyndns"
 url: "https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns"
 arch:
@@ -33,6 +33,7 @@ options:
   ssl_staging: false
   ssl_renewal_days: 30
   ssl_check_interval: 12
+  ssl_force_renewal: false
 schema:
   username: str
   password: password
@@ -49,3 +50,4 @@ schema:
   ssl_staging: bool
   ssl_renewal_days: int(1,60)?
   ssl_check_interval: int(1,24)?
+  ssl_force_renewal: bool?

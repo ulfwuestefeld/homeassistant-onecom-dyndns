@@ -38,3 +38,6 @@ configuration:
   ssl_check_interval:
     name: SSL Prüfintervall
     description: Wie oft nach Zertifikatserneuerung prüfen (in Stunden)
+  ssl_force_renewal:
+    name: Zertifikatserneuerung erzwingen
+    description: Erzwingt Erneuerung des SSL-Zertifikats beim nächsten Start (wird nach Erneuerung automatisch zurückgesetzt)

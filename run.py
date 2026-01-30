@@ -66,6 +66,7 @@ class DynDNSUpdater:
         self.ssl_staging = options.get("ssl_staging", False)
         self.ssl_renewal_days = options.get("ssl_renewal_days", 30)
         self.ssl_check_interval = options.get("ssl_check_interval", 12)
+        self.ssl_force_renewal = options.get("ssl_force_renewal", False)
 
         self._running = True
         self._last_ip: Optional[str] = None
@@ -295,6 +296,14 @@ class DynDNSUpdater:
             # Register callback for SSL events
             self._cert_manager.add_callback(self._ssl_event_callback)
 
+            # Force renewal if requested
+            if self.ssl_force_renewal:
+                self._logger.info("Force renewal requested - requesting new certificate...")
+                if self._cert_manager.request_certificate(force=True):
+                    self._logger.info("Force renewal completed successfully")
+                else:
+                    self._logger.error("Force renewal failed")
+
             # Start the certificate manager
             self._cert_manager.start()
 
@@ -390,6 +399,7 @@ def load_options() -> dict:
         "ssl_staging": os.environ.get("ONECOM_SSL_STAGING", "false").lower() == "true",
         "ssl_renewal_days": int(os.environ.get("ONECOM_SSL_RENEWAL_DAYS", "30")),
         "ssl_check_interval": int(os.environ.get("ONECOM_SSL_CHECK_INTERVAL", "12")),
+        "ssl_force_renewal": os.environ.get("ONECOM_SSL_FORCE_RENEWAL", "false").lower() == "true",
     }
 
 

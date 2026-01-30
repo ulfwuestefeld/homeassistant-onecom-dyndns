@@ -38,3 +38,6 @@ configuration:
   ssl_check_interval:
     name: SSL Check Interval
     description: How often to check for certificate renewal (in hours)
+  ssl_force_renewal:
+    name: Force Certificate Renewal
+    description: Force renewal of SSL certificate on next startup (automatically resets after renewal)
