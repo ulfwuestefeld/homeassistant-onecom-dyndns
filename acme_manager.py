@@ -220,18 +220,14 @@ class ACMEManager:
         """
         self._account_key = self._load_or_create_account_key()
 
-        # Create network client
-        net = client.ClientNetwork(self._account_key, user_agent="OneComDynDNS/1.0")
+        # Create network client with optional account
+        net = client.ClientNetwork(self._account_key, account=regr, user_agent="OneComDynDNS/1.0")
 
         # Get directory with retry
         directory = self._fetch_directory(net)
 
-        # Create client with or without registration
-        if regr:
-            # Use keyword argument for registration (acct parameter)
-            self._client = client.ClientV2(directory, net=net, acct=regr)
-        else:
-            self._client = client.ClientV2(directory, net=net)
+        # Create client - ClientV2 takes (directory, net) as positional args
+        self._client = client.ClientV2(directory, net)
         
         return self._client
 
