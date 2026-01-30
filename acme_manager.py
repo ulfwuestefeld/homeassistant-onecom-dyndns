@@ -234,13 +234,20 @@ class ACMEManager:
                 # Domain doesn't match base domain - use just _acme-challenge
                 challenge_subdomain = "_acme-challenge"
 
+        # Build the full DNS name for the TXT record
+        full_txt_name = f"{challenge_subdomain}.{self.onecom_api.domain}"
+        
         _LOGGER.info(f"Setting up DNS-01 challenge for {domain}")
-        _LOGGER.debug(f"Challenge subdomain: {challenge_subdomain}")
-        _LOGGER.debug(f"Validation token: {validation}")
+        _LOGGER.info(f"=== ACME DNS-01 Challenge ===")
+        _LOGGER.info(f"TXT Record Name: {full_txt_name}")
+        _LOGGER.info(f"TXT Record Value: {validation}")
+        _LOGGER.info(f"=============================")
+        _LOGGER.debug(f"Challenge subdomain (prefix): {challenge_subdomain}")
 
         record_id = None
         try:
             # Create TXT record
+            _LOGGER.info(f"Creating TXT record at One.com...")
             record_id = self.onecom_api.create_txt_record(
                 subdomain=challenge_subdomain,
                 content=validation,
@@ -285,6 +292,10 @@ class ACMEManager:
 
         except OneComAPIError as e:
             _LOGGER.error(f"DNS operation failed: {e}")
+            _LOGGER.error(f"If automatic creation fails, you can manually create the TXT record:")
+            _LOGGER.error(f"  Name: {full_txt_name}")
+            _LOGGER.error(f"  Type: TXT")
+            _LOGGER.error(f"  Value: {validation}")
             return False
 
         except Exception as e:
