@@ -394,7 +394,7 @@ class OneComAPI:
             ttl: Time to live in seconds (default 600, One.com minimum)
 
         Returns:
-            The ID of the created record.
+            The ID of the created record (or existing record ID if already exists).
 
         Raises:
             OneComAPIError: If creation fails.
@@ -433,8 +433,39 @@ class OneComAPI:
 
             # Log response details for debugging
             _LOGGER.debug(f"Create TXT record response: {response.status_code}")
+            
+            # Check for conflict error (record already exists)
             if response.status_code >= 400:
-                _LOGGER.debug(f"Response body: {response.text}")
+                response_text = response.text
+                _LOGGER.debug(f"Response body: {response_text}")
+                
+                # One.com returns 500 with a conflict message when record already exists
+                if "DNS_RECORD_CONFLICTING" in response_text or "ConflictingDnsRecordException" in response_text:
+                    # Check if it's the same content - extract record ID from error
+                    # Error format: "conflicts with existing TXT record (36316970)"
+                    import re
+                    match = re.search(r'existing TXT record \((\d+)\)', response_text)
+                    
+                    if match and "same content" in response_text:
+                        existing_id = match.group(1)
+                        _LOGGER.info(f"TXT record already exists with same content (ID: {existing_id}), treating as success")
+                        return existing_id
+                    
+                    # If conflict but different content, we need to delete old and create new
+                    if match:
+                        existing_id = match.group(1)
+                        _LOGGER.info(f"TXT record exists with different content, replacing (ID: {existing_id})")
+                        try:
+                            self.delete_txt_record(existing_id)
+                            # Retry creation after deletion
+                            response = self.session.post(
+                                create_url,
+                                json=create_data,
+                                headers=headers
+                            )
+                            _LOGGER.debug(f"Retry create TXT record response: {response.status_code}")
+                        except OneComAPIError as e:
+                            _LOGGER.warning(f"Failed to delete conflicting record: {e}")
 
             response.raise_for_status()
             result = response.json()
@@ -482,11 +513,14 @@ class OneComAPI:
         except requests.RequestException as e:
             raise OneComAPIError(f"Failed to delete DNS record: {e}")
 
-    def find_txt_records(self, subdomain: str) -> List[Dict[str, Any]]:
+    def find_txt_records(self, subdomain: str, exact_match: bool = False) -> List[Dict[str, Any]]:
         """Find all TXT records for a subdomain.
 
         Args:
             subdomain: The subdomain to search for
+            exact_match: If True, match prefix exactly. If False, match records
+                        that start with the subdomain (useful for finding all
+                        ACME challenge records like _acme-challenge.*)
 
         Returns:
             List of matching TXT records with their IDs and content.
@@ -503,20 +537,35 @@ class OneComAPI:
             # Check both dns_service_records and dns_custom_records types
             if record.get("type") in ["dns_service_records", "dns_custom_records"]:
                 attributes = record.get("attributes", {})
-                if attributes.get("type") == "TXT" and attributes.get("prefix") == subdomain:
-                    matching_records.append({
-                        "id": record.get("id"),
-                        "content": attributes.get("content"),
-                        "ttl": attributes.get("ttl")
-                    })
+                prefix = attributes.get("prefix", "")
+                
+                if attributes.get("type") == "TXT":
+                    # Match either exactly or by prefix
+                    if exact_match:
+                        matches = prefix == subdomain
+                    else:
+                        # Match if prefix equals subdomain or starts with subdomain.
+                        # e.g., "_acme-challenge" matches "_acme-challenge" and "_acme-challenge.homeassistant"
+                        matches = prefix == subdomain or prefix.startswith(f"{subdomain}.")
+                    
+                    if matches:
+                        matching_records.append({
+                            "id": record.get("id"),
+                            "prefix": prefix,
+                            "content": attributes.get("content"),
+                            "ttl": attributes.get("ttl")
+                        })
 
         return matching_records
 
     def cleanup_acme_records(self, subdomain: str = "_acme-challenge") -> int:
         """Remove all ACME challenge TXT records for a subdomain.
 
+        This finds and removes ALL TXT records that start with the given subdomain,
+        e.g., "_acme-challenge" will also match "_acme-challenge.homeassistant".
+
         Args:
-            subdomain: The subdomain to clean up (default: _acme-challenge)
+            subdomain: The subdomain prefix to clean up (default: _acme-challenge)
 
         Returns:
             Number of records deleted.
@@ -524,9 +573,16 @@ class OneComAPI:
         if not self._logged_in or not self.session:
             raise OneComAPIError("Not logged in")
 
-        _LOGGER.debug(f"Cleaning up ACME records for '{subdomain}'")
+        _LOGGER.debug(f"Cleaning up ACME records starting with '{subdomain}'")
 
-        records = self.find_txt_records(subdomain)
+        # Find all records that start with the subdomain (not exact match)
+        records = self.find_txt_records(subdomain, exact_match=False)
+        
+        if records:
+            _LOGGER.debug(f"Found {len(records)} ACME record(s) to clean up:")
+            for r in records:
+                _LOGGER.debug(f"  - ID: {r['id']}, prefix: {r.get('prefix', 'N/A')}")
+        
         deleted_count = 0
 
         for record in records:
