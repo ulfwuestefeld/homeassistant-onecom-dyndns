@@ -272,17 +272,24 @@ class OneComAPI:
         data = result.get("data", [])
 
         target_prefix = subdomain if subdomain else "@"
+        _LOGGER.debug(f"Looking for record with prefix '{target_prefix}'")
 
         for record in data:
-            if record.get("type") == "dns_service_records":
-                attributes = record.get("attributes", {})
-                prefix = attributes.get("prefix", "")
+            record_type = record.get("type")
+            attributes = record.get("attributes", {})
+            prefix = attributes.get("prefix", "")
+            dns_type = attributes.get("type", "")
 
+            _LOGGER.debug(f"Found record: type={record_type}, prefix='{prefix}', dns_type={dns_type}")
+
+            if record_type == "dns_service_records":
                 # Match subdomain or root domain (@)
                 if prefix == target_prefix or (not subdomain and prefix in ["", "@"]):
-                    if attributes.get("type") == "A":
+                    if dns_type == "A":
+                        _LOGGER.debug(f"Match found! Record ID: {record.get('id')}")
                         return record.get("id")
 
+        _LOGGER.debug(f"No matching record found for '{target_prefix}'")
         return None
 
     def update_dns_record(self, subdomain: str, ip_address: str) -> bool:
