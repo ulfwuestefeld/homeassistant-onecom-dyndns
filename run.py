@@ -43,8 +43,32 @@ OPTIONS_FILE = "/data/options.json"
 ACME_CHALLENGE_FILE = "/data/acme_challenge.json"
 
 # Home Assistant Supervisor API
-# Try both token names for compatibility
-SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN") or os.environ.get("HASSIO_TOKEN", "")
+def get_supervisor_token():
+    """Get the Supervisor token from various possible sources."""
+    # Try environment variables first
+    token = os.environ.get("SUPERVISOR_TOKEN") or os.environ.get("HASSIO_TOKEN")
+    if token:
+        return token
+    
+    # Try reading from s6 container environment
+    token_paths = [
+        "/run/s6/container_environment/SUPERVISOR_TOKEN",
+        "/run/s6/container_environment/HASSIO_TOKEN",
+        "/data/.supervisor_token",
+    ]
+    for path in token_paths:
+        try:
+            if os.path.exists(path):
+                with open(path, 'r') as f:
+                    token = f.read().strip()
+                    if token:
+                        return token
+        except Exception:
+            pass
+    
+    return ""
+
+SUPERVISOR_TOKEN = get_supervisor_token()
 HA_API_URL = "http://supervisor/core/api"
 
 
@@ -240,7 +264,15 @@ class DynDNSUpdater:
             # List all environment variables starting with SUPER or HASS for debugging
             relevant_envs = {k: '***' for k, v in os.environ.items() 
                            if k.upper().startswith(('SUPER', 'HASS', 'HOME'))}
-            self._logger.debug(f"Relevant environment variables: {relevant_envs}")
+            self._logger.info(f"Relevant environment variables: {list(relevant_envs.keys())}")
+            # Check for token files
+            token_paths = [
+                "/run/s6/container_environment/SUPERVISOR_TOKEN",
+                "/run/s6/container_environment/HASSIO_TOKEN",
+            ]
+            for path in token_paths:
+                exists = os.path.exists(path)
+                self._logger.info(f"Token file {path}: {'exists' if exists else 'not found'}")
 
     def _setup_logging(self):
         """Configure logging based on options."""
@@ -465,6 +497,19 @@ class DynDNSUpdater:
             cert_info = data.get("certificate", {})
             if cert_info:
                 self._update_certificate_sensor(cert_info)
+            
+            # Send notification to user
+            expiry = cert_info.get("not_valid_after", "unknown") if cert_info else "unknown"
+            send_ha_notification(
+                title="🔒 SSL Certificate Renewed",
+                message=(
+                    f"**Domains:** {', '.join(domains)}\n\n"
+                    f"**Valid until:** {expiry}\n\n"
+                    f"**Certificate:** `/ssl/fullchain.pem`\n\n"
+                    f"**Action required:** Restart NGINX or Home Assistant to use the new certificate!"
+                ),
+                notification_id="onecom_dyndns_certificate_renewed"
+            )
         elif event_type == "error":
             self._logger.error(f"SSL certificate error: {data.get('error', 'Unknown error')}")
         elif event_type == "expiring":

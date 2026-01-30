@@ -427,17 +427,43 @@ class ACMEManager:
         """
         self._ensure_directories()
 
+        _LOGGER.info(f"Saving certificate to {self.cert_path}")
+        _LOGGER.info(f"Saving private key to {self.key_path}")
+
         # Save certificate
-        with open(self.cert_path, "w") as f:
-            f.write(cert_pem)
-        os.chmod(self.cert_path, 0o644)
-        _LOGGER.info(f"Certificate saved to {self.cert_path}")
+        try:
+            with open(self.cert_path, "w") as f:
+                f.write(cert_pem)
+            os.chmod(self.cert_path, 0o644)
+            
+            # Verify file was written
+            cert_size = os.path.getsize(self.cert_path)
+            cert_mtime = os.path.getmtime(self.cert_path)
+            _LOGGER.info(f"Certificate saved: {cert_size} bytes, modified: {cert_mtime}")
+        except Exception as e:
+            _LOGGER.error(f"Failed to save certificate: {e}")
+            raise
 
         # Save private key
-        with open(self.key_path, "w") as f:
-            f.write(key_pem)
-        os.chmod(self.key_path, 0o600)
-        _LOGGER.info(f"Private key saved to {self.key_path}")
+        try:
+            with open(self.key_path, "w") as f:
+                f.write(key_pem)
+            os.chmod(self.key_path, 0o600)
+            
+            # Verify file was written
+            key_size = os.path.getsize(self.key_path)
+            key_mtime = os.path.getmtime(self.key_path)
+            _LOGGER.info(f"Private key saved: {key_size} bytes, modified: {key_mtime}")
+        except Exception as e:
+            _LOGGER.error(f"Failed to save private key: {e}")
+            raise
+        
+        _LOGGER.info("="*50)
+        _LOGGER.info("CERTIFICATE UPDATE COMPLETE")
+        _LOGGER.info(f"Certificate: {self.cert_path}")
+        _LOGGER.info(f"Private Key: {self.key_path}")
+        _LOGGER.info("NOTE: Restart NGINX or Home Assistant to use new certificate!")
+        _LOGGER.info("="*50)
 
     def get_certificate_expiry(self) -> Optional[datetime]:
         """Get the expiry date of the current certificate.

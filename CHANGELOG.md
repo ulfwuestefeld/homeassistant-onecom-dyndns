@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-01-30
+
+### Added
+
+- Home Assistant notification when SSL certificate is renewed
+- Reminder to restart NGINX after certificate update
+
+### Fixed
+
+- Improved SUPERVISOR_TOKEN detection with multiple fallback methods
+- Added token file detection for s6 container environments
+- Enhanced debug logging to show available environment variables and token files
+- Added detailed logging for certificate file saving (size, timestamp)
+
 ## [1.2.1] - 2026-01-30
 
 ### Added
