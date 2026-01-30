@@ -3,7 +3,7 @@
 
 name: "One.com DynDNS Updater"
 description: "Dynamic DNS updater for One.com domains with automatic SSL certificates"
-version: "1.2.12"
+version: "1.2.13"
 slug: "homeassistant-onecom-dyndns"
 url: "https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns"
 arch:

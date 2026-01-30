@@ -327,8 +327,8 @@ class OneComAPI:
         except requests.RequestException as e:
             raise OneComAPIError(f"Failed to update DNS record: {e}")
 
-    def create_txt_record(self, subdomain: str, content: str, ttl: int = 60) -> str:
-        """Create a TXT DNS record."""
+    def create_txt_record(self, subdomain: str, content: str, ttl: int = 600) -> str:
+        """Create a TXT DNS record (One.com requires minimum TTL of 600)."""
         if not self._logged_in or not self.session:
             raise OneComAPIError("Not logged in")
 
