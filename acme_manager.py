@@ -187,24 +187,42 @@ class ACMEManager:
             )
             _LOGGER.debug("Calling new_account...")
             regr = acme_client.new_account(new_reg)
-            _LOGGER.info(f"ACME account ready (URI: {regr.uri})")
+            _LOGGER.info(f"ACME account registered (URI: {regr.uri})")
             
-            # Store the registration and update client to use Key ID
-            self._regr = regr
+        except acme_errors.ConflictError as e:
+            # Account already exists - this is expected for existing accounts
+            # The exception contains the account URI
+            account_uri = str(e.location) if hasattr(e, 'location') else (e.args[0] if e.args else None)
+            _LOGGER.info(f"ACME account already exists at: {account_uri}")
             
-            # Re-create client with registration for authenticated requests
-            _LOGGER.debug("Updating client with registration...")
-            self._get_client(regr)
-            _LOGGER.debug("Client updated with account registration")
-            
-            return regr
-
+            # Query the existing account to get the registration resource
+            if account_uri:
+                regr = messages.RegistrationResource(
+                    body=messages.Registration(
+                        contact=(f"mailto:{self.email}",),
+                        status="valid"
+                    ),
+                    uri=account_uri
+                )
+            else:
+                raise ACMEManagerError("Account exists but URI not found")
+                
         except Exception as e:
             import traceback
             _LOGGER.error(f"Exception type: {type(e).__name__}")
             _LOGGER.error(f"Exception args: {e.args}")
             _LOGGER.error(f"Traceback: {traceback.format_exc()}")
             raise ACMEManagerError(f"Failed to register ACME account: {e}")
+        
+        # Store the registration and update client to use Key ID
+        self._regr = regr
+        
+        # Re-create client with registration for authenticated requests
+        _LOGGER.debug("Updating client with registration...")
+        self._get_client(regr)
+        _LOGGER.info(f"ACME client ready with account: {regr.uri}")
+        
+        return regr
 
     def _perform_dns_challenge(
         self,
