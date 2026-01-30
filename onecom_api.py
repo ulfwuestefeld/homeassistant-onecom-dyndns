@@ -173,20 +173,49 @@ class OneComAPI:
         # Check for specific error messages indicating wrong credentials
         response_lower = response.text.lower()
 
-        # Log a snippet of the response for debugging
+        # Log detailed debug information if we're still on account.one.com
         if "account.one.com" in response.url:
-            # Extract any error message from the page
-            error_match = re.search(r'<span[^>]*class="[^"]*error[^"]*"[^>]*>([^<]+)</span>', response.text, re.IGNORECASE)
-            if error_match:
-                _LOGGER.error(f"Login error from One.com: {error_match.group(1).strip()}")
+            _LOGGER.debug(f"Still on account.one.com after login attempt")
 
-            # Also check for alert messages
-            alert_match = re.search(r'<div[^>]*class="[^"]*alert[^"]*"[^>]*>([^<]+)', response.text, re.IGNORECASE)
-            if alert_match:
-                _LOGGER.error(f"Login alert from One.com: {alert_match.group(1).strip()}")
+            # Extract any error message from the page - try multiple patterns
+            error_patterns = [
+                r'<span[^>]*class="[^"]*error[^"]*"[^>]*>([^<]+)</span>',
+                r'<div[^>]*class="[^"]*alert[^"]*"[^>]*>\s*<[^>]+>\s*([^<]+)',
+                r'<div[^>]*class="[^"]*alert[^"]*"[^>]*>([^<]+)',
+                r'class="kc-feedback-text">([^<]+)<',
+                r'<span[^>]*id="input-error[^"]*"[^>]*>([^<]+)</span>',
+            ]
 
-        if "invalid username or password" in response_lower or "ungültige" in response_lower or "invalid credentials" in response_lower:
+            for pattern in error_patterns:
+                match = re.search(pattern, response.text, re.IGNORECASE | re.DOTALL)
+                if match and match.group(1).strip():
+                    _LOGGER.error(f"Login error from One.com: {match.group(1).strip()}")
+                    break
+
+            # Log part of the response body to see what One.com returns
+            # Find the main content area
+            body_snippet = ""
+            main_match = re.search(r'<div[^>]*id="kc-form"[^>]*>(.*?)</div>', response.text, re.DOTALL)
+            if main_match:
+                body_snippet = main_match.group(1)[:500]
+            else:
+                # Just get a portion around any error
+                body_snippet = response.text[response.text.find('<body'):response.text.find('<body')+1000] if '<body' in response.text else response.text[:500]
+
+            _LOGGER.debug(f"Response snippet: {body_snippet[:300]}...")
+
+        # Check for specific credential errors (but not "ungültiger code" which is OAuth error)
+        if "invalid username or password" in response_lower or "invalid credentials" in response_lower:
             raise OneComAPIError("Invalid credentials - please check username and password")
+
+        # Check for German credential error (not OAuth code error)
+        if "ungültige anmeldedaten" in response_lower or "ungültiger benutzername" in response_lower:
+            raise OneComAPIError("Invalid credentials - please check username and password")
+
+        # Check for OAuth code errors
+        if "ungültiger code" in response_lower or "invalid code" in response_lower:
+            _LOGGER.error("OAuth session code error - One.com rejected the login session")
+            raise OneComAPIError("Login session expired or invalid. This may be a temporary issue - please try again.")
 
         # If we're still on the login page (account.one.com), login likely failed
         if "account.one.com" in response.url and "kc-form-login" in response.text:
