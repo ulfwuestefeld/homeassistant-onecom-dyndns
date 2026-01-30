@@ -9,10 +9,13 @@ import json
 import logging
 import os
 import time
+import random
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Tuple, List, Callable
+from functools import wraps
 
+import requests
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
@@ -33,6 +36,59 @@ LETSENCRYPT_STAGING = "https://acme-staging-v02.api.letsencrypt.org/directory"
 DEFAULT_ACCOUNT_KEY_PATH = "/data/acme/account.key"
 DEFAULT_CERT_PATH = "/ssl/fullchain.pem"
 DEFAULT_KEY_PATH = "/ssl/privkey.pem"
+
+# Retry configuration
+MAX_RETRIES = 5
+BASE_DELAY = 2  # seconds
+MAX_DELAY = 60  # seconds
+
+# Retryable exceptions
+RETRYABLE_EXCEPTIONS = (
+    requests.exceptions.Timeout,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.ReadTimeout,
+    ConnectionError,
+    TimeoutError,
+    OSError,
+)
+
+
+def retry_with_backoff(func):
+    """Decorator that implements retry with exponential backoff.
+    
+    Retries the function on network-related errors with increasing delays.
+    Uses jitter to prevent thundering herd.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        last_exception = None
+        
+        for attempt in range(MAX_RETRIES):
+            try:
+                return func(*args, **kwargs)
+            except RETRYABLE_EXCEPTIONS as e:
+                last_exception = e
+                
+                if attempt < MAX_RETRIES - 1:
+                    # Calculate delay with exponential backoff and jitter
+                    delay = min(BASE_DELAY * (2 ** attempt), MAX_DELAY)
+                    jitter = random.uniform(0, delay * 0.3)
+                    total_delay = delay + jitter
+                    
+                    _LOGGER.warning(
+                        f"Network error (attempt {attempt + 1}/{MAX_RETRIES}): {type(e).__name__}"
+                    )
+                    _LOGGER.info(f"Retrying in {total_delay:.1f} seconds...")
+                    time.sleep(total_delay)
+                else:
+                    _LOGGER.error(
+                        f"All {MAX_RETRIES} attempts failed: {type(e).__name__}: {e}"
+                    )
+        
+        # Re-raise the last exception after all retries failed
+        raise last_exception
+    
+    return wrapper
 
 
 class ACMEManagerError(Exception):
@@ -138,6 +194,21 @@ class ACMEManager:
 
         return jose.JWKRSA(key=private_key)
 
+    @retry_with_backoff
+    def _fetch_directory(self, net: client.ClientNetwork) -> messages.Directory:
+        """Fetch ACME directory with retry support.
+        
+        Args:
+            net: Network client
+            
+        Returns:
+            ACME directory
+        """
+        _LOGGER.debug("Fetching ACME directory...")
+        return messages.Directory.from_json(
+            net.get(self.directory_url).json()
+        )
+
     def _get_client(self, regr: messages.RegistrationResource = None) -> client.ClientV2:
         """Get or create ACME client.
 
@@ -152,10 +223,8 @@ class ACMEManager:
         # Create network client
         net = client.ClientNetwork(self._account_key, user_agent="OneComDynDNS/1.0")
 
-        # Get directory
-        directory = messages.Directory.from_json(
-            net.get(self.directory_url).json()
-        )
+        # Get directory with retry
+        directory = self._fetch_directory(net)
 
         # Create client with or without registration
         if regr:
@@ -165,6 +234,11 @@ class ACMEManager:
             self._client = client.ClientV2(directory, net=net)
         
         return self._client
+
+    @retry_with_backoff
+    def _call_new_account(self, acme_client, new_reg):
+        """Call new_account with retry support."""
+        return acme_client.new_account(new_reg)
 
     def register_account(self) -> messages.RegistrationResource:
         """Register or retrieve existing ACME account.
@@ -187,7 +261,7 @@ class ACMEManager:
                 terms_of_service_agreed=True
             )
             _LOGGER.debug("Calling new_account...")
-            regr = acme_client.new_account(new_reg)
+            regr = self._call_new_account(acme_client, new_reg)
             _LOGGER.info(f"ACME account registered (URI: {regr.uri})")
             
         except acme_errors.ConflictError as e:
@@ -207,6 +281,10 @@ class ACMEManager:
                 )
             else:
                 raise ACMEManagerError("Account exists but URI not found")
+                
+        except RETRYABLE_EXCEPTIONS as e:
+            # Network errors after all retries failed
+            raise ACMEManagerError(f"Network error during account registration: {e}")
                 
         except Exception as e:
             import traceback
