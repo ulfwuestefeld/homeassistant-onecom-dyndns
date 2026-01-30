@@ -138,15 +138,15 @@ class ACMEManager:
 
         return jose.JWKRSA(key=private_key)
 
-    def _get_client(self) -> client.ClientV2:
+    def _get_client(self, regr: messages.RegistrationResource = None) -> client.ClientV2:
         """Get or create ACME client.
 
+        Args:
+            regr: Optional registration resource to use for authenticated requests
+            
         Returns:
             Configured ACME client.
         """
-        if self._client:
-            return self._client
-
         self._account_key = self._load_or_create_account_key()
 
         # Create network client
@@ -157,7 +157,12 @@ class ACMEManager:
             net.get(self.directory_url).json()
         )
 
-        self._client = client.ClientV2(directory, net)
+        # Create client with or without registration
+        if regr:
+            self._client = client.ClientV2(directory, net, regr)
+        else:
+            self._client = client.ClientV2(directory, net)
+        
         return self._client
 
     def register_account(self) -> messages.RegistrationResource:
@@ -169,44 +174,28 @@ class ACMEManager:
         Raises:
             ACMEManagerError: If registration fails.
         """
+        # Get initial client without registration
         acme_client = self._get_client()
 
         _LOGGER.info(f"Registering ACME account for {self.email}")
 
         try:
-            # Try to create new registration
+            # Register or retrieve existing account
             new_reg = messages.NewRegistration.from_data(
                 email=self.email,
                 terms_of_service_agreed=True
             )
             regr = acme_client.new_account(new_reg)
-            _LOGGER.info("New ACME account registered")
+            _LOGGER.info(f"ACME account ready (URI: {regr.uri})")
+            
+            # Store the registration and update client to use Key ID
+            self._regr = regr
+            
+            # Re-create client with registration for authenticated requests
+            self._get_client(regr)
+            _LOGGER.debug("Client updated with account registration")
+            
             return regr
-
-        except acme_errors.ConflictError:
-            # Account already exists, retrieve it with only_return_existing flag
-            _LOGGER.info("ACME account already exists, retrieving...")
-            try:
-                existing_reg = messages.NewRegistration.from_data(
-                    email=self.email,
-                    terms_of_service_agreed=True,
-                    only_return_existing=True
-                )
-                regr = acme_client.new_account(existing_reg)
-                _LOGGER.debug("Account retrieved successfully")
-                return regr
-            except Exception as e2:
-                _LOGGER.warning(f"Could not retrieve with only_return_existing: {e2}")
-                # Fallback: just continue without re-retrieving, account exists
-                _LOGGER.info("Using existing account key for authentication")
-                # Create a minimal registration resource
-                return messages.RegistrationResource(
-                    body=messages.Registration(
-                        contact=(f"mailto:{self.email}",),
-                        status="valid"
-                    ),
-                    uri=None
-                )
 
         except Exception as e:
             raise ACMEManagerError(f"Failed to register ACME account: {e}")
