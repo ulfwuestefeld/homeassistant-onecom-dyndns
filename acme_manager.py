@@ -159,9 +159,10 @@ class ACMEManager:
 
         # Create client with or without registration
         if regr:
-            self._client = client.ClientV2(directory, net, regr)
+            # Use keyword argument for registration (acct parameter)
+            self._client = client.ClientV2(directory, net=net, acct=regr)
         else:
-            self._client = client.ClientV2(directory, net)
+            self._client = client.ClientV2(directory, net=net)
         
         return self._client
 
