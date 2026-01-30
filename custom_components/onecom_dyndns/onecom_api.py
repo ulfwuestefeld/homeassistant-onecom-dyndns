@@ -288,17 +288,19 @@ class OneComAPI:
         _LOGGER.debug(f"Updating DNS record for '{subdomain or '@'}' to {ip_address}")
 
         records = self._get_dns_records()
-        record_id = self._find_record_id(subdomain, records)
+        result = self._find_record_id(subdomain, records)
 
-        if not record_id:
+        if not result:
             raise OneComAPIError(
                 f"DNS record for '{subdomain or 'root domain'}' not found."
             )
 
+        record_id, record_type = result
+
         update_url = f"{self.ADMIN_URL}/api/domains/{self.domain}/dns/custom_records/{record_id}"
 
         update_data = {
-            "type": "dns_service_records",
+            "type": record_type,  # Use the actual record type from the API
             "id": record_id,
             "attributes": {
                 "type": "A",
