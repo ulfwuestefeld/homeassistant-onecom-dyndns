@@ -406,8 +406,9 @@ class OneComAPI:
 
         create_url = f"{self.ADMIN_URL}/api/domains/{self.domain}/dns/custom_records"
 
+        # Use dns_custom_records type which One.com expects for custom DNS entries
         create_data = {
-            "type": "dns_service_records",
+            "type": "dns_custom_records",
             "attributes": {
                 "type": "TXT",
                 "prefix": subdomain,
@@ -421,12 +422,20 @@ class OneComAPI:
             "Accept": "application/json"
         }
 
+        _LOGGER.debug(f"Creating TXT record with data: {create_data}")
+
         try:
             response = self.session.post(
                 create_url,
                 json=create_data,
                 headers=headers
             )
+
+            # Log response details for debugging
+            _LOGGER.debug(f"Create TXT record response: {response.status_code}")
+            if response.status_code >= 400:
+                _LOGGER.debug(f"Response body: {response.text}")
+
             response.raise_for_status()
             result = response.json()
 
@@ -491,7 +500,8 @@ class OneComAPI:
 
         matching_records = []
         for record in data:
-            if record.get("type") == "dns_service_records":
+            # Check both dns_service_records and dns_custom_records types
+            if record.get("type") in ["dns_service_records", "dns_custom_records"]:
                 attributes = record.get("attributes", {})
                 if attributes.get("type") == "TXT" and attributes.get("prefix") == subdomain:
                     matching_records.append({

@@ -12,6 +12,8 @@ This Home Assistant add-on automatically updates DNS A records at One.com when y
 - **Automatic SSL certificates via Let's Encrypt**
 - DNS-01 challenge for certificate validation
 - Automatic certificate renewal
+- Online certificate verification
+- Force renewal option for adding new domains
 
 ## Requirements
 
@@ -48,6 +50,7 @@ This Home Assistant add-on automatically updates DNS A records at One.com when y
 | `ssl_staging` | `false` | Use Let's Encrypt staging server for testing |
 | `ssl_renewal_days` | `30` | Renew certificate this many days before expiration |
 | `ssl_check_interval` | `12` | How often to check for renewal (in hours) |
+| `ssl_force_renewal` | `false` | Force certificate renewal on next startup (use when adding new domains) |
 
 ### Example Configuration (DynDNS only)
 
@@ -86,7 +89,18 @@ ssl_domains:
 ssl_staging: false
 ssl_renewal_days: 30
 ssl_check_interval: 12
+ssl_force_renewal: false
 ```
+
+### Force Certificate Renewal
+
+If you need to renew your certificate immediately (e.g., after adding new domains), set `ssl_force_renewal: true` and restart the add-on:
+
+```yaml
+ssl_force_renewal: true  # Set to true, restart, then set back to false
+```
+
+This will request a new certificate with all configured domains, even if the current certificate is still valid.
 
 ## Setup Instructions
 
@@ -141,6 +155,21 @@ This add-on does not support Two-Factor Authentication. If enabled:
    - Certificate: `/ssl/fullchain.pem`
    - Private Key: `/ssl/privkey.pem`
 
+### Online Certificate Verification
+
+The add-on periodically verifies that your certificates are actually active on your servers:
+
+- Connects to each configured domain on port 443
+- Validates the SSL certificate is trusted and not expired
+- Checks that the certificate covers the domain (including wildcard support)
+- Logs warnings if any domain has an invalid or missing certificate
+
+This helps detect issues like:
+- Certificate not deployed to web server
+- Hostname mismatch (domain not in certificate)
+- Expired certificates
+- Server unreachable
+
 ## Troubleshooting
 
 ### Login Failed
@@ -173,6 +202,8 @@ This add-on does not support Two-Factor Authentication. If enabled:
 - **Rate Limited**: Let's Encrypt has rate limits. Use `ssl_staging: true` for testing.
 - **Certificate Not Trusted**: If using staging mode, certificates won't be trusted by browsers.
 - **Renewal Failed**: Check if One.com credentials are still valid.
+- **Hostname Mismatch**: Your certificate doesn't cover all domains. Set `ssl_force_renewal: true` to request a new certificate with all configured domains.
+- **Online Verification Failed**: The certificate exists locally but isn't active on the server. Check your web server configuration.
 
 ## Security Considerations
 

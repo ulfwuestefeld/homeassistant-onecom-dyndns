@@ -214,13 +214,25 @@ class ACMEManager:
         response, validation = challenge.response_and_validation(self._account_key)
 
         # Determine the ACME challenge subdomain
+        # For subdomains like "homeassistant.wuesti.eu", the TXT record prefix
+        # must be "_acme-challenge.homeassistant" (relative to the base domain)
         if domain.startswith("*."):
             # Wildcard certificate
             base_domain = domain[2:]
             challenge_subdomain = "_acme-challenge"
         else:
-            challenge_subdomain = "_acme-challenge"
-            base_domain = domain
+            # Check if domain is a subdomain of the configured base domain
+            base_domain = self.onecom_api.domain
+            if domain == base_domain:
+                # Root domain - just use _acme-challenge
+                challenge_subdomain = "_acme-challenge"
+            elif domain.endswith(f".{base_domain}"):
+                # Subdomain - prepend subdomain to _acme-challenge
+                subdomain_part = domain[:-len(f".{base_domain}")]
+                challenge_subdomain = f"_acme-challenge.{subdomain_part}"
+            else:
+                # Domain doesn't match base domain - use just _acme-challenge
+                challenge_subdomain = "_acme-challenge"
 
         _LOGGER.info(f"Setting up DNS-01 challenge for {domain}")
         _LOGGER.debug(f"Challenge subdomain: {challenge_subdomain}")

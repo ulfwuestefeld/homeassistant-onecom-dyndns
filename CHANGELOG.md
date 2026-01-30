@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.6] - 2026-01-30
+## [0.0.9] - 2026-01-30
 
 ### Added
 
@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Browser-like headers for Keycloak compatibility
   - Improved error messages for login failures
 - Support for both `dns_service_records` and `dns_custom_records` types
+- ACME challenge TXT record creation for subdomains (e.g., `_acme-challenge.homeassistant`)
+- TXT record creation using correct `dns_custom_records` type
 - Cryptography deprecation warnings (UTC-aware datetime)
 - Enhanced debug logging for troubleshooting
 
