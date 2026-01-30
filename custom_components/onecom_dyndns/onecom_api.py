@@ -99,13 +99,34 @@ class OneComAPI:
         except requests.RequestException as e:
             raise OneComAPIError(f"Login request failed: {e}")
 
-        if "logout" in response.text.lower() or "dns" in response.url.lower():
+        _LOGGER.debug(f"Login response URL: {response.url}")
+
+        # Check if login was successful by looking for admin panel indicators
+        if "logout" in response.text.lower() or "dns" in response.url.lower() or "/admin" in response.url:
             _LOGGER.info("Successfully logged into One.com")
             self._logged_in = True
             return True
 
-        if "invalid" in response.text.lower() or "error" in response.text.lower():
-            raise OneComAPIError("Invalid credentials")
+        # Check for specific error messages indicating wrong credentials
+        response_lower = response.text.lower()
+        if "invalid username or password" in response_lower or "ungültige" in response_lower:
+            raise OneComAPIError("Invalid credentials - please check username and password")
+
+        # If we're still on the login page (account.one.com), login likely failed
+        if "account.one.com" in response.url and "kc-form-login" in response.text:
+            _LOGGER.error("Still on login page after authentication attempt")
+            raise OneComAPIError("Login failed - please verify your One.com credentials")
+
+        # Try to access the admin panel to verify login
+        _LOGGER.debug("Login status uncertain, verifying by accessing admin panel...")
+        try:
+            verify_response = self.session.get(f"{self.ADMIN_URL}/", allow_redirects=True)
+            if "/admin" in verify_response.url and "account.one.com" not in verify_response.url:
+                _LOGGER.info("Successfully logged into One.com (verified)")
+                self._logged_in = True
+                return True
+        except Exception as e:
+            _LOGGER.debug(f"Verification request failed: {e}")
 
         _LOGGER.warning("Login status uncertain - proceeding anyway")
         self._logged_in = True
