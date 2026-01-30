@@ -10,49 +10,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Automatic SSL certificate generation via Let's Encrypt**
-- DNS-01 challenge support using One.com DNS API
-- TXT record creation/deletion for ACME challenges
-- Automatic certificate renewal (configurable days before expiry)
-- Staging mode for testing without hitting rate limits
-- Certificate status monitoring and callbacks
-- DNS propagation waiting with Google DNS verification
-- New configuration options:
-  - `ssl_enabled`: Enable/disable SSL feature
-  - `ssl_email`: Email for Let's Encrypt account
-  - `ssl_domains`: Custom domain list for certificate
-  - `ssl_staging`: Use staging server for testing
-  - `ssl_renewal_days`: Days before expiry to renew
-  - `ssl_check_interval`: Hours between renewal checks
+  - DNS-01 challenge support using One.com DNS API
+  - TXT record creation/deletion for ACME challenges
+  - Automatic certificate renewal (configurable days before expiry)
+  - Staging mode for testing without hitting rate limits
+  - DNS propagation waiting with Google DNS verification
+  - New configuration options: `ssl_enabled`, `ssl_email`, `ssl_domains`, `ssl_staging`, `ssl_renewal_days`, `ssl_check_interval`
+
+- **Online certificate verification**
+  - Periodic validation that certificates are active on configured domains
+  - Checks server reachability, certificate validity, and domain coverage
+  - Automatic notifications when online certificates are invalid
+  - Support for wildcard certificate detection
 
 - **Home Assistant Custom Integration with Config Flow**
-- Step-by-step setup wizard with credential validation
-- Automatic domain detection from One.com account
-- Automatic subdomain detection from existing DNS records
-- Options flow for runtime configuration changes
-- Sensor entities:
-  - Current IP address
-  - Last update timestamp
-  - Certificate expiry date
-- Binary sensor entities:
-  - DNS status (connectivity)
-  - Certificate validity
-- Services:
-  - `onecom_dyndns.update_dns`: Force DNS update
-  - `onecom_dyndns.renew_certificate`: Force certificate renewal
-  - `onecom_dyndns.check_ip`: Check current IP
-- German and English UI translations
+  - Step-by-step setup wizard with credential validation
+  - Automatic domain and subdomain detection from One.com account
+  - Options flow for runtime configuration changes
+  - Sensor entities: Current IP, Last update, Certificate expiry
+  - Binary sensor entities: DNS status, Certificate validity
+  - Services: `update_dns`, `renew_certificate`, `check_ip`
+  - German and English UI translations
+
+### Fixed
+
+- Login compatibility with One.com's Keycloak authentication
+  - HTML entity decoding for OAuth URLs (`&amp;` → `&`)
+  - Browser-like headers for Keycloak compatibility
+  - Improved error messages for login failures
+- Support for both `dns_service_records` and `dns_custom_records` types
+- Cryptography deprecation warnings (UTC-aware datetime)
+- Enhanced debug logging for troubleshooting
 
 ### Changed
 
-- Updated version to 1.1.0
 - Added `ssl:rw` mapping for certificate storage
 - Extended One.com API with TXT record management
 
 ### Dependencies
 
-- Added `acme` library for ACME protocol
-- Added `josepy` for JSON Object Signing
-- Added `cryptography` for certificate handling
+- Added `acme`, `josepy`, `cryptography` for SSL support
 
 ## [1.0.0] - 2026-01-28
 

@@ -8,9 +8,11 @@ including scheduling renewals and status monitoring.
 import json
 import logging
 import os
+import socket
+import ssl
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any, List
 
@@ -141,15 +143,26 @@ class CertificateManager:
             except x509.ExtensionNotFound:
                 domains = [subject.get("commonName", "")]
 
-            # Calculate days remaining
-            days_remaining = (cert.not_valid_after - datetime.now()).days
+            # Calculate days remaining (use UTC-aware methods to avoid deprecation)
+            try:
+                expiry = cert.not_valid_after_utc
+                valid_from = cert.not_valid_before_utc
+                from datetime import timezone
+                now = datetime.now(timezone.utc)
+            except AttributeError:
+                # Fallback for older cryptography versions
+                expiry = cert.not_valid_after
+                valid_from = cert.not_valid_before
+                now = datetime.now()
+
+            days_remaining = (expiry - now).days
 
             return {
                 "subject": subject,
                 "issuer": {attr.oid._name: attr.value for attr in cert.issuer},
                 "domains": domains,
-                "not_valid_before": cert.not_valid_before.isoformat(),
-                "not_valid_after": cert.not_valid_after.isoformat(),
+                "not_valid_before": valid_from.isoformat(),
+                "not_valid_after": expiry.isoformat(),
                 "days_remaining": days_remaining,
                 "serial_number": str(cert.serial_number),
                 "needs_renewal": days_remaining <= self.renewal_days,
@@ -312,6 +325,15 @@ class CertificateManager:
                 "domains": cert_info["domains"],
             })
 
+        # Verify online certificates
+        _LOGGER.debug("Verifying online certificates...")
+        online_results = self.verify_all_domains()
+
+        # Log summary
+        valid_count = sum(1 for r in online_results.values() if r["valid"])
+        total_count = len(online_results)
+        _LOGGER.info(f"Online certificate verification: {valid_count}/{total_count} domains valid")
+
     def _renewal_loop(self):
         """Background loop for automatic renewal checks."""
         _LOGGER.info("Starting certificate renewal loop...")
@@ -355,6 +377,108 @@ class CertificateManager:
             self._thread = None
 
         _LOGGER.info("Certificate manager stopped")
+
+    def verify_online_certificate(self, domain: str, port: int = 443, timeout: int = 10) -> Dict[str, Any]:
+        """Verify that a valid certificate is served for a domain.
+
+        Args:
+            domain: The domain to check
+            port: The port to connect to (default 443)
+            timeout: Connection timeout in seconds
+
+        Returns:
+            Dictionary with verification results.
+        """
+        result = {
+            "domain": domain,
+            "valid": False,
+            "reachable": False,
+            "error": None,
+            "certificate": None,
+        }
+
+        try:
+            context = ssl.create_default_context()
+            with socket.create_connection((domain, port), timeout=timeout) as sock:
+                with context.wrap_socket(sock, server_hostname=domain) as ssock:
+                    result["reachable"] = True
+                    cert = ssock.getpeercert()
+
+                    # Extract certificate info
+                    subject = dict(x[0] for x in cert.get("subject", []))
+                    issuer = dict(x[0] for x in cert.get("issuer", []))
+                    sans = [x[1] for x in cert.get("subjectAltName", [])]
+
+                    # Parse dates
+                    not_after_str = cert.get("notAfter", "")
+                    not_before_str = cert.get("notBefore", "")
+
+                    result["certificate"] = {
+                        "subject": subject.get("commonName", ""),
+                        "issuer": issuer.get("organizationName", ""),
+                        "issuer_cn": issuer.get("commonName", ""),
+                        "not_before": not_before_str,
+                        "not_after": not_after_str,
+                        "sans": sans,
+                    }
+
+                    # Check if domain is covered
+                    domain_covered = domain in sans
+                    if not domain_covered:
+                        # Check for wildcard
+                        parts = domain.split(".", 1)
+                        if len(parts) == 2:
+                            wildcard = f"*.{parts[1]}"
+                            domain_covered = wildcard in sans
+
+                    result["domain_covered"] = domain_covered
+                    result["valid"] = domain_covered
+
+                    _LOGGER.info(f"Online certificate for {domain}: valid={domain_covered}, issuer={issuer.get('organizationName', 'Unknown')}")
+
+        except socket.timeout:
+            result["error"] = "Connection timeout"
+            _LOGGER.warning(f"Certificate check for {domain}: timeout")
+        except socket.gaierror as e:
+            result["error"] = f"DNS resolution failed: {e}"
+            _LOGGER.warning(f"Certificate check for {domain}: DNS failed")
+        except ssl.SSLCertVerificationError as e:
+            result["error"] = f"Certificate verification failed: {e}"
+            result["reachable"] = True
+            _LOGGER.error(f"Certificate check for {domain}: SSL error - {e}")
+        except ConnectionRefusedError:
+            result["error"] = "Connection refused - no HTTPS server"
+            _LOGGER.warning(f"Certificate check for {domain}: connection refused")
+        except Exception as e:
+            result["error"] = f"{type(e).__name__}: {e}"
+            _LOGGER.error(f"Certificate check for {domain}: {e}")
+
+        return result
+
+    def verify_all_domains(self) -> Dict[str, Dict[str, Any]]:
+        """Verify certificates for all configured domains.
+
+        Returns:
+            Dictionary mapping domains to their verification results.
+        """
+        results = {}
+        all_valid = True
+
+        for domain in self.ssl_domains:
+            result = self.verify_online_certificate(domain)
+            results[domain] = result
+            if not result["valid"]:
+                all_valid = False
+
+        # Notify if any domain has an invalid certificate
+        if not all_valid:
+            invalid_domains = [d for d, r in results.items() if not r["valid"]]
+            self._notify("certificate_invalid_online", {
+                "invalid_domains": invalid_domains,
+                "results": results,
+            })
+
+        return results
 
     def get_status(self) -> Dict[str, Any]:
         """Get the current status of the certificate manager.

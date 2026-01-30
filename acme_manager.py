@@ -412,7 +412,11 @@ class ACMEManager:
                 cert_data = f.read()
 
             cert = x509.load_pem_x509_certificate(cert_data, default_backend())
-            return cert.not_valid_after
+            # Use UTC-aware method to avoid deprecation warning
+            try:
+                return cert.not_valid_after_utc
+            except AttributeError:
+                return cert.not_valid_after
 
         except Exception as e:
             _LOGGER.warning(f"Failed to read certificate expiry: {e}")

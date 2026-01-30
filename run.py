@@ -251,6 +251,13 @@ class DynDNSUpdater:
         elif event_type == "expiring_soon":
             days = data.get("days_remaining", 0)
             self._logger.info(f"SSL certificate will expire in {days} days")
+        elif event_type == "certificate_invalid_online":
+            invalid_domains = data.get("invalid_domains", [])
+            self._logger.warning(f"Online certificate check failed for: {', '.join(invalid_domains)}")
+            for domain, result in data.get("results", {}).items():
+                if not result.get("valid"):
+                    error = result.get("error", "Unknown error")
+                    self._logger.warning(f"  - {domain}: {error}")
 
     def _start_ssl_manager(self):
         """Start the SSL certificate manager if enabled."""
