@@ -307,14 +307,14 @@ class ACMEManager:
     def _perform_dns_challenge(
         self,
         domain: str,
-        challenge: challenges.DNS01,
+        challenge_body: messages.ChallengeBody,
         authz: messages.AuthorizationResource
     ) -> bool:
         """Perform DNS-01 challenge for a domain.
 
         Args:
             domain: The domain being validated
-            challenge: The DNS-01 challenge object
+            challenge_body: The complete challenge body (contains .chall with DNS01)
             authz: Authorization resource
 
         Returns:
@@ -324,6 +324,9 @@ class ACMEManager:
         if not self._client:
             raise ACMEManagerError("ACME client not initialized")
 
+        # Get the DNS01 challenge object from the body
+        challenge = challenge_body.chall
+        
         # Get the validation token
         response, validation = challenge.response_and_validation(self._account_key)
 
@@ -387,8 +390,8 @@ class ACMEManager:
             # Additional wait for safety
             time.sleep(5)
 
-            # Answer the challenge
-            self._client.answer_challenge(challenge, response)
+            # Answer the challenge (needs the full ChallengeBody with .url)
+            self._client.answer_challenge(challenge_body, response)
 
             # Poll for authorization status
             deadline = datetime.now() + timedelta(minutes=5)
@@ -498,8 +501,8 @@ class ACMEManager:
                 if not dns_challenge:
                     raise ACMEManagerError(f"No DNS-01 challenge available for {domain}")
 
-                # Perform the challenge
-                if not self._perform_dns_challenge(domain, dns_challenge.chall, authz):
+                # Perform the challenge (pass full ChallengeBody, not just .chall)
+                if not self._perform_dns_challenge(domain, dns_challenge, authz):
                     raise ACMEManagerError(f"DNS-01 challenge failed for {domain}")
 
             # Finalize the order
