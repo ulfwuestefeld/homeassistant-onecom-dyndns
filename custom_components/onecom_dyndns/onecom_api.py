@@ -83,11 +83,32 @@ class OneComAPI:
         # Decode HTML entities in URL
         login_url = login_url.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"')
 
+        # Extract any hidden form fields (like CSRF tokens)
+        hidden_fields = {}
+        hidden_pattern = re.findall(
+            r'<input[^>]*type=["\']hidden["\'][^>]*name=["\']([^"\']+)["\'][^>]*value=["\']([^"\']*)["\']',
+            response.text
+        )
+        for name, value in hidden_pattern:
+            hidden_fields[name] = value
+
+        # Also try alternative pattern (value before name)
+        hidden_pattern2 = re.findall(
+            r'<input[^>]*value=["\']([^"\']*)["\'][^>]*type=["\']hidden["\'][^>]*name=["\']([^"\']+)["\']',
+            response.text
+        )
+        for value, name in hidden_pattern2:
+            if name not in hidden_fields:
+                hidden_fields[name] = value
+
+        # Perform login
         login_data = {
             "username": self.username,
             "password": self.password,
-            "credentialId": ""
         }
+
+        # Add any hidden fields (CSRF tokens, etc.)
+        login_data.update(hidden_fields)
 
         try:
             response = self.session.post(
@@ -109,13 +130,21 @@ class OneComAPI:
 
         # Check for specific error messages indicating wrong credentials
         response_lower = response.text.lower()
-        if "invalid username or password" in response_lower or "ungültige" in response_lower:
+
+        # Log a snippet of the response for debugging
+        if "account.one.com" in response.url:
+            # Extract any error message from the page
+            error_match = re.search(r'<span[^>]*class="[^"]*error[^"]*"[^>]*>([^<]+)</span>', response.text, re.IGNORECASE)
+            if error_match:
+                _LOGGER.error(f"Login error from One.com: {error_match.group(1).strip()}")
+
+        if "invalid username or password" in response_lower or "ungültige" in response_lower or "invalid credentials" in response_lower:
             raise OneComAPIError("Invalid credentials - please check username and password")
 
         # If we're still on the login page (account.one.com), login likely failed
         if "account.one.com" in response.url and "kc-form-login" in response.text:
             _LOGGER.error("Still on login page after authentication attempt")
-            raise OneComAPIError("Login failed - please verify your One.com credentials")
+            raise OneComAPIError("Login failed - still on login page. Please verify your One.com credentials and ensure 2FA is disabled.")
 
         # Try to access the admin panel to verify login
         _LOGGER.debug("Login status uncertain, verifying by accessing admin panel...")
