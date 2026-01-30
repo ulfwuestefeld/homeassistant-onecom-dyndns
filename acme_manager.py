@@ -372,7 +372,7 @@ class ACMEManager:
             record_id = self.onecom_api.create_txt_record(
                 subdomain=challenge_subdomain,
                 content=validation,
-                ttl=60
+                ttl=600  # One.com requires minimum 600 seconds
             )
 
             # Wait for DNS propagation
