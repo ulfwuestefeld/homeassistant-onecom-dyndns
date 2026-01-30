@@ -2,5 +2,5 @@
 # Place this file in the root of your GitHub repository
 
 name: One.com DynDNS Add-ons
-url: https://github.com/your-username/homeassistant-onecom-dyndns
-maintainer: Your Name <your.email@example.com>
+url: https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns
+maintainer: Ulf Wüstefeld <ulf@wuesti.eu>
