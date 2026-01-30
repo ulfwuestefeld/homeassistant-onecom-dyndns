@@ -229,6 +229,11 @@ class ACMEManager:
         # Create client - ClientV2 takes (directory, net) as positional args
         self._client = client.ClientV2(directory, net)
         
+        # Ensure the registration is stored on the client if provided
+        if regr:
+            self._client.net.account = regr
+            _LOGGER.debug(f"Client configured with account URI: {regr.uri}")
+        
         return self._client
 
     @retry_with_backoff
@@ -289,12 +294,12 @@ class ACMEManager:
             _LOGGER.error(f"Traceback: {traceback.format_exc()}")
             raise ACMEManagerError(f"Failed to register ACME account: {e}")
         
-        # Store the registration and update client to use Key ID
+        # Store the registration
         self._regr = regr
         
-        # Re-create client with registration for authenticated requests
+        # Update the existing client's network account for Key ID signing
         _LOGGER.debug("Updating client with registration...")
-        self._get_client(regr)
+        self._client.net.account = regr
         _LOGGER.info(f"ACME client ready with account: {regr.uri}")
         
         return regr
