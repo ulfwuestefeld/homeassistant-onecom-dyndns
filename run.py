@@ -43,7 +43,8 @@ OPTIONS_FILE = "/data/options.json"
 ACME_CHALLENGE_FILE = "/data/acme_challenge.json"
 
 # Home Assistant Supervisor API
-SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
+# Try both token names for compatibility
+SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN") or os.environ.get("HASSIO_TOKEN", "")
 HA_API_URL = "http://supervisor/core/api"
 
 
@@ -232,6 +233,14 @@ class DynDNSUpdater:
         self._logger.info(f"Subdomains: {', '.join(s or '@' for s in self.subdomains)}")
         self._logger.info(f"Update interval: {self.update_interval} minutes")
         self._logger.info(f"SSL enabled: {self.ssl_enabled}")
+        
+        # Debug: Log available supervisor tokens
+        self._logger.info(f"SUPERVISOR_TOKEN available: {bool(SUPERVISOR_TOKEN)}")
+        if not SUPERVISOR_TOKEN:
+            # List all environment variables starting with SUPER or HASS for debugging
+            relevant_envs = {k: '***' for k, v in os.environ.items() 
+                           if k.upper().startswith(('SUPER', 'HASS', 'HOME'))}
+            self._logger.debug(f"Relevant environment variables: {relevant_envs}")
 
     def _setup_logging(self):
         """Configure logging based on options."""

@@ -5,7 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.11] - 2026-01-30
+## [1.2.0] - 2026-01-30
+
+### Added
+
+- **Home Assistant Sensors**
+  - `sensor.onecom_dyndns_ip` - Current public IP address
+  - `sensor.onecom_dyndns_dns_status` - DNS update status
+  - `sensor.onecom_dyndns_certificate` - SSL certificate expiry date
+  - `sensor.onecom_dyndns_acme_challenge` - Current ACME challenge value
+
+### Fixed
+
+- Improved SUPERVISOR_TOKEN detection (now checks both SUPERVISOR_TOKEN and HASSIO_TOKEN)
+- Added debug logging for environment variables when token is not found
+
+## [1.1.0] - 2026-01-30
 
 ### Added
 
