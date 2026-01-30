@@ -47,9 +47,17 @@ class OneComAPI:
         """Create a new requests session with appropriate headers."""
         session = requests.Session()
         session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9,de;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Cache-Control": "max-age=0",
         })
         return session
 
@@ -130,10 +138,24 @@ class OneComAPI:
         # Add any hidden fields (CSRF tokens, etc.)
         login_data.update(hidden_fields)
 
+        _LOGGER.debug(f"Login data fields: {list(login_data.keys())}")
+
+        # Set headers for form submission
+        post_headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Origin": "https://account.one.com",
+            "Referer": response.url,
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-User": "?1",
+        }
+
         try:
             response = self.session.post(
                 login_url,
                 data=login_data,
+                headers=post_headers,
                 allow_redirects=True
             )
             response.raise_for_status()
