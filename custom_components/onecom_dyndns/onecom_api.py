@@ -76,9 +76,12 @@ class OneComAPI:
         if not login_url:
             match = re.search(r'action="([^"]+)"', response.text)
             if match:
-                login_url = match.group(1).replace("&amp;", "&")
+                login_url = match.group(1)
             else:
                 raise OneComAPIError("Could not find login form URL")
+
+        # Decode HTML entities in URL
+        login_url = login_url.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"')
 
         login_data = {
             "username": self.username,
