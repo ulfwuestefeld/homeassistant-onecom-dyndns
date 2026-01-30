@@ -14,6 +14,7 @@ This Home Assistant add-on automatically updates DNS A records at One.com when y
 - Automatic certificate renewal
 - Online certificate verification
 - Force renewal option for adding new domains
+- ACME challenge notifications in Home Assistant
 
 ## Requirements
 
@@ -204,6 +205,44 @@ This helps detect issues like:
 - **Renewal Failed**: Check if One.com credentials are still valid.
 - **Hostname Mismatch**: Your certificate doesn't cover all domains. Set `ssl_force_renewal: true` to request a new certificate with all configured domains.
 - **Online Verification Failed**: The certificate exists locally but isn't active on the server. Check your web server configuration.
+
+### Manual DNS Challenge
+
+When the add-on creates an ACME challenge, it sends a **Home Assistant notification** with the TXT record details. You can also find the challenge information in:
+
+- **Home Assistant Notifications**: Look for "ACME DNS Challenge" notification
+- **File**: `/data/acme_challenge.json` in the add-on data directory
+- **Sensor**: `sensor.onecom_dyndns_acme_challenge`
+
+If automatic TXT record creation fails, you can manually create the record at One.com with the provided name and value.
+
+## Home Assistant Sensors
+
+The add-on creates the following sensors in Home Assistant:
+
+| Sensor | Description |
+|--------|-------------|
+| `sensor.onecom_dyndns_ip` | Current public IP address with domain/subdomain info |
+| `sensor.onecom_dyndns_dns_status` | DNS update status (ok/error) |
+| `sensor.onecom_dyndns_certificate` | SSL certificate expiry date with days remaining |
+| `sensor.onecom_dyndns_acme_challenge` | Current ACME challenge TXT record value |
+
+These sensors can be used in automations, dashboards, or alerts. For example:
+
+```yaml
+# Alert when certificate is expiring soon
+automation:
+  - alias: "SSL Certificate Expiry Warning"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.onecom_dyndns_certificate
+        attribute: days_remaining
+        below: 14
+    action:
+      - service: notify.notify
+        data:
+          message: "SSL certificate expires in {{ state_attr('sensor.onecom_dyndns_certificate', 'days_remaining') }} days"
+```
 
 ## Security Considerations
 

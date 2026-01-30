@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.10] - 2026-01-30
+## [0.0.11] - 2026-01-30
 
 ### Added
 
@@ -27,6 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New `ssl_force_renewal` configuration option
   - Forces renewal even if current certificate is still valid
   - Useful when adding new domains to an existing certificate
+
+- **ACME Challenge Notification**
+  - Displays TXT record name and value in Home Assistant notifications
+  - Saves challenge info to `/data/acme_challenge.json`
+  - Helps with manual DNS configuration if automatic creation fails
+
+- **Home Assistant Sensors**
+  - `sensor.onecom_dyndns_ip` - Current public IP address
+  - `sensor.onecom_dyndns_dns_status` - DNS update status
+  - `sensor.onecom_dyndns_certificate` - SSL certificate expiry date
+  - `sensor.onecom_dyndns_acme_challenge` - Current ACME challenge value
 
 - **Home Assistant Custom Integration with Config Flow**
   - Step-by-step setup wizard with credential validation

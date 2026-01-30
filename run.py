@@ -40,6 +40,154 @@ IP_SERVICES = {
 # File to store the last known IP
 LAST_IP_FILE = "/data/last_ip.txt"
 OPTIONS_FILE = "/data/options.json"
+ACME_CHALLENGE_FILE = "/data/acme_challenge.json"
+
+# Home Assistant Supervisor API
+SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
+HA_API_URL = "http://supervisor/core/api"
+
+
+def send_ha_notification(title: str, message: str, notification_id: str = None):
+    """Send a persistent notification to Home Assistant.
+    
+    Args:
+        title: Notification title
+        message: Notification message
+        notification_id: Optional ID for the notification (allows updates)
+    """
+    if not SUPERVISOR_TOKEN:
+        logging.warning("No SUPERVISOR_TOKEN available, cannot send notification")
+        return False
+    
+    try:
+        headers = {
+            "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+            "Content-Type": "application/json",
+        }
+        
+        data = {
+            "title": title,
+            "message": message,
+        }
+        if notification_id:
+            data["notification_id"] = notification_id
+        
+        response = requests.post(
+            f"{HA_API_URL}/services/persistent_notification/create",
+            headers=headers,
+            json=data,
+            timeout=10
+        )
+        response.raise_for_status()
+        logging.debug(f"Notification sent: {title}")
+        return True
+    except Exception as e:
+        logging.warning(f"Failed to send notification: {e}")
+        return False
+
+
+def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
+    """Update a Home Assistant sensor entity.
+    
+    Args:
+        entity_id: Full entity ID (e.g., sensor.onecom_dyndns_ip)
+        state: The state value
+        attributes: Optional dictionary of attributes
+    """
+    if not SUPERVISOR_TOKEN:
+        logging.debug("No SUPERVISOR_TOKEN available, cannot update sensor")
+        return False
+    
+    try:
+        headers = {
+            "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+            "Content-Type": "application/json",
+        }
+        
+        data = {
+            "state": state,
+            "attributes": attributes or {},
+        }
+        
+        # Add friendly name and icon if not provided
+        if "friendly_name" not in data["attributes"]:
+            if "ip" in entity_id:
+                data["attributes"]["friendly_name"] = "One.com DynDNS IP"
+                data["attributes"]["icon"] = "mdi:ip-network"
+            elif "certificate" in entity_id:
+                data["attributes"]["friendly_name"] = "One.com SSL Certificate"
+                data["attributes"]["icon"] = "mdi:certificate"
+            elif "dns" in entity_id:
+                data["attributes"]["friendly_name"] = "One.com DNS Status"
+                data["attributes"]["icon"] = "mdi:dns"
+            elif "acme" in entity_id:
+                data["attributes"]["friendly_name"] = "ACME Challenge"
+                data["attributes"]["icon"] = "mdi:shield-key"
+        
+        response = requests.post(
+            f"{HA_API_URL}/states/{entity_id}",
+            headers=headers,
+            json=data,
+            timeout=10
+        )
+        response.raise_for_status()
+        logging.debug(f"Sensor updated: {entity_id} = {state}")
+        return True
+    except Exception as e:
+        logging.warning(f"Failed to update sensor {entity_id}: {e}")
+        return False
+
+
+def save_acme_challenge_info(domain: str, txt_name: str, txt_value: str):
+    """Save ACME challenge information to file and send notification.
+    
+    Args:
+        domain: The domain being validated
+        txt_name: Full TXT record name
+        txt_value: TXT record value
+    """
+    challenge_info = {
+        "domain": domain,
+        "txt_name": txt_name,
+        "txt_value": txt_value,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "instruction": f"Create a TXT record with name '{txt_name}' and value '{txt_value}'"
+    }
+    
+    # Save to file
+    try:
+        with open(ACME_CHALLENGE_FILE, "w") as f:
+            json.dump(challenge_info, f, indent=2)
+        logging.info(f"ACME challenge info saved to {ACME_CHALLENGE_FILE}")
+    except Exception as e:
+        logging.warning(f"Failed to save ACME challenge info: {e}")
+    
+    # Send Home Assistant notification
+    notification_message = (
+        f"**Domain:** {domain}\n\n"
+        f"**TXT Record Name:**\n`{txt_name}`\n\n"
+        f"**TXT Record Value:**\n`{txt_value}`\n\n"
+        f"Create this TXT record at your DNS provider if automatic creation fails."
+    )
+    send_ha_notification(
+        title="🔐 ACME DNS Challenge",
+        message=notification_message,
+        notification_id="onecom_dyndns_acme_challenge"
+    )
+    
+    # Update ACME challenge sensor
+    update_ha_sensor(
+        "sensor.onecom_dyndns_acme_challenge",
+        txt_value,
+        {
+            "friendly_name": "ACME Challenge",
+            "icon": "mdi:shield-key",
+            "domain": domain,
+            "txt_record_name": txt_name,
+            "txt_record_value": txt_value,
+            "timestamp": challenge_info["timestamp"],
+        }
+    )
 
 
 class DynDNSUpdater:
@@ -219,6 +367,9 @@ class DynDNSUpdater:
             self._logger.warning("Could not determine public IP")
             return
 
+        # Update IP sensor regardless of change
+        self._update_ip_sensor(current_ip)
+        
         # Check if IP has changed
         if current_ip == self._last_ip:
             self._logger.debug(f"IP unchanged: {current_ip}")
@@ -230,8 +381,65 @@ class DynDNSUpdater:
         if self.update_dns(current_ip):
             self._save_last_ip(current_ip)
             self._logger.info("DNS update completed successfully")
+            self._update_dns_sensor("ok", current_ip)
         else:
             self._logger.error("DNS update failed - will retry on next interval")
+            self._update_dns_sensor("error", current_ip)
+
+    def _update_ip_sensor(self, ip: str):
+        """Update the IP sensor in Home Assistant."""
+        subdomains_list = [f"{s}.{self.domain}" if s else self.domain for s in self.subdomains]
+        update_ha_sensor(
+            "sensor.onecom_dyndns_ip",
+            ip,
+            {
+                "friendly_name": "One.com DynDNS IP",
+                "icon": "mdi:ip-network",
+                "domain": self.domain,
+                "subdomains": subdomains_list,
+                "last_update": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        )
+    
+    def _update_dns_sensor(self, status: str, ip: str):
+        """Update the DNS status sensor in Home Assistant."""
+        subdomains_list = [f"{s}.{self.domain}" if s else self.domain for s in self.subdomains]
+        update_ha_sensor(
+            "sensor.onecom_dyndns_dns_status",
+            status,
+            {
+                "friendly_name": "One.com DNS Status",
+                "icon": "mdi:dns" if status == "ok" else "mdi:dns-outline",
+                "domain": self.domain,
+                "current_ip": ip,
+                "subdomains": subdomains_list,
+                "last_update": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        )
+    
+    def _update_certificate_sensor(self, cert_info: dict):
+        """Update the certificate sensor in Home Assistant."""
+        if not cert_info:
+            return
+        
+        expiry_date = cert_info.get("not_valid_after", "unknown")
+        days_remaining = cert_info.get("days_remaining", 0)
+        
+        update_ha_sensor(
+            "sensor.onecom_dyndns_certificate",
+            expiry_date,
+            {
+                "friendly_name": "One.com SSL Certificate",
+                "icon": "mdi:certificate",
+                "device_class": "timestamp",
+                "days_remaining": days_remaining,
+                "domains": cert_info.get("domains", []),
+                "issuer": cert_info.get("issuer", "unknown"),
+                "valid_from": cert_info.get("not_valid_before", "unknown"),
+                "needs_renewal": cert_info.get("needs_renewal", False),
+                "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        )
 
     def _ssl_event_callback(self, event_type: str, data: dict):
         """Handle SSL certificate events.
@@ -244,6 +452,10 @@ class DynDNSUpdater:
             self._logger.info("SSL certificate renewed successfully")
             domains = data.get("domains", [])
             self._logger.info(f"Certificate domains: {', '.join(domains)}")
+            # Update certificate sensor
+            cert_info = data.get("certificate", {})
+            if cert_info:
+                self._update_certificate_sensor(cert_info)
         elif event_type == "error":
             self._logger.error(f"SSL certificate error: {data.get('error', 'Unknown error')}")
         elif event_type == "expiring":
@@ -291,6 +503,7 @@ class DynDNSUpdater:
                 staging=self.ssl_staging,
                 renewal_days=self.ssl_renewal_days,
                 check_interval_hours=self.ssl_check_interval,
+                challenge_callback=save_acme_challenge_info,
             )
 
             # Register callback for SSL events
@@ -308,6 +521,11 @@ class DynDNSUpdater:
             self._cert_manager.start()
 
             self._logger.info("SSL certificate manager started")
+            
+            # Update certificate sensor with current info
+            cert_info = self._cert_manager.get_certificate_info()
+            if cert_info:
+                self._update_certificate_sensor(cert_info)
 
         except Exception as e:
             self._logger.error(f"Failed to start SSL certificate manager: {e}")

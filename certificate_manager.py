@@ -12,6 +12,7 @@ import socket
 import ssl
 import threading
 import time
+import traceback
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any, List
@@ -50,6 +51,7 @@ class CertificateManager:
         key_path: str = DEFAULT_KEY_PATH,
         renewal_days: int = 30,
         check_interval_hours: int = 12,
+        challenge_callback: Optional[Callable[[str, str, str], None]] = None,
     ):
         """Initialize the Certificate Manager.
 
@@ -64,6 +66,7 @@ class CertificateManager:
             key_path: Path to save private key
             renewal_days: Days before expiry to trigger renewal
             check_interval_hours: Hours between renewal checks
+            challenge_callback: Callback function(domain, txt_name, txt_value) for ACME challenges
         """
         self.username = username
         self.password = password
@@ -75,6 +78,7 @@ class CertificateManager:
         self.key_path = key_path
         self.renewal_days = renewal_days
         self.check_interval = check_interval_hours * 3600
+        self.challenge_callback = challenge_callback
 
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -241,6 +245,7 @@ class CertificateManager:
                 staging=self.staging,
                 cert_path=self.cert_path,
                 key_path=self.key_path,
+                challenge_callback=self.challenge_callback,
             )
 
             # Obtain certificate
@@ -286,8 +291,9 @@ class CertificateManager:
             return False
 
         except Exception as e:
-            error_msg = f"Unexpected error: {e}"
+            error_msg = f"Unexpected error ({type(e).__name__}): {e}"
             _LOGGER.error(error_msg)
+            _LOGGER.error(f"Traceback:\n{traceback.format_exc()}")
             self._save_status({"status": "error", "error": error_msg})
             self._notify("error", {"error": error_msg})
             return False

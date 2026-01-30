@@ -11,7 +11,7 @@ import os
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Callable
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -51,6 +51,7 @@ class ACMEManager:
         account_key_path: str = DEFAULT_ACCOUNT_KEY_PATH,
         cert_path: str = DEFAULT_CERT_PATH,
         key_path: str = DEFAULT_KEY_PATH,
+        challenge_callback: Optional[Callable[[str, str, str], None]] = None,
     ):
         """Initialize the ACME Manager.
 
@@ -61,6 +62,8 @@ class ACMEManager:
             account_key_path: Path to store/load account key
             cert_path: Path to store certificate
             key_path: Path to store private key
+            challenge_callback: Optional callback function(domain, txt_name, txt_value)
+                               called when an ACME challenge is created
         """
         self.email = email
         self.onecom_api = onecom_api
@@ -68,6 +71,7 @@ class ACMEManager:
         self.account_key_path = account_key_path
         self.cert_path = cert_path
         self.key_path = key_path
+        self.challenge_callback = challenge_callback
 
         self.directory_url = LETSENCRYPT_STAGING if staging else LETSENCRYPT_PRODUCTION
         self._account_key: Optional[jose.JWKRSA] = None
@@ -182,12 +186,16 @@ class ACMEManager:
         except acme_errors.ConflictError:
             # Account already exists, retrieve it
             _LOGGER.info("ACME account already exists, retrieving...")
-            existing_reg = messages.NewRegistration.from_data(
-                email=self.email,
-                terms_of_service_agreed=True
-            )
-            regr = acme_client.new_account(existing_reg)
-            return regr
+            try:
+                existing_reg = messages.NewRegistration.from_data(
+                    email=self.email,
+                    terms_of_service_agreed=True
+                )
+                regr = acme_client.new_account(existing_reg)
+                _LOGGER.debug("Account retrieved successfully")
+                return regr
+            except Exception as e2:
+                raise ACMEManagerError(f"Failed to retrieve existing ACME account: {e2}")
 
         except Exception as e:
             raise ACMEManagerError(f"Failed to register ACME account: {e}")
@@ -243,6 +251,13 @@ class ACMEManager:
         _LOGGER.info(f"TXT Record Value: {validation}")
         _LOGGER.info(f"=============================")
         _LOGGER.debug(f"Challenge subdomain (prefix): {challenge_subdomain}")
+        
+        # Notify via callback (e.g., Home Assistant notification)
+        if self.challenge_callback:
+            try:
+                self.challenge_callback(domain, full_txt_name, validation)
+            except Exception as e:
+                _LOGGER.warning(f"Challenge callback failed: {e}")
 
         record_id = None
         try:
@@ -325,10 +340,13 @@ class ACMEManager:
         if not domains:
             raise ACMEManagerError("No domains specified")
 
+        _LOGGER.debug("Getting ACME client...")
         acme_client = self._get_client()
 
         # Ensure account is registered
+        _LOGGER.debug("Registering/retrieving ACME account...")
         self.register_account()
+        _LOGGER.debug("ACME account ready")
 
         _LOGGER.info(f"Requesting certificate for: {', '.join(domains)}")
 
