@@ -385,13 +385,13 @@ class OneComAPI:
         self._logged_in = False
         _LOGGER.debug("Logged out from One.com")
 
-    def create_txt_record(self, subdomain: str, content: str, ttl: int = 60) -> str:
+    def create_txt_record(self, subdomain: str, content: str, ttl: int = 600) -> str:
         """Create a TXT DNS record.
 
         Args:
             subdomain: The subdomain for the TXT record (e.g., '_acme-challenge')
             content: The TXT record content
-            ttl: Time to live in seconds (default 60 for ACME challenges)
+            ttl: Time to live in seconds (default 600, One.com minimum)
 
         Returns:
             The ID of the created record.
