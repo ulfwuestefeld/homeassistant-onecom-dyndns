@@ -16,7 +16,7 @@
       "type": "application",
       "bom-ref": "onecom-dyndns",
       "name": "One.com DynDNS Updater",
-      "version": "1.2.18",
+      "version": "1.2.19",
       "description": "Home Assistant add-on for dynamic DNS updates at One.com with automatic SSL certificates",
       "licenses": [
         {

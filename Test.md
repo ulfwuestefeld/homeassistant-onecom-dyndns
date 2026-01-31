@@ -115,6 +115,20 @@ tests/
 | **Edge Case Tests** | Test boundary conditions and unusual inputs |
 | **Error Handling Tests** | Verify proper error handling and recovery |
 
+### Continuous Integration (CI)
+
+Tests are automatically run on every push and pull request via **GitHub Actions**.
+
+- **Workflow file:** `.github/workflows/test.yml`
+- **Branches:** `main`, `master`, `develop`
+- **Status badge:** [![Tests](https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns/actions/workflows/test.yml/badge.svg)](https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns/actions/workflows/test.yml)
+
+The CI pipeline:
+1. Runs all tests with coverage reporting
+2. Uploads coverage reports as artifacts
+3. Optionally uploads to Codecov
+4. Runs flake8 linting for code quality
+
 ### Troubleshooting
 
 **ImportError: No module named 'pytest'**
@@ -246,6 +260,20 @@ tests/
 | **Sicherheitstests** | Überprüfen sichere Handhabung von Zugangsdaten |
 | **Grenzfall-Tests** | Testen Randbedingungen und ungewöhnliche Eingaben |
 | **Fehlerbehandlungs-Tests** | Überprüfen korrekte Fehlerbehandlung und Wiederherstellung |
+
+### Continuous Integration (CI)
+
+Tests werden bei jedem Push und Pull Request automatisch über **GitHub Actions** ausgeführt.
+
+- **Workflow-Datei:** `.github/workflows/test.yml`
+- **Branches:** `main`, `master`, `develop`
+- **Status-Badge:** [![Tests](https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns/actions/workflows/test.yml/badge.svg)](https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns/actions/workflows/test.yml)
+
+Die CI-Pipeline:
+1. Führt alle Tests mit Coverage-Reporting aus
+2. Lädt Coverage-Berichte als Artefakte hoch
+3. Lädt optional zu Codecov hoch
+4. Führt flake8-Linting für Code-Qualität aus
 
 ### Fehlerbehebung
 

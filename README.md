@@ -1,6 +1,7 @@
 # One.com DynDNS Updater for Home Assistant
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns/actions/workflows/test.yml/badge.svg)](https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns/actions/workflows/test.yml)
 
 A Home Assistant add-on that automatically updates DNS A records at One.com when your public IP address changes. It also supports **automatic SSL certificate generation** using Let's Encrypt.
 
