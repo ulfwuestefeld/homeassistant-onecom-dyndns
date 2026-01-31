@@ -29,48 +29,43 @@ class TestTXTRecordConflictHandling:
         # First call fails with conflict
         mock_response_fail = Mock()
         mock_response_fail.status_code = 500
-        mock_response_fail.text = '{"metadata": {"messages": [{"code": "DNS_RECORD_CONFLICTING", "text": "conflict: existing TXT record with same content"}]}}'
+        # Include the numeric record ID in the expected format: "existing TXT record (12345)"
+        mock_response_fail.text = '{"metadata": {"messages": [{"code": "DNS_RECORD_CONFLICTING", "text": "conflict: new TXT record conflicts with existing TXT record (36316970) on same prefix with same content"}]}}'
         mock_response_fail.json.return_value = {
             "metadata": {
                 "messages": [{
                     "code": "DNS_RECORD_CONFLICTING",
-                    "text": "conflict: existing TXT record with same content"
+                    "text": "conflict: new TXT record conflicts with existing TXT record (36316970) on same prefix with same content"
                 }]
             }
         }
         mock_response_fail.raise_for_status.side_effect = Exception("500 Error")
 
-        # Mock find_txt_records to return existing record with same content
-        with patch.object(self.api, 'find_txt_records') as mock_find:
-            mock_find.return_value = [{
-                "id": "existing-123",
-                "content": "same-token-value",
-                "ttl": 600
-            }]
+        self.api.session.post.return_value = mock_response_fail
 
-            self.api.session.post.return_value = mock_response_fail
+        # Should succeed (treat as existing) - code extracts ID from error message
+        record_id = self.api.create_txt_record("_acme-challenge", "same-token-value")
 
-            # Should succeed (treat as existing)
-            record_id = self.api.create_txt_record("_acme-challenge", "same-token-value")
-
-            # Should return existing record ID
-            assert record_id == "existing-123"
+        # Should return existing record ID extracted from the error message
+        assert record_id == "36316970"
 
     def test_create_txt_record_conflict_different_content(self):
         """Test handling conflict when record exists with different content."""
-        # First call fails with conflict
+        # First call fails with conflict (different content - no "same content" in message)
         mock_response_fail = Mock()
         mock_response_fail.status_code = 500
-        mock_response_fail.text = '{"metadata": {"messages": [{"code": "DNS_RECORD_CONFLICTING", "text": "conflict: existing TXT record"}]}}'
+        # Note: no "same content" in the message, just the record ID
+        mock_response_fail.text = '{"metadata": {"messages": [{"code": "DNS_RECORD_CONFLICTING", "text": "conflict: new TXT record conflicts with existing TXT record (36316970) on same prefix"}]}}'
         mock_response_fail.json.return_value = {
             "metadata": {
                 "messages": [{
                     "code": "DNS_RECORD_CONFLICTING",
-                    "text": "conflict: existing TXT record"
+                    "text": "conflict: new TXT record conflicts with existing TXT record (36316970) on same prefix"
                 }]
             }
         }
-        mock_response_fail.raise_for_status.side_effect = Exception("500 Error")
+        # Only raise on the first response, not the retry
+        mock_response_fail.raise_for_status = Mock()
 
         # Second call succeeds after delete
         mock_response_success = Mock()
@@ -81,22 +76,15 @@ class TestTXTRecordConflictHandling:
         }
         mock_response_success.raise_for_status = Mock()
 
-        with patch.object(self.api, 'find_txt_records') as mock_find:
-            with patch.object(self.api, 'delete_txt_record') as mock_delete:
-                mock_find.return_value = [{
-                    "id": "existing-123",
-                    "content": "old-token-value",  # Different content
-                    "ttl": 600
-                }]
-                mock_delete.return_value = True
+        with patch.object(self.api, 'delete_txt_record') as mock_delete:
+            mock_delete.return_value = True
+            self.api.session.post.side_effect = [mock_response_fail, mock_response_success]
 
-                self.api.session.post.side_effect = [mock_response_fail, mock_response_success]
+            record_id = self.api.create_txt_record("_acme-challenge", "new-token-value")
 
-                record_id = self.api.create_txt_record("_acme-challenge", "new-token-value")
-
-                # Should delete old and create new
-                mock_delete.assert_called_once_with("existing-123")
-                assert record_id == "new-456"
+            # Should delete old (ID extracted from error) and create new
+            mock_delete.assert_called_once_with("36316970")
+            assert record_id == "new-456"
 
 
 class TestFindTXTRecordsMatching:

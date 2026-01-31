@@ -63,7 +63,7 @@ class TestIPDetection:
         
         with patch.object(DynDNSUpdater, '_load_last_ip'):
             updater = DynDNSUpdater(options)
-            ip = updater._get_current_ip()
+            ip = updater.get_public_ip()
             assert ip == "91.51.131.49"
 
     @patch('run.OneComAPI')
@@ -86,7 +86,7 @@ class TestIPDetection:
         
         with patch.object(DynDNSUpdater, '_load_last_ip'):
             updater = DynDNSUpdater(options)
-            ip = updater._get_current_ip()
+            ip = updater.get_public_ip()
             # Should be stripped
             assert ip.strip() == "91.51.131.49"
 
@@ -107,7 +107,7 @@ class TestIPDetection:
         
         with patch.object(DynDNSUpdater, '_load_last_ip'):
             updater = DynDNSUpdater(options)
-            ip = updater._get_current_ip()
+            ip = updater.get_public_ip()
             assert ip is None
 
     @patch('run.OneComAPI')
@@ -127,7 +127,7 @@ class TestIPDetection:
         
         with patch.object(DynDNSUpdater, '_load_last_ip'):
             updater = DynDNSUpdater(options)
-            ip = updater._get_current_ip()
+            ip = updater.get_public_ip()
             assert ip is None
 
 
