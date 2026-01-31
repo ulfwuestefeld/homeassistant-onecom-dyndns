@@ -148,15 +148,24 @@ class TestCertificateManagerStatus:
 
     def test_save_and_load_status(self):
         """Test saving and loading status."""
+        import certificate_manager as cm
+        
         with tempfile.TemporaryDirectory() as tmpdir:
             status_file = f"{tmpdir}/status.json"
+            cert_path = f"{tmpdir}/cert.pem"
+            key_path = f"{tmpdir}/key.pem"
 
-            with patch('certificate_manager.CERT_STATUS_FILE', status_file):
+            original = cm.CERT_STATUS_FILE
+            cm.CERT_STATUS_FILE = status_file
+            
+            try:
                 manager = CertificateManager(
                     username="user@example.com",
                     password="password",
                     domain="example.com",
                     email="ssl@example.com",
+                    cert_path=cert_path,
+                    key_path=key_path,
                 )
 
                 test_status = {"status": "valid", "test_key": "test_value"}
@@ -167,6 +176,8 @@ class TestCertificateManagerStatus:
                 assert loaded_status["status"] == "valid"
                 assert loaded_status["test_key"] == "test_value"
                 assert "last_updated" in loaded_status
+            finally:
+                cm.CERT_STATUS_FILE = original
 
     def test_load_status_no_file(self):
         """Test loading status when file doesn't exist."""

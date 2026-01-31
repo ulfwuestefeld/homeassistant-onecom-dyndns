@@ -40,14 +40,22 @@ class TestOnlineCertificateVerification:
     """Tests for online certificate verification."""
 
     @pytest.fixture
-    def manager(self):
-        """Create a test certificate manager."""
-        return CertificateManager(
+    def manager(self, temp_cert_paths):
+        """Create a test certificate manager with temp paths."""
+        import certificate_manager as cm
+        original = cm.CERT_STATUS_FILE
+        cm.CERT_STATUS_FILE = temp_cert_paths['status_file']
+        
+        mgr = CertificateManager(
             username="test@example.com",
             password="password",
             domain="example.com",
             email="ssl@example.com",
+            cert_path=temp_cert_paths['cert_path'],
+            key_path=temp_cert_paths['key_path'],
         )
+        yield mgr
+        cm.CERT_STATUS_FILE = original
 
     @patch("certificate_manager.socket.create_connection")
     @patch("certificate_manager.ssl.create_default_context")
@@ -163,15 +171,23 @@ class TestVerifyAllDomains:
     """Tests for verifying all configured domains."""
 
     @pytest.fixture
-    def manager(self):
+    def manager(self, temp_cert_paths):
         """Create a test certificate manager with multiple domains."""
-        return CertificateManager(
+        import certificate_manager as cm
+        original = cm.CERT_STATUS_FILE
+        cm.CERT_STATUS_FILE = temp_cert_paths['status_file']
+        
+        mgr = CertificateManager(
             username="test@example.com",
             password="password",
             domain="example.com",
             email="ssl@example.com",
             ssl_domains=["example.com", "www.example.com", "api.example.com"],
+            cert_path=temp_cert_paths['cert_path'],
+            key_path=temp_cert_paths['key_path'],
         )
+        yield mgr
+        cm.CERT_STATUS_FILE = original
 
     @patch.object(CertificateManager, 'verify_online_certificate')
     def test_verify_all_domains_all_valid(self, mock_verify, manager):
@@ -213,15 +229,23 @@ class TestCertificateRenewalLogic:
     """Tests for certificate renewal logic."""
 
     @pytest.fixture
-    def manager(self):
+    def manager(self, temp_cert_paths):
         """Create a test certificate manager."""
-        return CertificateManager(
+        import certificate_manager as cm
+        original = cm.CERT_STATUS_FILE
+        cm.CERT_STATUS_FILE = temp_cert_paths['status_file']
+        
+        mgr = CertificateManager(
             username="test@example.com",
             password="password",
             domain="example.com",
             email="ssl@example.com",
             renewal_days=30,
+            cert_path=temp_cert_paths['cert_path'],
+            key_path=temp_cert_paths['key_path'],
         )
+        yield mgr
+        cm.CERT_STATUS_FILE = original
 
     @patch.object(CertificateManager, 'get_certificate_info')
     @patch.object(CertificateManager, 'request_certificate')
@@ -293,14 +317,22 @@ class TestRequestCertificate:
     """Tests for certificate request functionality."""
 
     @pytest.fixture
-    def manager(self):
+    def manager(self, temp_cert_paths):
         """Create a test certificate manager."""
-        return CertificateManager(
+        import certificate_manager as cm
+        original = cm.CERT_STATUS_FILE
+        cm.CERT_STATUS_FILE = temp_cert_paths['status_file']
+        
+        mgr = CertificateManager(
             username="test@example.com",
             password="password",
             domain="example.com",
             email="ssl@example.com",
+            cert_path=temp_cert_paths['cert_path'],
+            key_path=temp_cert_paths['key_path'],
         )
+        yield mgr
+        cm.CERT_STATUS_FILE = original
 
     @patch.object(CertificateManager, 'get_certificate_info')
     def test_request_certificate_skip_if_valid(self, mock_info, manager):
@@ -394,14 +426,22 @@ class TestCertificateInfoParsing:
     """Tests for certificate info parsing."""
 
     @pytest.fixture
-    def manager(self):
+    def manager(self, temp_cert_paths):
         """Create a test certificate manager."""
-        return CertificateManager(
+        import certificate_manager as cm
+        original = cm.CERT_STATUS_FILE
+        cm.CERT_STATUS_FILE = temp_cert_paths['status_file']
+        
+        mgr = CertificateManager(
             username="test@example.com",
             password="password",
             domain="example.com",
             email="ssl@example.com",
+            cert_path=temp_cert_paths['cert_path'],
+            key_path=temp_cert_paths['key_path'],
         )
+        yield mgr
+        cm.CERT_STATUS_FILE = original
 
     def test_get_certificate_info_no_file(self, manager):
         """Test getting info when no certificate file exists."""
@@ -429,15 +469,23 @@ class TestThreadingBehavior:
     """Tests for threading behavior."""
 
     @pytest.fixture
-    def manager(self):
+    def manager(self, temp_cert_paths):
         """Create a test certificate manager."""
-        return CertificateManager(
+        import certificate_manager as cm
+        original = cm.CERT_STATUS_FILE
+        cm.CERT_STATUS_FILE = temp_cert_paths['status_file']
+        
+        mgr = CertificateManager(
             username="test@example.com",
             password="password",
             domain="example.com",
             email="ssl@example.com",
             check_interval_hours=0.001,  # Very short for testing
+            cert_path=temp_cert_paths['cert_path'],
+            key_path=temp_cert_paths['key_path'],
         )
+        yield mgr
+        cm.CERT_STATUS_FILE = original
 
     def test_start_creates_daemon_thread(self, manager):
         """Test that start creates a daemon thread."""
@@ -472,34 +520,38 @@ class TestStatusPersistence:
     """Tests for status file persistence."""
 
     @pytest.fixture
-    def manager(self):
+    def manager(self, temp_cert_paths):
         """Create a test certificate manager."""
-        return CertificateManager(
+        import certificate_manager as cm
+        original = cm.CERT_STATUS_FILE
+        cm.CERT_STATUS_FILE = temp_cert_paths['status_file']
+        
+        mgr = CertificateManager(
             username="test@example.com",
             password="password",
             domain="example.com",
             email="ssl@example.com",
+            cert_path=temp_cert_paths['cert_path'],
+            key_path=temp_cert_paths['key_path'],
         )
+        yield mgr
+        cm.CERT_STATUS_FILE = original
 
     def test_save_and_load_status_roundtrip(self, manager):
         """Test that status can be saved and loaded."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            status_file = os.path.join(tmpdir, "status.json")
+        test_status = {
+            "status": "valid",
+            "last_renewal": "2026-01-30T12:00:00",
+            "certificate": {"days_remaining": 89},
+        }
 
-            with patch("certificate_manager.CERT_STATUS_FILE", status_file):
-                test_status = {
-                    "status": "valid",
-                    "last_renewal": "2026-01-30T12:00:00",
-                    "certificate": {"days_remaining": 89},
-                }
+        manager._save_status(test_status)
 
-                manager._save_status(test_status)
+        loaded = manager._load_status()
 
-                loaded = manager._load_status()
-
-                assert loaded["status"] == "valid"
-                assert loaded["last_renewal"] == "2026-01-30T12:00:00"
-                assert "last_updated" in loaded
+        assert loaded["status"] == "valid"
+        assert loaded["last_renewal"] == "2026-01-30T12:00:00"
+        assert "last_updated" in loaded
 
     def test_load_status_invalid_json(self, manager):
         """Test loading status with invalid JSON."""
@@ -517,9 +569,13 @@ class TestGetStatus:
     """Tests for get_status method."""
 
     @pytest.fixture
-    def manager(self):
+    def manager(self, temp_cert_paths):
         """Create a test certificate manager."""
-        return CertificateManager(
+        import certificate_manager as cm
+        original = cm.CERT_STATUS_FILE
+        cm.CERT_STATUS_FILE = temp_cert_paths['status_file']
+        
+        mgr = CertificateManager(
             username="test@example.com",
             password="password",
             domain="example.com",
@@ -528,7 +584,11 @@ class TestGetStatus:
             staging=True,
             renewal_days=45,
             check_interval_hours=6,
+            cert_path=temp_cert_paths['cert_path'],
+            key_path=temp_cert_paths['key_path'],
         )
+        yield mgr
+        cm.CERT_STATUS_FILE = original
 
     @patch.object(CertificateManager, 'get_certificate_info')
     @patch.object(CertificateManager, '_load_status')

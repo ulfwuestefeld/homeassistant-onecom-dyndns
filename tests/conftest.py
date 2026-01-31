@@ -127,6 +127,19 @@ def temp_directory():
 
 
 @pytest.fixture
+def temp_cert_paths():
+    """Provide temporary certificate paths for testing."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield {
+            'cert_path': os.path.join(tmpdir, 'cert.pem'),
+            'key_path': os.path.join(tmpdir, 'key.pem'),
+            'account_key_path': os.path.join(tmpdir, 'account.key'),
+            'status_file': os.path.join(tmpdir, 'status.json'),
+            'tmpdir': tmpdir,
+        }
+
+
+@pytest.fixture
 def mock_certificate_info():
     """Provide mock certificate info."""
     return {

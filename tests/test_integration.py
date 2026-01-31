@@ -148,7 +148,8 @@ class TestACMEManagerAndOneComAPIIntegration:
             staging=True,
         )
 
-        assert manager._onecom_api is onecom_api
+        # Attribute is stored without underscore prefix
+        assert manager.onecom_api is onecom_api
         assert manager.email == "ssl@example.com"
 
 

@@ -154,12 +154,14 @@ class TestACMEManagerCertificateSaving:
         with tempfile.TemporaryDirectory() as tmpdir:
             cert_path = f"{tmpdir}/cert.pem"
             key_path = f"{tmpdir}/key.pem"
+            account_key_path = f"{tmpdir}/account.key"
 
             manager = ACMEManager(
                 email="test@example.com",
                 onecom_api=onecom_api,
                 cert_path=cert_path,
                 key_path=key_path,
+                account_key_path=account_key_path,
             )
 
             cert_pem = "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"

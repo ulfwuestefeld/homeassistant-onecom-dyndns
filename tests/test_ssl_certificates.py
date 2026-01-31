@@ -25,7 +25,8 @@ class TestCertificateExpiry:
         expiry_date = datetime.now() + timedelta(days=30)
         days_until_expiry = (expiry_date - datetime.now()).days
         
-        assert days_until_expiry == 30
+        # Due to timing, this could be 29 or 30
+        assert days_until_expiry >= 29 and days_until_expiry <= 30
 
     def test_certificate_expired(self):
         """Test detection of expired certificate."""

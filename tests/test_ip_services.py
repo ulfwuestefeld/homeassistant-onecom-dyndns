@@ -43,82 +43,90 @@ class TestIPServices:
 class TestIPDetection:
     """Tests for IP detection functionality."""
 
+    @patch('run.OneComAPI')
     @patch('requests.get')
-    def test_get_current_ip_success(self, mock_get):
+    def test_get_current_ip_success(self, mock_get, mock_api):
         """Test successful IP detection."""
         mock_response = Mock()
         mock_response.text = "91.51.131.49"
         mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
         
-        with patch('run.OneComAPI'):
-            updater = DynDNSUpdater(
-                username='test@example.com',
-                password='testpass',
-                domain='example.com',
-                subdomains=['www'],
-                update_interval=5,
-                ip_service='ipify',
-            )
-            
+        options = {
+            'username': 'test@example.com',
+            'password': 'testpass',
+            'domain': 'example.com',
+            'subdomains': ['www'],
+            'update_interval': 5,
+            'ip_service': 'ipify',
+        }
+        
+        with patch.object(DynDNSUpdater, '_load_last_ip'):
+            updater = DynDNSUpdater(options)
             ip = updater._get_current_ip()
             assert ip == "91.51.131.49"
 
+    @patch('run.OneComAPI')
     @patch('requests.get')
-    def test_get_current_ip_with_whitespace(self, mock_get):
+    def test_get_current_ip_with_whitespace(self, mock_get, mock_api):
         """Test IP detection with leading/trailing whitespace."""
         mock_response = Mock()
         mock_response.text = "  91.51.131.49\n"
         mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
         
-        with patch('run.OneComAPI'):
-            updater = DynDNSUpdater(
-                username='test@example.com',
-                password='testpass',
-                domain='example.com',
-                subdomains=['www'],
-                update_interval=5,
-                ip_service='ipify',
-            )
-            
+        options = {
+            'username': 'test@example.com',
+            'password': 'testpass',
+            'domain': 'example.com',
+            'subdomains': ['www'],
+            'update_interval': 5,
+            'ip_service': 'ipify',
+        }
+        
+        with patch.object(DynDNSUpdater, '_load_last_ip'):
+            updater = DynDNSUpdater(options)
             ip = updater._get_current_ip()
             # Should be stripped
             assert ip.strip() == "91.51.131.49"
 
+    @patch('run.OneComAPI')
     @patch('requests.get')
-    def test_get_current_ip_timeout(self, mock_get):
+    def test_get_current_ip_timeout(self, mock_get, mock_api):
         """Test IP detection timeout handling."""
         mock_get.side_effect = requests.exceptions.Timeout("Request timed out")
         
-        with patch('run.OneComAPI'):
-            updater = DynDNSUpdater(
-                username='test@example.com',
-                password='testpass',
-                domain='example.com',
-                subdomains=['www'],
-                update_interval=5,
-                ip_service='ipify',
-            )
-            
+        options = {
+            'username': 'test@example.com',
+            'password': 'testpass',
+            'domain': 'example.com',
+            'subdomains': ['www'],
+            'update_interval': 5,
+            'ip_service': 'ipify',
+        }
+        
+        with patch.object(DynDNSUpdater, '_load_last_ip'):
+            updater = DynDNSUpdater(options)
             ip = updater._get_current_ip()
             assert ip is None
 
+    @patch('run.OneComAPI')
     @patch('requests.get')
-    def test_get_current_ip_connection_error(self, mock_get):
+    def test_get_current_ip_connection_error(self, mock_get, mock_api):
         """Test IP detection connection error handling."""
         mock_get.side_effect = requests.exceptions.ConnectionError("Connection failed")
         
-        with patch('run.OneComAPI'):
-            updater = DynDNSUpdater(
-                username='test@example.com',
-                password='testpass',
-                domain='example.com',
-                subdomains=['www'],
-                update_interval=5,
-                ip_service='ipify',
-            )
-            
+        options = {
+            'username': 'test@example.com',
+            'password': 'testpass',
+            'domain': 'example.com',
+            'subdomains': ['www'],
+            'update_interval': 5,
+            'ip_service': 'ipify',
+        }
+        
+        with patch.object(DynDNSUpdater, '_load_last_ip'):
+            updater = DynDNSUpdater(options)
             ip = updater._get_current_ip()
             assert ip is None
 
@@ -188,11 +196,9 @@ class TestIPChangeDetection:
         should_update = previous_ip is None or previous_ip != current_ip
         assert should_update
 
-    @patch('run.OneComAPI')
-    def test_ip_persistence(self, mock_api):
+    def test_ip_persistence(self):
         """Test that IP is persisted between checks."""
         import tempfile
-        import os
         
         with tempfile.TemporaryDirectory() as tmpdir:
             last_ip_file = os.path.join(tmpdir, 'last_ip.txt')
@@ -215,16 +221,16 @@ class TestIPValidation:
         """Test valid public IPv4 addresses."""
         import ipaddress
         
+        # Use truly public IPs (not documentation range)
         valid_public_ips = [
             "8.8.8.8",
             "1.1.1.1",
             "91.51.131.49",
-            "203.0.113.1",
         ]
         
         for ip in valid_public_ips:
             addr = ipaddress.ip_address(ip)
-            assert addr.is_global or not addr.is_private
+            assert addr.is_global
 
     def test_invalid_for_dyndns(self):
         """Test IP addresses invalid for DynDNS use."""
@@ -276,13 +282,15 @@ class TestUpdateInterval:
     @patch('run.OneComAPI')
     def test_update_interval_stored(self, mock_api):
         """Test that update interval is stored correctly."""
-        updater = DynDNSUpdater(
-            username='test@example.com',
-            password='testpass',
-            domain='example.com',
-            subdomains=['www'],
-            update_interval=10,
-            ip_service='ipify',
-        )
+        options = {
+            'username': 'test@example.com',
+            'password': 'testpass',
+            'domain': 'example.com',
+            'subdomains': ['www'],
+            'update_interval': 10,
+            'ip_service': 'ipify',
+        }
         
-        assert updater.update_interval == 10
+        with patch.object(DynDNSUpdater, '_load_last_ip'):
+            updater = DynDNSUpdater(options)
+            assert updater.update_interval == 10

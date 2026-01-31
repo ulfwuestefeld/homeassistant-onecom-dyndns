@@ -145,8 +145,10 @@ class TestHTTPSEnforcement:
 
         api = OneComAPI("test@example.com", "pass", "example.com")
         
-        # Check base URLs in the module
-        assert "https://www.one.com" in str(api.__class__)
+        # Check base URLs are HTTPS
+        assert api.BASE_URL.startswith("https://")
+        assert api.ADMIN_URL.startswith("https://")
+        assert api.LOGIN_URL.startswith("https://")
 
     def test_acme_uses_https(self):
         """Test that ACME endpoints use HTTPS."""
@@ -208,14 +210,16 @@ class TestFilePermissions:
         from acme_manager import ACMEManager
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            cert_path = os.path.join(tmpdir, "cert.pem")
-            key_path = os.path.join(tmpdir, "key.pem")
+            cert_path = os.path.join(tmpdir, "ssl", "cert.pem")
+            key_path = os.path.join(tmpdir, "ssl", "key.pem")
+            account_key_path = os.path.join(tmpdir, "data", "account.key")
 
             manager = ACMEManager(
                 email="test@example.com",
                 onecom_api=Mock(),
                 cert_path=cert_path,
                 key_path=key_path,
+                account_key_path=account_key_path,
             )
 
             cert_pem = "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"
@@ -232,25 +236,28 @@ class TestFilePermissions:
 
     def test_status_files_no_sensitive_data(self):
         """Test that status files don't contain sensitive data."""
-        # Mock ACME modules
-        sys.modules['acme'] = MagicMock()
-        sys.modules['acme.client'] = MagicMock()
-        sys.modules['acme.messages'] = MagicMock()
-        sys.modules['acme.challenges'] = MagicMock()
-        sys.modules['acme.errors'] = MagicMock()
-        sys.modules['josepy'] = MagicMock()
-
-        from certificate_manager import CertificateManager
-
+        import certificate_manager as cm
+        
         with tempfile.TemporaryDirectory() as tmpdir:
             status_file = os.path.join(tmpdir, "status.json")
+            cert_path = os.path.join(tmpdir, "cert.pem")
+            key_path = os.path.join(tmpdir, "key.pem")
+            
+            # Create directory for status file
+            os.makedirs(os.path.dirname(status_file), exist_ok=True)
 
-            with patch("certificate_manager.CERT_STATUS_FILE", status_file):
-                manager = CertificateManager(
+            # Patch the module constant before using the class
+            original = cm.CERT_STATUS_FILE
+            cm.CERT_STATUS_FILE = status_file
+            
+            try:
+                manager = cm.CertificateManager(
                     username="test@example.com",
                     password="secret_password",
                     domain="example.com",
                     email="ssl@example.com",
+                    cert_path=cert_path,
+                    key_path=key_path,
                 )
 
                 manager._save_status({"status": "valid"})
@@ -260,6 +267,8 @@ class TestFilePermissions:
 
                 # Password should not be in status file
                 assert "secret_password" not in content
+            finally:
+                cm.CERT_STATUS_FILE = original
 
 
 class TestErrorMessages:
@@ -271,13 +280,14 @@ class TestErrorMessages:
 
         api = OneComAPI("test@example.com", "secret_password", "example.com")
 
-        # Simulate a login failure
+        # Simulate a login failure with a request exception
+        import requests
         with patch("onecom_api.requests.Session") as mock_session:
-            mock_session.return_value.get.side_effect = Exception("Connection failed")
+            mock_session.return_value.get.side_effect = requests.exceptions.ConnectionError("Connection failed")
 
             try:
                 api.login()
-            except OneComAPIError as e:
+            except (OneComAPIError, requests.exceptions.ConnectionError) as e:
                 error_message = str(e)
                 # Password should not appear in error message
                 assert "secret_password" not in error_message

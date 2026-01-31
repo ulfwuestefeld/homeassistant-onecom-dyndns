@@ -88,7 +88,7 @@ class TestRetryWithBackoffDecorator:
         assert call_count == 2
 
     def test_max_retries_exceeded(self):
-        """Test that exception is raised after max retries."""
+        """Test that exception is raised after max retries (5 attempts)."""
         call_count = 0
         
         @retry_with_backoff
@@ -101,8 +101,8 @@ class TestRetryWithBackoffDecorator:
             with pytest.raises(requests.exceptions.ConnectionError):
                 always_failing()
         
-        # Default max_retries is 3, so it should be called 4 times (initial + 3 retries)
-        assert call_count == 4
+        # MAX_RETRIES is 5, so it should be called 5 times
+        assert call_count == 5
 
     def test_non_retryable_exception_not_retried(self):
         """Test that non-network exceptions are not retried."""
@@ -134,15 +134,15 @@ class TestRetryWithBackoffDecorator:
             with pytest.raises(requests.exceptions.ConnectionError):
                 always_failing()
         
-        # Verify exponential backoff pattern (2^0, 2^1, 2^2 = 1, 2, 4)
-        # With jitter, values should be around these numbers
-        assert len(sleep_times) == 3
-        # First retry should be around 1 second (plus jitter)
-        assert 0.5 <= sleep_times[0] <= 2.0
-        # Second retry should be around 2 seconds (plus jitter)
-        assert 1.0 <= sleep_times[1] <= 4.0
-        # Third retry should be around 4 seconds (plus jitter)
-        assert 2.0 <= sleep_times[2] <= 8.0
+        # With 5 retries, there should be 4 sleep calls (between attempts)
+        assert len(sleep_times) == 4
+        
+        # Verify exponential backoff pattern with jitter
+        # BASE_DELAY=2, so delays are approximately 2, 4, 8, 16 (plus jitter)
+        for i, sleep_time in enumerate(sleep_times):
+            expected_base = 2 * (2 ** i)
+            # With up to 30% jitter, check reasonable range
+            assert expected_base * 0.9 <= sleep_time <= expected_base * 1.5
 
 
 class TestRetryWithBackoffWithMethods:

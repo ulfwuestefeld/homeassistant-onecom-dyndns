@@ -167,28 +167,36 @@ class TestCertificateManagerErrors:
 
     def test_api_error_during_request(self):
         """Test handling of API error during certificate request."""
+        import certificate_manager as cm
         from certificate_manager import CertificateManager
         from onecom_api import OneComAPIError
 
-        manager = CertificateManager(
-            username="test@example.com",
-            password="password",
-            domain="example.com",
-            email="ssl@example.com",
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original = cm.CERT_STATUS_FILE
+            cm.CERT_STATUS_FILE = os.path.join(tmpdir, "status.json")
+            
+            try:
+                manager = CertificateManager(
+                    username="test@example.com",
+                    password="password",
+                    domain="example.com",
+                    email="ssl@example.com",
+                    cert_path=os.path.join(tmpdir, "cert.pem"),
+                    key_path=os.path.join(tmpdir, "key.pem"),
+                )
 
-        with patch("certificate_manager.OneComAPI") as mock_api:
-            mock_api.return_value.login.side_effect = OneComAPIError("Login failed")
+                with patch("certificate_manager.OneComAPI") as mock_api:
+                    mock_api.return_value.login.side_effect = OneComAPIError("Login failed")
 
-            callback_events = []
-            manager.add_callback(lambda event, data: callback_events.append(event))
+                    callback_events = []
+                    manager.add_callback(lambda event, data: callback_events.append(event))
 
-            with tempfile.TemporaryDirectory() as tmpdir:
-                with patch("certificate_manager.CERT_STATUS_FILE", os.path.join(tmpdir, "s.json")):
                     result = manager.request_certificate()
 
-            assert result is False
-            assert "error" in callback_events
+                assert result is False
+                assert "error" in callback_events
+            finally:
+                cm.CERT_STATUS_FILE = original
 
     def test_callback_error_doesnt_crash(self):
         """Test that callback errors don't crash the manager."""
