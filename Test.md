@@ -97,6 +97,11 @@ tests/
 ├── test_certificate_manager.py      # Certificate Manager unit tests
 ├── test_certificate_manager_advanced.py  # Advanced cert tests
 ├── test_run.py                      # Main module unit tests
+├── test_main_function.py            # Entry point and signal handler tests
+├── test_retry_decorator.py          # Retry decorator tests
+├── test_dns_operations.py           # DNS record operation tests
+├── test_ip_services.py              # IP detection service tests
+├── test_ssl_certificates.py         # SSL certificate tests
 ├── test_e2e.py                      # End-to-End workflow tests
 ├── test_integration.py              # Component integration tests
 ├── test_security.py                 # Security-related tests
@@ -243,6 +248,11 @@ tests/
 ├── test_certificate_manager.py      # Certificate Manager Unit-Tests
 ├── test_certificate_manager_advanced.py  # Erweiterte Zertifikat-Tests
 ├── test_run.py                      # Hauptmodul Unit-Tests
+├── test_main_function.py            # Einstiegspunkt- und Signal-Handler-Tests
+├── test_retry_decorator.py          # Retry-Decorator-Tests
+├── test_dns_operations.py           # DNS-Record-Operations-Tests
+├── test_ip_services.py              # IP-Erkennungsdienst-Tests
+├── test_ssl_certificates.py         # SSL-Zertifikat-Tests
 ├── test_e2e.py                      # End-to-End Workflow-Tests
 ├── test_integration.py              # Komponenten-Integrationstests
 ├── test_security.py                 # Sicherheitsbezogene Tests
@@ -338,8 +348,8 @@ pytest tests/ -v
 
 | Metric | Value |
 |--------|-------|
-| Test Files / Test-Dateien | 13 |
-| Estimated Tests / Geschätzte Tests | ~200+ |
+| Test Files / Test-Dateien | 18 |
+| Estimated Tests / Geschätzte Tests | ~300+ |
 | Test Categories / Test-Kategorien | 7 |
 | Coverage Target / Coverage-Ziel | >80% |
 
