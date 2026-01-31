@@ -201,10 +201,11 @@ This helps detect issues like:
 
 - **Challenge Failed**: DNS propagation may take time. The add-on waits up to 3 minutes.
 - **Rate Limited**: Let's Encrypt has rate limits. Use `ssl_staging: true` for testing.
-- **Certificate Not Trusted**: If using staging mode, certificates won't be trusted by browsers.
+- **Certificate Not Trusted**: If using staging mode, certificates won't be trusted by browsers. Set `ssl_staging: false` for production certificates.
 - **Renewal Failed**: Check if One.com credentials are still valid.
 - **Hostname Mismatch**: Your certificate doesn't cover all domains. Set `ssl_force_renewal: true` to request a new certificate with all configured domains.
 - **Online Verification Failed**: The certificate exists locally but isn't active on the server. Check your web server configuration.
+- **ERR_SSL_PROTOCOL_ERROR**: Check your router port forwarding! Port 443 must forward to internal port 443 (NGINX), NOT to port 8123 (Home Assistant HTTP). See Router Configuration section above.
 
 ### Manual DNS Challenge
 
@@ -338,8 +339,19 @@ You will now have:
 ### Router Configuration
 
 Make sure your router forwards:
-- Port 80 → Home Assistant IP
-- Port 443 → Home Assistant IP
+- Port 80 → Home Assistant IP, **Port 80**
+- Port 443 → Home Assistant IP, **Port 443**
+
+⚠️ **WICHTIG / IMPORTANT**: Die Portweiterleitung muss auf die korrekten internen Ports zeigen!
+
+| Extern | Intern | Beschreibung |
+|--------|--------|--------------|
+| 443 | **443** | ✅ Korrekt - NGINX SSL Proxy |
+| 443 | 8123 | ❌ FALSCH - Home Assistant HTTP |
+| 80 | **80** | ✅ Korrekt - NGINX HTTP Redirect |
+| 80 | 8123 | ❌ FALSCH - Home Assistant HTTP |
+
+Port 443 muss auf Port **443** (NGINX) zeigen, NICHT auf Port 8123 (Home Assistant HTTP). NGINX macht die SSL-Terminierung und leitet dann intern an Home Assistant weiter.
 
 ## Limitations
 

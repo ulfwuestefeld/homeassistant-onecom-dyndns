@@ -187,6 +187,12 @@ The integration provides sensors, binary sensors, and services. See [DOCS.md](DO
 
 See [DOCS.md](DOCS.md) for detailed troubleshooting information.
 
+### Common Issues
+
+- **ERR_SSL_PROTOCOL_ERROR**: Check router port forwarding. Port 443 must forward to **port 443** (NGINX), not port 8123.
+- **Certificate Not Trusted**: Make sure `ssl_staging: false` is set for production certificates.
+- **No secure protocols supported**: Router is forwarding to wrong internal port.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file.

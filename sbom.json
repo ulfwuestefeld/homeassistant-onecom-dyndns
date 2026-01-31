@@ -1,0 +1,251 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:onecom-dyndns-sbom-2026-01-30",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-01-30T22:30:00Z",
+    "tools": [
+      {
+        "vendor": "Manual",
+        "name": "SBOM Generator",
+        "version": "1.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "onecom-dyndns",
+      "name": "One.com DynDNS Updater",
+      "version": "1.2.18",
+      "description": "Home Assistant add-on for dynamic DNS updates at One.com with automatic SSL certificates",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns.git"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/requests@2.28.0",
+      "name": "requests",
+      "version": ">=2.28.0",
+      "description": "Python HTTP library for making HTTP requests",
+      "purl": "pkg:pypi/requests",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://requests.readthedocs.io/"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/acme@2.0.0",
+      "name": "acme",
+      "version": ">=2.0.0",
+      "description": "ACME protocol client library for Let's Encrypt",
+      "purl": "pkg:pypi/acme",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/certbot/certbot"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/josepy@1.13.0",
+      "name": "josepy",
+      "version": ">=1.13.0",
+      "description": "JOSE (JSON Object Signing and Encryption) library",
+      "purl": "pkg:pypi/josepy",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/certbot/josepy"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/cryptography@41.0.0",
+      "name": "cryptography",
+      "version": ">=41.0.0",
+      "description": "Cryptographic recipes and primitives for Python",
+      "purl": "pkg:pypi/cryptography",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://cryptography.io/"
+        }
+      ]
+    },
+    {
+      "type": "container",
+      "bom-ref": "container:home-assistant-base-python",
+      "name": "Home Assistant Base Python",
+      "version": "3.11-alpine3.18",
+      "description": "Home Assistant base container image with Python 3.11 on Alpine Linux 3.18",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "ghcr.io/home-assistant/amd64-base-python:3.11-alpine3.18"
+        }
+      ]
+    },
+    {
+      "type": "operating-system",
+      "bom-ref": "os:alpine-linux@3.18",
+      "name": "Alpine Linux",
+      "version": "3.18",
+      "description": "Lightweight Linux distribution",
+      "licenses": [
+        {
+          "license": {
+            "name": "Various Open Source Licenses"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://alpinelinux.org/"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "app:python@3.11",
+      "name": "Python",
+      "version": "3.11",
+      "description": "Python programming language runtime",
+      "licenses": [
+        {
+          "license": {
+            "id": "PSF-2.0"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.python.org/"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:apk/openssl",
+      "name": "openssl",
+      "version": "latest",
+      "description": "Cryptography and SSL/TLS library",
+      "purl": "pkg:apk/alpine/openssl",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:apk/libffi",
+      "name": "libffi",
+      "version": "latest",
+      "description": "Foreign Function Interface library",
+      "purl": "pkg:apk/alpine/libffi",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "onecom-dyndns",
+      "dependsOn": [
+        "pkg:pypi/requests@2.28.0",
+        "pkg:pypi/acme@2.0.0",
+        "pkg:pypi/josepy@1.13.0",
+        "pkg:pypi/cryptography@41.0.0",
+        "container:home-assistant-base-python",
+        "app:python@3.11"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/acme@2.0.0",
+      "dependsOn": [
+        "pkg:pypi/josepy@1.13.0",
+        "pkg:pypi/cryptography@41.0.0",
+        "pkg:pypi/requests@2.28.0"
+      ]
+    },
+    {
+      "ref": "container:home-assistant-base-python",
+      "dependsOn": [
+        "os:alpine-linux@3.18",
+        "app:python@3.11",
+        "pkg:apk/openssl",
+        "pkg:apk/libffi"
+      ]
+    }
+  ]
+}
