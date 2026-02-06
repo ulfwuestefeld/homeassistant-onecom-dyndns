@@ -59,6 +59,53 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._domains: list[str] = []
         self._subdomains: list[str] = []
 
+    async def async_step_hassio(
+        self, discovery_info: dict[str, Any]
+    ) -> FlowResult:
+        """Handle Supervisor add-on discovery.
+
+        Called automatically when the add-on publishes its discovery
+        info via the Supervisor API.  We auto-create a config entry
+        with the add-on's configuration so the user sees entities
+        immediately without manual setup.
+        """
+        config = discovery_info.get("config", discovery_info)
+        domain = config.get("domain", "")
+
+        if not domain:
+            return self.async_abort(reason="no_domain")
+
+        # Prevent duplicate entries for the same domain
+        await self.async_set_unique_id(f"onecom_{domain}")
+        self._abort_if_unique_id_configured(updates=config)
+
+        # Store the add-on slug so entities can attach to its device
+        config["addon_slug"] = discovery_info.get(
+            "addon", "homeassistant-onecom-dyndns"
+        )
+
+        # Show a confirmation step so the user knows what's happening
+        self._data = config
+        return await self.async_step_hassio_confirm()
+
+    async def async_step_hassio_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Confirm Supervisor add-on discovery."""
+        if user_input is not None:
+            return self.async_create_entry(
+                title=self._data.get("domain", "One.com DynDNS"),
+                data=self._data,
+            )
+
+        return self.async_show_form(
+            step_id="hassio_confirm",
+            description_placeholders={
+                "domain": self._data.get("domain", ""),
+                "addon": "One.com DynDNS Updater",
+            },
+        )
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:

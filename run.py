@@ -8,9 +8,11 @@ at One.com when changes are detected. It also supports automatic SSL
 certificate generation using Let's Encrypt with DNS-01 challenge.
 """
 
+import filecmp
 import json
 import logging
 import os
+import shutil
 import signal
 import sys
 import threading
@@ -108,6 +110,137 @@ def send_ha_notification(title: str, message: str, notification_id: str = None):
         return True
     except Exception as e:
         logging.warning("Failed to send notification: %s", e)
+        return False
+
+
+# Paths for custom component deployment
+_COMPONENT_SOURCE = "/app/custom_components/onecom_dyndns"
+_COMPONENT_TARGET = "/config/custom_components/onecom_dyndns"
+
+
+def deploy_custom_component():
+    """Deploy or update the custom component into the HA config directory.
+
+    Copies ``/app/custom_components/onecom_dyndns`` (bundled in the Docker
+    image) to ``/config/custom_components/onecom_dyndns`` so that the
+    integration is available in Home Assistant without manual installation.
+
+    The function compares the bundled ``manifest.json`` version against the
+    installed version and only overwrites when the version has changed or
+    the target does not exist yet.
+    """
+    if not os.path.isdir(_COMPONENT_SOURCE):
+        logging.debug(
+            "Custom component source %s not found, skipping deployment",
+            _COMPONENT_SOURCE,
+        )
+        return False
+
+    # Read bundled version
+    src_manifest = os.path.join(_COMPONENT_SOURCE, "manifest.json")
+    if not os.path.isfile(src_manifest):
+        logging.warning("manifest.json missing in bundled component")
+        return False
+
+    try:
+        with open(src_manifest, "r") as f:
+            src_version = json.load(f).get("version", "0.0.0")
+    except (IOError, json.JSONDecodeError) as exc:
+        logging.warning("Cannot read bundled manifest.json: %s", exc)
+        return False
+
+    # Read currently installed version (if any)
+    tgt_manifest = os.path.join(_COMPONENT_TARGET, "manifest.json")
+    tgt_version = None
+    if os.path.isfile(tgt_manifest):
+        try:
+            with open(tgt_manifest, "r") as f:
+                tgt_version = json.load(f).get("version", "0.0.0")
+        except (IOError, json.JSONDecodeError):
+            tgt_version = None
+
+    if tgt_version == src_version:
+        logging.debug(
+            "Custom component %s already installed (v%s)",
+            _COMPONENT_TARGET,
+            tgt_version,
+        )
+        return True
+
+    # Deploy: create parent directory and copy the component tree
+    try:
+        os.makedirs(os.path.dirname(_COMPONENT_TARGET), exist_ok=True)
+
+        if os.path.exists(_COMPONENT_TARGET):
+            shutil.rmtree(_COMPONENT_TARGET)
+
+        shutil.copytree(_COMPONENT_SOURCE, _COMPONENT_TARGET)
+
+        logging.info(
+            "Custom component deployed to %s (v%s → v%s)",
+            _COMPONENT_TARGET,
+            tgt_version or "none",
+            src_version,
+        )
+        return True
+    except Exception as exc:
+        logging.error("Failed to deploy custom component: %s", exc)
+        return False
+
+
+def publish_addon_discovery(options: dict):
+    """Publish discovery info via Supervisor so the custom component auto-configures.
+
+    The Supervisor forwards the discovery to HA core which triggers
+    ``async_step_hassio()`` in the integration's config flow.
+    """
+    if not SUPERVISOR_TOKEN:
+        logging.debug("No SUPERVISOR_TOKEN, skipping discovery")
+        return False
+
+    try:
+        headers = {
+            "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+            "Content-Type": "application/json",
+        }
+
+        discovery_data = {
+            "addon": "homeassistant-onecom-dyndns",
+            "service": "onecom_dyndns",
+            "config": {
+                "username": options.get("username", ""),
+                "password": options.get("password", ""),
+                "domain": options.get("domain", ""),
+                "subdomains": options.get("subdomains", [""]),
+                "update_interval": options.get("update_interval", 5),
+                "ip_service": options.get("ip_service", "ipify"),
+                "ssl_enabled": options.get("ssl_enabled", False),
+                "ssl_email": options.get("ssl_email", ""),
+                "ssl_domains": options.get("ssl_domains", []),
+                "ssl_staging": options.get("ssl_staging", False),
+                "ssl_renewal_days": options.get("ssl_renewal_days", 30),
+                "ssl_check_interval": options.get("ssl_check_interval", 12),
+            },
+        }
+
+        response = requests.post(
+            "http://supervisor/discovery",
+            headers=headers,
+            json=discovery_data,
+            timeout=10,
+        )
+        if response.ok:
+            logging.info("Published discovery for onecom_dyndns integration")
+            return True
+        else:
+            logging.debug(
+                "Discovery publish returned %s: %s",
+                response.status_code,
+                response.text,
+            )
+            return False
+    except Exception as e:
+        logging.debug("Failed to publish discovery: %s", e)
         return False
 
 
@@ -729,6 +862,13 @@ def main():
     """Main entry point."""
     # Load options
     options = load_options()
+
+    # Deploy custom component into /config/custom_components/ so the
+    # integration is available in Home Assistant without manual setup.
+    deploy_custom_component()
+
+    # Publish discovery so the HA custom component auto-configures
+    publish_addon_discovery(options)
 
     # Create updater
     updater = DynDNSUpdater(options)

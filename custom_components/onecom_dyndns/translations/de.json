@@ -1,6 +1,10 @@
 {
   "config": {
     "step": {
+      "hassio_confirm": {
+        "title": "One.com DynDNS (Add-on)",
+        "description": "Das One.com DynDNS Add-on wurde erkannt. Möchten Sie Entitäten für die Domain **{domain}** erstellen?"
+      },
       "user": {
         "title": "One.com Anmeldung",
         "description": "Geben Sie Ihre One.com Kontodaten ein. [Dokumentation]({docs_url})",

@@ -353,7 +353,7 @@ pytest tests/ -v
 | Metric | Value |
 |--------|-------|
 | Test Files / Test-Dateien | 19 |
-| Estimated Tests / Geschätzte Tests | ~378 |
+| Estimated Tests / Geschätzte Tests | ~422 |
 | Test Categories / Test-Kategorien | 8 |
 | Coverage Target / Coverage-Ziel | >80% |
 

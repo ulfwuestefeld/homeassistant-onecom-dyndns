@@ -13,13 +13,13 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN,
     CONF_DOMAIN,
+    CONF_ADDON_SLUG,
     ATTR_CURRENT_IP,
     ATTR_LAST_UPDATE,
     ATTR_LAST_IP_UPDATE,
@@ -28,6 +28,7 @@ from .const import (
     ATTR_CERTIFICATE_DOMAINS,
     ATTR_DAYS_UNTIL_EXPIRY,
     ATTR_ACME_CHALLENGE,
+    get_device_info,
 )
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
@@ -113,12 +114,10 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
         self._entry = entry
 
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=f"One.com DynDNS - {domain}",
-            manufacturer="One.com",
-            model="DynDNS",
-            configuration_url="https://www.one.com/admin",
+        self._attr_device_info = get_device_info(
+            entry.entry_id,
+            domain,
+            addon_slug=entry.data.get(CONF_ADDON_SLUG),
         )
 
     @property

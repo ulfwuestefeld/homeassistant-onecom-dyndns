@@ -20,7 +20,9 @@ class TestMainFunction:
 
     @patch('run.load_options')
     @patch('run.DynDNSUpdater')
-    def test_main_initializes_updater(self, mock_updater_class, mock_load_options):
+    @patch('run.deploy_custom_component')
+    @patch('run.publish_addon_discovery')
+    def test_main_initializes_updater(self, mock_discovery, mock_deploy, mock_updater_class, mock_load_options):
         """Test that main() initializes DynDNSUpdater with loaded options."""
         from run import main
         
@@ -51,7 +53,108 @@ class TestMainFunction:
         mock_load_options.assert_called_once()
 
     @patch('run.load_options')
-    def test_main_handles_missing_config(self, mock_load_options):
+    @patch('run.DynDNSUpdater')
+    @patch('run.deploy_custom_component')
+    @patch('run.publish_addon_discovery')
+    def test_main_calls_deploy_custom_component(self, mock_discovery, mock_deploy, mock_updater_class, mock_load_options):
+        """Test that main() calls deploy_custom_component before starting."""
+        from run import main
+
+        mock_options = {
+            'username': 'test@example.com',
+            'password': 'testpass',
+            'domain': 'example.com',
+            'subdomains': ['www'],
+            'update_interval': 5,
+            'ip_service': 'ipify',
+            'log_level': 'info',
+            'ssl_enabled': False,
+        }
+        mock_load_options.return_value = mock_options
+
+        mock_updater = MagicMock()
+        mock_updater_class.return_value = mock_updater
+        mock_updater.run.side_effect = KeyboardInterrupt
+
+        with patch('signal.signal'):
+            try:
+                main()
+            except (KeyboardInterrupt, SystemExit):
+                pass
+
+        mock_deploy.assert_called_once()
+
+    @patch('run.load_options')
+    @patch('run.DynDNSUpdater')
+    @patch('run.deploy_custom_component')
+    @patch('run.publish_addon_discovery')
+    def test_main_calls_publish_addon_discovery(self, mock_discovery, mock_deploy, mock_updater_class, mock_load_options):
+        """Test that main() calls publish_addon_discovery with options."""
+        from run import main
+
+        mock_options = {
+            'username': 'test@example.com',
+            'password': 'testpass',
+            'domain': 'example.com',
+            'subdomains': ['www'],
+            'update_interval': 5,
+            'ip_service': 'ipify',
+            'log_level': 'info',
+            'ssl_enabled': False,
+        }
+        mock_load_options.return_value = mock_options
+
+        mock_updater = MagicMock()
+        mock_updater_class.return_value = mock_updater
+        mock_updater.run.side_effect = KeyboardInterrupt
+
+        with patch('signal.signal'):
+            try:
+                main()
+            except (KeyboardInterrupt, SystemExit):
+                pass
+
+        mock_discovery.assert_called_once_with(mock_options)
+
+    @patch('run.load_options')
+    @patch('run.DynDNSUpdater')
+    @patch('run.deploy_custom_component')
+    @patch('run.publish_addon_discovery')
+    def test_main_calls_deploy_before_discovery(self, mock_discovery, mock_deploy, mock_updater_class, mock_load_options):
+        """Test that deploy_custom_component is called before publish_addon_discovery."""
+        from run import main
+
+        call_order = []
+        mock_deploy.side_effect = lambda: call_order.append("deploy")
+        mock_discovery.side_effect = lambda opts: call_order.append("discovery")
+
+        mock_options = {
+            'username': 'test@example.com',
+            'password': 'testpass',
+            'domain': 'example.com',
+            'subdomains': ['www'],
+            'update_interval': 5,
+            'ip_service': 'ipify',
+            'log_level': 'info',
+            'ssl_enabled': False,
+        }
+        mock_load_options.return_value = mock_options
+
+        mock_updater = MagicMock()
+        mock_updater_class.return_value = mock_updater
+        mock_updater.run.side_effect = KeyboardInterrupt
+
+        with patch('signal.signal'):
+            try:
+                main()
+            except (KeyboardInterrupt, SystemExit):
+                pass
+
+        assert call_order == ["deploy", "discovery"]
+
+    @patch('run.deploy_custom_component')
+    @patch('run.load_options')
+    def test_main_handles_missing_config(self, mock_load_options, mock_deploy):
         """Test that main() handles missing configuration gracefully."""
         from run import main
         
@@ -60,8 +163,9 @@ class TestMainFunction:
         with pytest.raises(FileNotFoundError):
             main()
 
+    @patch('run.deploy_custom_component')
     @patch('run.load_options')
-    def test_main_handles_invalid_json(self, mock_load_options):
+    def test_main_handles_invalid_json(self, mock_load_options, mock_deploy):
         """Test that main() handles invalid JSON configuration."""
         from run import main
         
@@ -126,7 +230,9 @@ class TestSignalHandlers:
 
     @patch('run.load_options')
     @patch('run.DynDNSUpdater')
-    def test_sigterm_stops_updater(self, mock_updater_class, mock_load_options):
+    @patch('run.deploy_custom_component')
+    @patch('run.publish_addon_discovery')
+    def test_sigterm_stops_updater(self, mock_discovery, mock_deploy, mock_updater_class, mock_load_options):
         """Test that SIGTERM signal stops the updater gracefully."""
         from run import main
         

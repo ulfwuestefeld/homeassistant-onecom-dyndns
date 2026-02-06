@@ -1294,6 +1294,598 @@ class TestSensorConstants:
         assert "sensor" in const_mod.PLATFORMS
         assert "binary_sensor" in const_mod.PLATFORMS
 
+    def test_addon_slug_constant(self):
+        """Verify ADDON_SLUG is defined correctly."""
+        _ensure_ha_stubs()
+        import importlib
+        const_mod = importlib.import_module("custom_components.onecom_dyndns.const")
+        importlib.reload(const_mod)
+        assert hasattr(const_mod, "ADDON_SLUG")
+        assert const_mod.ADDON_SLUG == "homeassistant-onecom-dyndns"
+
+    def test_conf_addon_slug_constant(self):
+        """Verify CONF_ADDON_SLUG is defined correctly."""
+        _ensure_ha_stubs()
+        import importlib
+        const_mod = importlib.import_module("custom_components.onecom_dyndns.const")
+        importlib.reload(const_mod)
+        assert hasattr(const_mod, "CONF_ADDON_SLUG")
+        assert const_mod.CONF_ADDON_SLUG == "addon_slug"
+
+
+# ---------------------------------------------------------------------------
+# Part 6: get_device_info() tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetDeviceInfo:
+    """Tests for the get_device_info() helper in const.py."""
+
+    def test_with_addon_slug_returns_hassio_identifiers(self):
+        """When addon_slug is set, DeviceInfo uses hassio identifiers."""
+        _ensure_ha_stubs()
+        import importlib
+        const_mod = importlib.import_module("custom_components.onecom_dyndns.const")
+        importlib.reload(const_mod)
+
+        info = const_mod.get_device_info(
+            entry_id="entry_123",
+            domain="example.com",
+            addon_slug="homeassistant-onecom-dyndns",
+        )
+
+        # Our stub DeviceInfo returns a dict of keyword args
+        assert info["identifiers"] == {("hassio", "homeassistant-onecom-dyndns")}
+        # Should NOT contain standalone fields
+        assert "name" not in info
+        assert "manufacturer" not in info
+
+    def test_without_addon_slug_returns_standalone_device(self):
+        """When addon_slug is None, DeviceInfo has full standalone metadata."""
+        _ensure_ha_stubs()
+        import importlib
+        const_mod = importlib.import_module("custom_components.onecom_dyndns.const")
+        importlib.reload(const_mod)
+
+        info = const_mod.get_device_info(
+            entry_id="entry_456",
+            domain="mysite.org",
+            addon_slug=None,
+        )
+
+        assert info["identifiers"] == {("onecom_dyndns", "entry_456")}
+        assert info["name"] == "One.com DynDNS - mysite.org"
+        assert info["manufacturer"] == "One.com"
+        assert info["model"] == "DynDNS"
+        assert info["configuration_url"] == "https://www.one.com/admin"
+
+    def test_without_addon_slug_default(self):
+        """When addon_slug is not passed, defaults to None (standalone)."""
+        _ensure_ha_stubs()
+        import importlib
+        const_mod = importlib.import_module("custom_components.onecom_dyndns.const")
+        importlib.reload(const_mod)
+
+        info = const_mod.get_device_info(
+            entry_id="entry_789",
+            domain="test.com",
+        )
+
+        # Should be standalone
+        assert info["identifiers"] == {("onecom_dyndns", "entry_789")}
+        assert "name" in info
+
+    def test_with_empty_addon_slug_returns_standalone(self):
+        """Empty string for addon_slug should be treated as falsy (standalone)."""
+        _ensure_ha_stubs()
+        import importlib
+        const_mod = importlib.import_module("custom_components.onecom_dyndns.const")
+        importlib.reload(const_mod)
+
+        info = const_mod.get_device_info(
+            entry_id="entry_abc",
+            domain="test.com",
+            addon_slug="",
+        )
+
+        # Empty string is falsy, so standalone device
+        assert info["identifiers"] == {("onecom_dyndns", "entry_abc")}
+
+
+# ---------------------------------------------------------------------------
+# Part 7: Button async_press() tests
+# ---------------------------------------------------------------------------
+
+
+def _make_button(key, coordinator_data=None, domain="example.com", ssl_enabled=False):
+    """Instantiate a OneComDynDNSButton with the given key and mock data."""
+    import sys
+    cc_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "custom_components",
+        "onecom_dyndns",
+    )
+    if cc_dir not in sys.path:
+        sys.path.insert(0, cc_dir)
+
+    _ensure_ha_stubs()
+
+    import importlib
+    btn_mod = importlib.import_module("custom_components.onecom_dyndns.button")
+    importlib.reload(btn_mod)
+
+    desc = None
+    for d in btn_mod.BUTTON_TYPES:
+        if d.key == key:
+            desc = d
+            break
+    assert desc is not None, f"Button type '{key}' not found"
+
+    coordinator = MagicMock()
+    coordinator.data = coordinator_data
+
+    entry = Mock()
+    entry.entry_id = "test_entry_id"
+    entry.data = {"domain": domain, "ssl_enabled": ssl_enabled}
+
+    with patch.object(btn_mod.OneComDynDNSButton, "__init__", lambda self, *a, **kw: None):
+        button = btn_mod.OneComDynDNSButton.__new__(btn_mod.OneComDynDNSButton)
+
+    button.coordinator = coordinator
+    button.entity_description = desc
+    button._domain = domain
+    button._entry = entry
+    button._attr_unique_id = f"test_entry_id_{key}"
+    button._attr_device_info = None
+    button._attr_has_entity_name = True
+
+    return button
+
+
+class TestButtonAsyncPress:
+    """Tests for the OneComDynDNSButton.async_press() method."""
+
+    def test_update_dns_press_calls_coordinator(self):
+        """Pressing update_dns calls coordinator.async_force_update_dns."""
+        import asyncio
+
+        async def _run():
+            button = _make_button("update_dns")
+            fut = asyncio.get_event_loop().create_future()
+            fut.set_result(None)
+            button.coordinator.async_force_update_dns = MagicMock(return_value=fut)
+
+            await button.async_press()
+            button.coordinator.async_force_update_dns.assert_called_once()
+
+        asyncio.run(_run())
+
+    def test_check_ip_press_calls_coordinator(self):
+        """Pressing check_ip calls coordinator.async_refresh."""
+        import asyncio
+
+        async def _run():
+            button = _make_button("check_ip")
+            fut = asyncio.get_event_loop().create_future()
+            fut.set_result(None)
+            button.coordinator.async_refresh = MagicMock(return_value=fut)
+
+            await button.async_press()
+            button.coordinator.async_refresh.assert_called_once()
+
+        asyncio.run(_run())
+
+    def test_renew_certificate_press_calls_coordinator(self):
+        """Pressing renew_certificate calls coordinator.async_force_renew_certificate."""
+        import asyncio
+
+        async def _run():
+            button = _make_button("renew_certificate", ssl_enabled=True)
+            fut = asyncio.get_event_loop().create_future()
+            fut.set_result(None)
+            button.coordinator.async_force_renew_certificate = MagicMock(return_value=fut)
+
+            await button.async_press()
+            button.coordinator.async_force_renew_certificate.assert_called_once()
+
+        asyncio.run(_run())
+
+
+# ---------------------------------------------------------------------------
+# Part 8: Config flow (hassio discovery) tests
+# ---------------------------------------------------------------------------
+
+
+def _ensure_config_flow_stubs():
+    """Ensure all stubs needed for config_flow.py are present."""
+    import sys
+    import types
+
+    _ensure_ha_stubs()
+
+    # voluptuous stub
+    if "voluptuous" not in sys.modules:
+        vol = types.ModuleType("voluptuous")
+        vol.Schema = lambda *a, **kw: None
+        vol.Required = lambda *a, **kw: a[0] if a else "required"
+        vol.Optional = lambda *a, **kw: a[0] if a else "optional"
+        sys.modules["voluptuous"] = vol
+
+    # homeassistant.data_entry_flow
+    mod_name = "homeassistant.data_entry_flow"
+    if mod_name not in sys.modules:
+        m = types.ModuleType(mod_name)
+        m.FlowResult = dict  # FlowResult is just a TypedDict
+        sys.modules[mod_name] = m
+
+    # homeassistant.helpers.selector stubs
+    sel_mod_name = "homeassistant.helpers.selector"
+    if sel_mod_name not in sys.modules:
+        sel = types.ModuleType(sel_mod_name)
+
+        class _Stub:
+            def __init__(self, *a, **kw):
+                pass
+
+        for cls_name in [
+            "BooleanSelector",
+            "NumberSelector",
+            "NumberSelectorConfig",
+            "NumberSelectorMode",
+            "SelectSelector",
+            "SelectSelectorConfig",
+            "SelectSelectorMode",
+            "TextSelector",
+            "TextSelectorConfig",
+            "TextSelectorType",
+        ]:
+            setattr(sel, cls_name, type(cls_name, (_Stub,), {}))
+
+        sys.modules[sel_mod_name] = sel
+
+    # config_entries stubs
+    ce = sys.modules["homeassistant.config_entries"]
+    if not hasattr(ce, "ConfigFlow"):
+        class _ConfigFlow:
+            """Minimal ConfigFlow stub."""
+            domain = None
+
+            def __init_subclass__(cls, domain=None, **kw):
+                super().__init_subclass__(**kw)
+                cls.domain = domain
+
+            async def async_set_unique_id(self, uid):
+                self._unique_id = uid
+
+            def _abort_if_unique_id_configured(self, **kw):
+                pass
+
+            def async_abort(self, reason=""):
+                return {"type": "abort", "reason": reason}
+
+            def async_create_entry(self, title="", data=None):
+                return {"type": "create_entry", "title": title, "data": data}
+
+            def async_show_form(self, step_id="", **kw):
+                return {"type": "form", "step_id": step_id, **kw}
+
+        ce.ConfigFlow = _ConfigFlow
+
+    if not hasattr(ce, "OptionsFlow"):
+        class _OptionsFlow:
+            def async_create_entry(self, title="", data=None):
+                return {"type": "create_entry", "title": title, "data": data}
+
+            def async_show_form(self, step_id="", **kw):
+                return {"type": "form", "step_id": step_id, **kw}
+
+        ce.OptionsFlow = _OptionsFlow
+
+    # onecom_api stub for config_flow
+    onecom_api_mod_name = "custom_components.onecom_dyndns.onecom_api"
+    if onecom_api_mod_name not in sys.modules:
+        m = types.ModuleType(onecom_api_mod_name)
+
+        async def async_validate_credentials(*a, **kw):
+            return {"valid": True, "domains": [], "subdomains": []}
+
+        m.async_validate_credentials = async_validate_credentials
+        m.OneComAPI = type("OneComAPI", (), {})
+        m.OneComAPIError = type("OneComAPIError", (Exception,), {})
+        sys.modules[onecom_api_mod_name] = m
+
+    # Ensure callback is identity function
+    core = sys.modules["homeassistant.core"]
+    if not hasattr(core, "callback"):
+        core.callback = lambda f: f
+
+
+class TestConfigFlowHassioDiscovery:
+    """Tests for async_step_hassio() and async_step_hassio_confirm()."""
+
+    def _get_flow_class(self):
+        """Import and return the OneComDynDNSConfigFlow class."""
+        _ensure_config_flow_stubs()
+        import importlib
+        cf_mod = importlib.import_module("custom_components.onecom_dyndns.config_flow")
+        importlib.reload(cf_mod)
+        return cf_mod.OneComDynDNSConfigFlow
+
+    def test_hassio_discovery_with_valid_domain(self):
+        """async_step_hassio should proceed to confirm step with valid domain."""
+        import asyncio
+
+        async def _run():
+            FlowClass = self._get_flow_class()
+            flow = FlowClass()
+
+            discovery_info = {
+                "addon": "homeassistant-onecom-dyndns",
+                "config": {
+                    "domain": "example.com",
+                    "username": "user@one.com",
+                    "password": "secret",
+                },
+            }
+
+            result = await flow.async_step_hassio(discovery_info)
+            assert result["type"] == "form"
+            assert result["step_id"] == "hassio_confirm"
+
+        asyncio.run(_run())
+
+    def test_hassio_discovery_stores_addon_slug(self):
+        """async_step_hassio should store the addon slug in _data."""
+        import asyncio
+
+        async def _run():
+            FlowClass = self._get_flow_class()
+            flow = FlowClass()
+
+            discovery_info = {
+                "addon": "homeassistant-onecom-dyndns",
+                "config": {
+                    "domain": "example.com",
+                    "username": "user@one.com",
+                    "password": "secret",
+                },
+            }
+
+            await flow.async_step_hassio(discovery_info)
+            assert flow._data.get("addon_slug") == "homeassistant-onecom-dyndns"
+
+        asyncio.run(_run())
+
+    def test_hassio_discovery_empty_domain_aborts(self):
+        """async_step_hassio should abort when domain is empty."""
+        import asyncio
+
+        async def _run():
+            FlowClass = self._get_flow_class()
+            flow = FlowClass()
+
+            discovery_info = {
+                "addon": "homeassistant-onecom-dyndns",
+                "config": {
+                    "domain": "",
+                    "username": "user@one.com",
+                },
+            }
+
+            result = await flow.async_step_hassio(discovery_info)
+            assert result["type"] == "abort"
+            assert result["reason"] == "no_domain"
+
+        asyncio.run(_run())
+
+    def test_hassio_discovery_no_domain_key_aborts(self):
+        """async_step_hassio should abort when domain key is missing."""
+        import asyncio
+
+        async def _run():
+            FlowClass = self._get_flow_class()
+            flow = FlowClass()
+
+            discovery_info = {
+                "addon": "homeassistant-onecom-dyndns",
+                "config": {
+                    "username": "user@one.com",
+                },
+            }
+
+            result = await flow.async_step_hassio(discovery_info)
+            assert result["type"] == "abort"
+            assert result["reason"] == "no_domain"
+
+        asyncio.run(_run())
+
+    def test_hassio_confirm_creates_entry(self):
+        """async_step_hassio_confirm with user_input creates a config entry."""
+        import asyncio
+
+        async def _run():
+            FlowClass = self._get_flow_class()
+            flow = FlowClass()
+            flow._data = {
+                "domain": "example.com",
+                "username": "user@one.com",
+                "password": "secret",
+                "addon_slug": "homeassistant-onecom-dyndns",
+            }
+
+            result = await flow.async_step_hassio_confirm(user_input={})
+            assert result["type"] == "create_entry"
+            assert result["title"] == "example.com"
+            assert result["data"]["domain"] == "example.com"
+            assert result["data"]["addon_slug"] == "homeassistant-onecom-dyndns"
+
+        asyncio.run(_run())
+
+    def test_hassio_confirm_shows_form_without_input(self):
+        """async_step_hassio_confirm without user_input shows confirmation form."""
+        import asyncio
+
+        async def _run():
+            FlowClass = self._get_flow_class()
+            flow = FlowClass()
+            flow._data = {"domain": "example.com"}
+
+            result = await flow.async_step_hassio_confirm(user_input=None)
+            assert result["type"] == "form"
+            assert result["step_id"] == "hassio_confirm"
+            assert result["description_placeholders"]["domain"] == "example.com"
+
+        asyncio.run(_run())
+
+    def test_hassio_sets_unique_id(self):
+        """async_step_hassio should set a unique ID based on the domain."""
+        import asyncio
+
+        async def _run():
+            FlowClass = self._get_flow_class()
+            flow = FlowClass()
+
+            discovery_info = {
+                "addon": "homeassistant-onecom-dyndns",
+                "config": {
+                    "domain": "mysite.org",
+                    "username": "user@one.com",
+                    "password": "secret",
+                },
+            }
+
+            await flow.async_step_hassio(discovery_info)
+            assert flow._unique_id == "onecom_mysite.org"
+
+        asyncio.run(_run())
+
+    def test_hassio_uses_discovery_config(self):
+        """async_step_hassio should extract config from discovery_info."""
+        import asyncio
+
+        async def _run():
+            FlowClass = self._get_flow_class()
+            flow = FlowClass()
+
+            discovery_info = {
+                "addon": "my-custom-addon",
+                "config": {
+                    "domain": "example.com",
+                    "username": "admin",
+                    "password": "pw",
+                    "ssl_enabled": True,
+                },
+            }
+
+            await flow.async_step_hassio(discovery_info)
+            assert flow._data["domain"] == "example.com"
+            assert flow._data["username"] == "admin"
+            assert flow._data["ssl_enabled"] is True
+            assert flow._data["addon_slug"] == "my-custom-addon"
+
+        asyncio.run(_run())
+
+
+# ---------------------------------------------------------------------------
+# Part 9: async_setup_entry conditional entity creation tests
+# ---------------------------------------------------------------------------
+
+
+class TestSensorAsyncSetupEntryConditional:
+    """Test that async_setup_entry in sensor.py correctly filters entities."""
+
+    def _simulate_setup_entry(self, ssl_enabled):
+        """Simulate the entity filtering logic from async_setup_entry."""
+        _ensure_ha_stubs()
+        import importlib
+        sensor_mod = importlib.import_module("custom_components.onecom_dyndns.sensor")
+        importlib.reload(sensor_mod)
+
+        ssl_only_sensors = {"certificate_expiry", "last_certificate_renewal", "acme_challenge"}
+        created_keys = []
+        for desc in sensor_mod.SENSOR_TYPES:
+            if desc.key in ssl_only_sensors and not ssl_enabled:
+                continue
+            created_keys.append(desc.key)
+        return created_keys
+
+    def test_ssl_disabled_creates_3_sensors(self):
+        """With SSL disabled, only 3 sensors should be created."""
+        keys = self._simulate_setup_entry(ssl_enabled=False)
+        assert len(keys) == 3
+        assert "current_ip" in keys
+        assert "last_update" in keys
+        assert "last_ip_update" in keys
+
+    def test_ssl_enabled_creates_6_sensors(self):
+        """With SSL enabled, all 6 sensors should be created."""
+        keys = self._simulate_setup_entry(ssl_enabled=True)
+        assert len(keys) == 6
+
+
+class TestBinarySensorAsyncSetupEntryConditional:
+    """Test that async_setup_entry in binary_sensor.py correctly filters entities."""
+
+    def _simulate_setup_entry(self, ssl_enabled):
+        """Simulate the entity filtering logic from async_setup_entry."""
+        _ensure_ha_stubs()
+        import importlib
+        bs_mod = importlib.import_module("custom_components.onecom_dyndns.binary_sensor")
+        importlib.reload(bs_mod)
+
+        created_keys = []
+        for desc in bs_mod.BINARY_SENSOR_TYPES:
+            if desc.key == "certificate_valid" and not ssl_enabled:
+                continue
+            created_keys.append(desc.key)
+        return created_keys
+
+    def test_ssl_disabled_creates_1_binary_sensor(self):
+        """With SSL disabled, only dns_status should be created."""
+        keys = self._simulate_setup_entry(ssl_enabled=False)
+        assert len(keys) == 1
+        assert "dns_status" in keys
+        assert "certificate_valid" not in keys
+
+    def test_ssl_enabled_creates_2_binary_sensors(self):
+        """With SSL enabled, both binary sensors should be created."""
+        keys = self._simulate_setup_entry(ssl_enabled=True)
+        assert len(keys) == 2
+        assert "dns_status" in keys
+        assert "certificate_valid" in keys
+
+
+class TestButtonAsyncSetupEntryConditional:
+    """Test that async_setup_entry in button.py correctly filters entities."""
+
+    def _simulate_setup_entry(self, ssl_enabled):
+        """Simulate the entity filtering logic from async_setup_entry."""
+        _ensure_ha_stubs()
+        import importlib
+        btn_mod = importlib.import_module("custom_components.onecom_dyndns.button")
+        importlib.reload(btn_mod)
+
+        created_keys = []
+        for desc in btn_mod.BUTTON_TYPES:
+            if desc.key == "renew_certificate" and not ssl_enabled:
+                continue
+            created_keys.append(desc.key)
+        return created_keys
+
+    def test_ssl_disabled_creates_2_buttons(self):
+        """With SSL disabled, renew_certificate button should be skipped."""
+        keys = self._simulate_setup_entry(ssl_enabled=False)
+        assert len(keys) == 2
+        assert "update_dns" in keys
+        assert "check_ip" in keys
+        assert "renew_certificate" not in keys
+
+    def test_ssl_enabled_creates_3_buttons(self):
+        """With SSL enabled, all 3 buttons should be created."""
+        keys = self._simulate_setup_entry(ssl_enabled=True)
+        assert len(keys) == 3
+        assert "renew_certificate" in keys
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -442,5 +442,334 @@ class TestIPServicesAndLogLevels:
         assert LOG_LEVELS["error"] == logging.ERROR
 
 
+# ---------------------------------------------------------------------------
+# Tests for deploy_custom_component()
+# ---------------------------------------------------------------------------
+
+class TestDeployCustomComponent:
+    """Tests for the deploy_custom_component function."""
+
+    def test_source_directory_not_found(self, tmp_path):
+        """Return False when the bundled component source does not exist."""
+        from run import deploy_custom_component
+
+        with patch("run._COMPONENT_SOURCE", str(tmp_path / "nonexistent")):
+            result = deploy_custom_component()
+        assert result is False
+
+    def test_source_manifest_missing(self, tmp_path):
+        """Return False when manifest.json is missing from the source."""
+        from run import deploy_custom_component
+
+        src = tmp_path / "source"
+        src.mkdir()
+        # No manifest.json inside
+
+        with patch("run._COMPONENT_SOURCE", str(src)):
+            result = deploy_custom_component()
+        assert result is False
+
+    def test_source_manifest_unreadable_json(self, tmp_path):
+        """Return False when manifest.json contains invalid JSON."""
+        from run import deploy_custom_component
+
+        src = tmp_path / "source"
+        src.mkdir()
+        (src / "manifest.json").write_text("NOT JSON {{")
+
+        with patch("run._COMPONENT_SOURCE", str(src)):
+            result = deploy_custom_component()
+        assert result is False
+
+    def test_source_manifest_unreadable_io(self, tmp_path):
+        """Return False when manifest.json cannot be opened."""
+        from run import deploy_custom_component
+
+        src = tmp_path / "source"
+        src.mkdir()
+        manifest = src / "manifest.json"
+        manifest.write_text('{"version": "1.0.0"}')
+
+        with patch("run._COMPONENT_SOURCE", str(src)):
+            with patch("builtins.open", side_effect=IOError("permission denied")):
+                result = deploy_custom_component()
+        assert result is False
+
+    def test_same_version_skips_copy(self, tmp_path):
+        """Return True without copying when source and target have the same version."""
+        from run import deploy_custom_component
+
+        src = tmp_path / "source"
+        src.mkdir()
+        (src / "manifest.json").write_text('{"version": "1.3.1"}')
+
+        tgt = tmp_path / "target"
+        tgt.mkdir()
+        (tgt / "manifest.json").write_text('{"version": "1.3.1"}')
+
+        with patch("run._COMPONENT_SOURCE", str(src)), \
+             patch("run._COMPONENT_TARGET", str(tgt)), \
+             patch("run.shutil.copytree") as mock_copy:
+            result = deploy_custom_component()
+
+        assert result is True
+        mock_copy.assert_not_called()
+
+    def test_deploys_when_target_missing(self, tmp_path):
+        """Deploy when the target directory does not exist yet."""
+        from run import deploy_custom_component
+
+        src = tmp_path / "source"
+        src.mkdir()
+        (src / "manifest.json").write_text('{"version": "1.3.1"}')
+        (src / "__init__.py").write_text("# init")
+
+        tgt = tmp_path / "custom_components" / "onecom_dyndns"
+
+        with patch("run._COMPONENT_SOURCE", str(src)), \
+             patch("run._COMPONENT_TARGET", str(tgt)):
+            result = deploy_custom_component()
+
+        assert result is True
+        assert tgt.exists()
+        assert (tgt / "manifest.json").exists()
+
+    def test_deploys_when_version_differs(self, tmp_path):
+        """Overwrite target when source has a newer version."""
+        from run import deploy_custom_component
+
+        src = tmp_path / "source"
+        src.mkdir()
+        (src / "manifest.json").write_text('{"version": "1.4.0"}')
+        (src / "__init__.py").write_text("# new init")
+
+        tgt = tmp_path / "target"
+        tgt.mkdir()
+        (tgt / "manifest.json").write_text('{"version": "1.3.1"}')
+        (tgt / "__init__.py").write_text("# old init")
+
+        with patch("run._COMPONENT_SOURCE", str(src)), \
+             patch("run._COMPONENT_TARGET", str(tgt)):
+            result = deploy_custom_component()
+
+        assert result is True
+        # Verify the new version was deployed
+        import json
+        with open(tgt / "manifest.json") as f:
+            assert json.load(f)["version"] == "1.4.0"
+
+    def test_deploys_when_target_manifest_unreadable(self, tmp_path):
+        """Deploy when the target manifest.json is corrupted."""
+        from run import deploy_custom_component
+
+        src = tmp_path / "source"
+        src.mkdir()
+        (src / "manifest.json").write_text('{"version": "1.4.0"}')
+        (src / "__init__.py").write_text("# init")
+
+        tgt = tmp_path / "target"
+        tgt.mkdir()
+        (tgt / "manifest.json").write_text("NOT JSON")
+
+        with patch("run._COMPONENT_SOURCE", str(src)), \
+             patch("run._COMPONENT_TARGET", str(tgt)):
+            result = deploy_custom_component()
+
+        assert result is True
+
+    def test_copy_failure_returns_false(self, tmp_path):
+        """Return False when shutil.copytree raises an exception."""
+        from run import deploy_custom_component
+
+        src = tmp_path / "source"
+        src.mkdir()
+        (src / "manifest.json").write_text('{"version": "1.4.0"}')
+
+        tgt = tmp_path / "target"
+        # Target doesn't exist, so no rmtree needed
+
+        with patch("run._COMPONENT_SOURCE", str(src)), \
+             patch("run._COMPONENT_TARGET", str(tgt)), \
+             patch("run.shutil.copytree", side_effect=OSError("disk full")):
+            result = deploy_custom_component()
+
+        assert result is False
+
+    def test_creates_parent_directory(self, tmp_path):
+        """Verify that parent directories are created (exist_ok=True)."""
+        from run import deploy_custom_component
+
+        src = tmp_path / "source"
+        src.mkdir()
+        (src / "manifest.json").write_text('{"version": "1.0.0"}')
+        (src / "__init__.py").write_text("")
+
+        # Target is nested several levels deep
+        tgt = tmp_path / "config" / "custom_components" / "onecom_dyndns"
+
+        with patch("run._COMPONENT_SOURCE", str(src)), \
+             patch("run._COMPONENT_TARGET", str(tgt)):
+            result = deploy_custom_component()
+
+        assert result is True
+        assert tgt.parent.exists()
+
+
+# ---------------------------------------------------------------------------
+# Tests for publish_addon_discovery()
+# ---------------------------------------------------------------------------
+
+class TestPublishAddonDiscovery:
+    """Tests for the publish_addon_discovery function."""
+
+    @patch("run.SUPERVISOR_TOKEN", "")
+    def test_no_token_returns_false(self):
+        """Return False when no SUPERVISOR_TOKEN is available."""
+        from run import publish_addon_discovery
+
+        result = publish_addon_discovery({"domain": "example.com"})
+        assert result is False
+
+    @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
+    @patch("run.requests.post")
+    def test_successful_discovery(self, mock_post):
+        """Return True on successful Supervisor API call."""
+        from run import publish_addon_discovery
+
+        mock_response = Mock()
+        mock_response.ok = True
+        mock_post.return_value = mock_response
+
+        result = publish_addon_discovery({"domain": "example.com"})
+        assert result is True
+        mock_post.assert_called_once()
+
+    @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
+    @patch("run.requests.post")
+    def test_api_non_ok_returns_false(self, mock_post):
+        """Return False when the Supervisor API returns a non-OK response."""
+        from run import publish_addon_discovery
+
+        mock_response = Mock()
+        mock_response.ok = False
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+        mock_post.return_value = mock_response
+
+        result = publish_addon_discovery({"domain": "example.com"})
+        assert result is False
+
+    @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
+    @patch("run.requests.post")
+    def test_request_exception_returns_false(self, mock_post):
+        """Return False when the HTTP request raises an exception."""
+        from run import publish_addon_discovery
+
+        mock_post.side_effect = Exception("Connection refused")
+
+        result = publish_addon_discovery({"domain": "example.com"})
+        assert result is False
+
+    @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
+    @patch("run.requests.post")
+    def test_discovery_data_structure(self, mock_post):
+        """Verify the discovery payload matches the expected structure."""
+        from run import publish_addon_discovery
+
+        mock_response = Mock()
+        mock_response.ok = True
+        mock_post.return_value = mock_response
+
+        options = {
+            "username": "user@one.com",
+            "password": "secret",
+            "domain": "example.com",
+            "subdomains": ["www", "api"],
+            "update_interval": 10,
+            "ip_service": "ifconfig",
+            "ssl_enabled": True,
+            "ssl_email": "ssl@example.com",
+            "ssl_domains": ["example.com", "www.example.com"],
+            "ssl_staging": True,
+            "ssl_renewal_days": 14,
+            "ssl_check_interval": 6,
+        }
+
+        publish_addon_discovery(options)
+
+        call_args = mock_post.call_args
+        payload = call_args[1]["json"]
+        assert payload["addon"] == "homeassistant-onecom-dyndns"
+        assert payload["service"] == "onecom_dyndns"
+        config = payload["config"]
+        assert config["username"] == "user@one.com"
+        assert config["password"] == "secret"
+        assert config["domain"] == "example.com"
+        assert config["subdomains"] == ["www", "api"]
+        assert config["update_interval"] == 10
+        assert config["ip_service"] == "ifconfig"
+        assert config["ssl_enabled"] is True
+        assert config["ssl_email"] == "ssl@example.com"
+        assert config["ssl_domains"] == ["example.com", "www.example.com"]
+        assert config["ssl_staging"] is True
+        assert config["ssl_renewal_days"] == 14
+        assert config["ssl_check_interval"] == 6
+
+    @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
+    @patch("run.requests.post")
+    def test_discovery_uses_correct_url(self, mock_post):
+        """Verify the request goes to http://supervisor/discovery."""
+        from run import publish_addon_discovery
+
+        mock_response = Mock()
+        mock_response.ok = True
+        mock_post.return_value = mock_response
+
+        publish_addon_discovery({"domain": "example.com"})
+
+        call_args = mock_post.call_args
+        assert call_args[0][0] == "http://supervisor/discovery"
+
+    @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
+    @patch("run.requests.post")
+    def test_discovery_uses_bearer_auth(self, mock_post):
+        """Verify the Authorization header contains the bearer token."""
+        from run import publish_addon_discovery
+
+        mock_response = Mock()
+        mock_response.ok = True
+        mock_post.return_value = mock_response
+
+        publish_addon_discovery({"domain": "example.com"})
+
+        call_args = mock_post.call_args
+        headers = call_args[1]["headers"]
+        assert headers["Authorization"] == "Bearer test-token-abc"
+
+    @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
+    @patch("run.requests.post")
+    def test_discovery_defaults_for_missing_options(self, mock_post):
+        """Verify sensible defaults when options dict is mostly empty."""
+        from run import publish_addon_discovery
+
+        mock_response = Mock()
+        mock_response.ok = True
+        mock_post.return_value = mock_response
+
+        # Minimal options dict
+        publish_addon_discovery({})
+
+        payload = mock_post.call_args[1]["json"]
+        config = payload["config"]
+        assert config["username"] == ""
+        assert config["domain"] == ""
+        assert config["subdomains"] == [""]
+        assert config["update_interval"] == 5
+        assert config["ip_service"] == "ipify"
+        assert config["ssl_enabled"] is False
+        assert config["ssl_renewal_days"] == 30
+        assert config["ssl_check_interval"] == 12
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

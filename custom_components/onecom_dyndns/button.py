@@ -9,11 +9,10 @@ from homeassistant.components.button import ButtonEntity, ButtonEntityDescriptio
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, CONF_DOMAIN
+from .const import DOMAIN, CONF_DOMAIN, CONF_ADDON_SLUG, get_device_info
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -89,12 +88,10 @@ class OneComDynDNSButton(CoordinatorEntity, ButtonEntity):
         self._entry = entry
 
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=f"One.com DynDNS - {domain}",
-            manufacturer="One.com",
-            model="DynDNS",
-            configuration_url="https://www.one.com/admin",
+        self._attr_device_info = get_device_info(
+            entry.entry_id,
+            domain,
+            addon_slug=entry.data.get(CONF_ADDON_SLUG),
         )
 
     async def async_press(self) -> None:

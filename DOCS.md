@@ -254,9 +254,22 @@ automation:
 - Regularly rotate your One.com password
 - Monitor the add-on logs for unauthorized access attempts
 
-## Home Assistant Integration (Alternative to Add-on)
+## Automatic Integration Setup (via Add-on)
 
-Instead of using the add-on, you can install this as a custom integration with a guided setup wizard.
+When the add-on starts it automatically:
+
+1. **Deploys the custom component** – Copies `custom_components/onecom_dyndns/` into the Home Assistant `/config/custom_components/` directory. This happens on every start and is version-aware (only updates when a new version is bundled).
+2. **Publishes Supervisor Discovery** – Notifies Home Assistant that an integration is available.
+3. **Shows a confirmation dialog** – Home Assistant presents a notification: *"The One.com DynDNS add-on was detected. Do you want to create entities?"*. Confirm to create the integration.
+4. **Attaches entities to the add-on device** – All sensors, binary sensors and buttons appear directly on the existing "One.com DynDNS Updater" device alongside the standard Supervisor entities (switch, CPU, memory, version).
+
+> **No manual file copying is required.** The add-on handles everything.
+
+After a Home Assistant restart you may need to confirm the discovery notification once. Subsequent add-on updates deploy the new component version automatically.
+
+## Home Assistant Integration (Standalone, without Add-on)
+
+You can also install the integration manually without the add-on.
 
 ### Installation
 
@@ -272,6 +285,8 @@ Instead of using the add-on, you can install this as a custom integration with a
 3. **Subdomain Selection**: Pick which DNS records to update
 4. **Options**: Set update interval, IP service, and enable SSL
 5. **SSL Configuration** (optional): Configure Let's Encrypt settings
+
+> When installed standalone (without the add-on) the integration creates its own device "One.com DynDNS - {domain}".
 
 ### Entities
 

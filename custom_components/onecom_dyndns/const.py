@@ -1,8 +1,14 @@
 """Constants for the One.com DynDNS integration."""
 
+from __future__ import annotations
+
 from typing import Final
 
 DOMAIN: Final = "onecom_dyndns"
+
+# Add-on slug (used for Supervisor device attachment)
+ADDON_SLUG: Final = "homeassistant-onecom-dyndns"
+CONF_ADDON_SLUG: Final = "addon_slug"
 
 # Configuration keys
 CONF_USERNAME: Final = "username"
@@ -54,3 +60,28 @@ ATTR_ACME_CHALLENGE: Final = "acme_challenge"
 
 # Update coordinator
 UPDATE_INTERVAL_SECONDS: Final = 60
+
+
+def get_device_info(entry_id: str, domain: str, addon_slug: str | None = None):
+    """Build DeviceInfo, attaching to the Supervisor add-on device when possible.
+
+    When *addon_slug* is set (i.e. the integration was auto-discovered from
+    the running add-on), we use the Supervisor's own device identifiers
+    so that our entities appear on the existing add-on device in the UI.
+    Otherwise we create a standalone device.
+    """
+    # Import here to avoid circular / missing-HA issues during unit tests
+    from homeassistant.helpers.entity import DeviceInfo  # noqa: E402
+
+    if addon_slug:
+        return DeviceInfo(
+            identifiers={("hassio", addon_slug)},
+        )
+
+    return DeviceInfo(
+        identifiers={(DOMAIN, entry_id)},
+        name=f"One.com DynDNS - {domain}",
+        manufacturer="One.com",
+        model="DynDNS",
+        configuration_url="https://www.one.com/admin",
+    )

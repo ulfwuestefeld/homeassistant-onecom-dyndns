@@ -30,6 +30,9 @@ COPY onecom_api.py /app/
 COPY acme_manager.py /app/
 COPY certificate_manager.py /app/
 
+# Copy custom component (deployed to /config at runtime)
+COPY custom_components/ /app/custom_components/
+
 # Create SSL directory
 RUN mkdir -p /ssl /data/acme /data/ssl
 

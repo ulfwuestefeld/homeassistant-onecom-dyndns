@@ -173,11 +173,21 @@ export ONECOM_SUBDOMAINS="www,"
 python run.py
 ```
 
-## Custom Integration (Alternative)
+## Custom Integration
 
-Instead of the add-on, you can install this as a **Custom Integration** with a guided setup wizard:
+### Automatic (via Add-on)
 
-1. Copy `custom_components/onecom_dyndns` to your HA config directory
+The add-on **automatically deploys** the custom integration into Home Assistant on every start. No manual file copying is needed:
+
+1. Install and start the add-on
+2. Confirm the discovery notification in **Settings → Devices & Services**
+3. All entities appear on the "One.com DynDNS Updater" device
+
+### Manual (without Add-on)
+
+You can also install the integration standalone:
+
+1. Copy `custom_components/onecom_dyndns` to your HA `config/custom_components/` directory
 2. Restart Home Assistant
 3. Go to **Settings → Devices & Services → Add Integration**
 4. Search for "One.com DynDNS"
