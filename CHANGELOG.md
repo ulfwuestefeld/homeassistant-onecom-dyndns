@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-02-06
+
+### Added
+
+- **Extended Test Suite** (378 → 422 tests)
+  - Tests for `deploy_custom_component()` (10 cases: source missing, manifest missing,
+    unreadable JSON, IOError, same version skip, fresh deploy, version upgrade,
+    corrupted target manifest, copy failure, parent directory creation)
+  - Tests for `publish_addon_discovery()` (8 cases: no token, success, API error,
+    exception, data structure, correct URL, bearer auth, default values)
+  - Tests for `get_device_info()` (4 cases: with addon_slug, without, default, empty)
+  - Tests for config flow `async_step_hassio()` and `async_step_hassio_confirm()`
+    (8 cases: valid domain, stores slug, empty domain abort, missing domain abort,
+    creates entry, shows form, sets unique ID, extracts config)
+  - Tests for `OneComDynDNSButton.async_press()` (3 cases: update_dns, check_ip,
+    renew_certificate each call the correct coordinator method)
+  - Tests for `ADDON_SLUG` and `CONF_ADDON_SLUG` constants
+  - Tests for `main()` calling `deploy_custom_component` and `publish_addon_discovery`
+    (4 cases incl. correct call order)
+  - Tests for conditional `async_setup_entry` entity filtering (6 cases: sensor,
+    binary_sensor, button platforms each with SSL enabled/disabled)
+
+### Changed
+
+- Updated existing `main()` tests with required mocks for `deploy_custom_component`
+  and `publish_addon_discovery`
+
 ## [1.3.1] - 2026-02-06
 
 ### Added
@@ -27,30 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `set_acme_challenge()` / `clear_acme_challenge()` methods for ACME challenge lifecycle
   - `acme_challenge` data included in coordinator update cycle
 
-- **Extended Test Suite** (346 → 422 tests)
+- **Extended Test Suite** (346 → 378 tests)
   - Tests for `acme_challenge` sensor (native_value, attributes, null handling)
   - Tests for entity_category on diagnostic and primary sensors
   - Tests for binary sensors (dns_status, certificate_valid)
   - Tests for button entity types, methods, and SSL-conditional creation
   - Tests for coordinator ACME challenge set/clear
   - Tests for PLATFORMS and ATTR_ACME_CHALLENGE constants
-  - Tests for `deploy_custom_component()` (10 cases: source missing, manifest missing,
-    unreadable JSON, IOError, same version skip, fresh deploy, version upgrade,
-    corrupted target manifest, copy failure, parent directory creation)
-  - Tests for `publish_addon_discovery()` (8 cases: no token, success, API error,
-    exception, data structure, correct URL, bearer auth, default values)
-  - Tests for `get_device_info()` (4 cases: with addon_slug, without, default, empty)
-  - Tests for config flow `async_step_hassio()` and `async_step_hassio_confirm()`
-    (8 cases: valid domain, stores slug, empty domain abort, missing domain abort,
-    creates entry, shows form, sets unique ID, extracts config)
-  - Tests for `OneComDynDNSButton.async_press()` (3 cases: update_dns, check_ip,
-    renew_certificate each call the correct coordinator method)
-  - Tests for `ADDON_SLUG` and `CONF_ADDON_SLUG` constants
-  - Tests for `main()` calling `deploy_custom_component` and `publish_addon_discovery`
-    (4 cases: deploy called, discovery called with options, correct call order,
-    existing tests updated with new mocks)
-  - Tests for conditional `async_setup_entry` entity filtering (6 cases: sensor,
-    binary_sensor, button platforms each with SSL enabled/disabled)
 
 - **Auto-Deployment of Custom Component**
   - Add-on automatically deploys `custom_components/onecom_dyndns/` to `/config/custom_components/`
@@ -73,7 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Custom component (1.2.0 → 1.3.1)**
+- **Custom component (1.2.0 → 1.3.2)**
   - SENSOR_TYPES extended from 5 to 6 (+ acme_challenge)
   - ssl_only_sensors set now includes acme_challenge
   - Updated English, German translations and strings.json for new entities
