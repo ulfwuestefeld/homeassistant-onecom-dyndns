@@ -272,7 +272,7 @@ class OneComAPI:
         data = result.get("data", [])
 
         target_prefix = subdomain if subdomain else "@"
-        _LOGGER.debug(f"Looking for record with prefix '{target_prefix}'")
+        _LOGGER.debug("Looking for record with prefix '%s'", target_prefix)
 
         for record in data:
             record_type = record.get("type")
@@ -280,17 +280,17 @@ class OneComAPI:
             prefix = attributes.get("prefix", "")
             dns_type = attributes.get("type", "")
 
-            _LOGGER.debug(f"Found record: type={record_type}, prefix='{prefix}', dns_type={dns_type}")
+            _LOGGER.debug("Found record: type=%s, prefix='%s', dns_type=%s", record_type, prefix, dns_type)
 
             # Accept both dns_service_records and dns_custom_records
             if record_type in ["dns_service_records", "dns_custom_records"]:
                 # Match subdomain or root domain (@)
                 if prefix == target_prefix or (not subdomain and prefix in ["", "@"]):
                     if dns_type == "A":
-                        _LOGGER.debug(f"Match found! Record ID: {record.get('id')}, type: {record_type}")
+                        _LOGGER.debug("Match found! Record ID: %s, type: %s", record.get('id'), record_type)
                         return (record.get("id"), record_type)
 
-        _LOGGER.debug(f"No matching record found for '{target_prefix}'")
+        _LOGGER.debug("No matching record found for '%s'", target_prefix)
         return None
 
     def update_dns_record(self, subdomain: str, ip_address: str) -> bool:
@@ -309,7 +309,7 @@ class OneComAPI:
         if not self._logged_in or not self.session:
             raise OneComAPIError("Not logged in")
 
-        _LOGGER.debug(f"Updating DNS record for '{subdomain or '@'}' to {ip_address}")
+        _LOGGER.debug("Updating DNS record for '%s' to %s", subdomain or '@', ip_address)
 
         # Get current records to find the record ID
         records = self._get_dns_records()
@@ -357,6 +357,9 @@ class OneComAPI:
     def update_all_subdomains(self, subdomains: list, ip_address: str) -> dict:
         """Update DNS records for multiple subdomains.
 
+        Fetches DNS records once and resolves record IDs for all subdomains
+        from the cached result, avoiding N redundant API calls.
+
         Args:
             subdomains: List of subdomains to update
             ip_address: The new IP address
@@ -364,18 +367,90 @@ class OneComAPI:
         Returns:
             Dictionary with results for each subdomain.
         """
+        if not self._logged_in or not self.session:
+            raise OneComAPIError("Not logged in")
+
         results = {}
+
+        # Fetch DNS records once for all subdomains
+        try:
+            records = self._get_dns_records()
+        except OneComAPIError as e:
+            # If we cannot even load the records, mark all as failed
+            for subdomain in subdomains:
+                display_name = subdomain if subdomain else "@"
+                results[display_name] = {"success": False, "error": str(e)}
+            return results
 
         for subdomain in subdomains:
             display_name = subdomain if subdomain else "@"
             try:
-                self.update_dns_record(subdomain, ip_address)
+                self._update_dns_record_with_cache(subdomain, ip_address, records)
                 results[display_name] = {"success": True, "error": None}
             except OneComAPIError as e:
-                _LOGGER.error(f"Failed to update {display_name}: {e}")
+                _LOGGER.error("Failed to update %s: %s", display_name, e)
                 results[display_name] = {"success": False, "error": str(e)}
 
         return results
+
+    def _update_dns_record_with_cache(
+        self, subdomain: str, ip_address: str, records: dict
+    ) -> bool:
+        """Update a DNS A record using pre-fetched records.
+
+        Args:
+            subdomain: The subdomain to update (empty string for root domain)
+            ip_address: The new IP address
+            records: Pre-fetched DNS records dict
+
+        Returns:
+            True if update was successful.
+
+        Raises:
+            OneComAPIError: If the update fails.
+        """
+        result = self._find_record_id(subdomain, records)
+
+        if not result:
+            raise OneComAPIError(
+                f"DNS record for '{subdomain or 'root domain'}' not found. "
+                "Please create the record manually in the One.com control panel first."
+            )
+
+        record_id, record_type = result
+
+        update_url = f"{self.ADMIN_URL}/api/domains/{self.domain}/dns/custom_records/{record_id}"
+
+        update_data = {
+            "type": record_type,
+            "id": record_id,
+            "attributes": {
+                "type": "A",
+                "prefix": subdomain if subdomain else "@",
+                "content": ip_address,
+                "ttl": 3600,
+            },
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        try:
+            response = self.session.patch(
+                update_url, json=update_data, headers=headers
+            )
+            response.raise_for_status()
+            _LOGGER.info(
+                "Successfully updated '%s.%s' to %s",
+                subdomain or "@",
+                self.domain,
+                ip_address,
+            )
+            return True
+        except requests.RequestException as e:
+            raise OneComAPIError(f"Failed to update DNS record: {e}")
 
     def logout(self):
         """Close the session."""
@@ -439,11 +514,10 @@ class OneComAPI:
                 response_text = response.text
                 _LOGGER.debug(f"Response body: {response_text}")
                 
-                # One.com returns 500 with a conflict message when record already exists
+                    # One.com returns 500 with a conflict message when record already exists
                 if "DNS_RECORD_CONFLICTING" in response_text or "ConflictingDnsRecordException" in response_text:
                     # Check if it's the same content - extract record ID from error
                     # Error format: "conflicts with existing TXT record (36316970)"
-                    import re
                     match = re.search(r'existing TXT record \((\d+)\)', response_text)
                     
                     if match and "same content" in response_text:

@@ -68,6 +68,7 @@ Coverage report will be generated in `htmlcov/index.html`
 | `pytest tests/test_security.py -v` | Security tests |
 | `pytest tests/test_edge_cases.py -v` | Edge case tests |
 | `pytest tests/test_error_handling.py -v` | Error handling tests |
+| `pytest tests/test_sensors.py -v` | Sensor entity tests |
 
 #### Run Tests in Parallel (Faster)
 ```bash
@@ -106,7 +107,8 @@ tests/
 ├── test_integration.py              # Component integration tests
 ├── test_security.py                 # Security-related tests
 ├── test_edge_cases.py               # Boundary and edge case tests
-└── test_error_handling.py           # Error handling tests
+├── test_error_handling.py           # Error handling tests
+└── test_sensors.py                  # Sensor entity tests (component + add-on)
 ```
 
 ### Test Categories Explained
@@ -219,6 +221,7 @@ Der Coverage-Bericht wird in `htmlcov/index.html` erstellt.
 | `pytest tests/test_security.py -v` | Sicherheitstests |
 | `pytest tests/test_edge_cases.py -v` | Grenzfall-Tests |
 | `pytest tests/test_error_handling.py -v` | Fehlerbehandlungs-Tests |
+| `pytest tests/test_sensors.py -v` | Sensor-Entity-Tests |
 
 #### Tests parallel ausführen (schneller)
 ```bash
@@ -257,7 +260,8 @@ tests/
 ├── test_integration.py              # Komponenten-Integrationstests
 ├── test_security.py                 # Sicherheitsbezogene Tests
 ├── test_edge_cases.py               # Grenzfall- und Edge-Case-Tests
-└── test_error_handling.py           # Fehlerbehandlungs-Tests
+├── test_error_handling.py           # Fehlerbehandlungs-Tests
+└── test_sensors.py                  # Sensor-Entity-Tests (Komponente + Add-on)
 ```
 
 ### Test-Kategorien erklärt
@@ -348,11 +352,11 @@ pytest tests/ -v
 
 | Metric | Value |
 |--------|-------|
-| Test Files / Test-Dateien | 18 |
-| Estimated Tests / Geschätzte Tests | ~300+ |
-| Test Categories / Test-Kategorien | 7 |
+| Test Files / Test-Dateien | 19 |
+| Estimated Tests / Geschätzte Tests | ~346 |
+| Test Categories / Test-Kategorien | 8 |
 | Coverage Target / Coverage-Ziel | >80% |
 
 ---
 
-*Last updated / Zuletzt aktualisiert: 2026-01-30*
+*Last updated / Zuletzt aktualisiert: 2026-02-06*

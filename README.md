@@ -182,7 +182,7 @@ Instead of the add-on, you can install this as a **Custom Integration** with a g
 3. Go to **Settings → Devices & Services → Add Integration**
 4. Search for "One.com DynDNS"
 
-The integration provides sensors, binary sensors, and services. See [DOCS.md](DOCS.md) for details.
+The integration provides sensors (Current IP, Last Update, Last IP Update, Certificate Expiry, Last Certificate Renewal), binary sensors, and services. See [DOCS.md](DOCS.md) for details.
 
 ## Troubleshooting
 

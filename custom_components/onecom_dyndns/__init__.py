@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -143,6 +143,8 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
         # State
         self._last_ip: str | None = None
         self._last_update: str | None = None
+        self._last_ip_update: str | None = None
+        self._last_certificate_renewal: str | None = None
         self._certificate_info: dict[str, Any] | None = None
 
         super().__init__(
@@ -158,22 +160,32 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
             # Get current public IP
             current_ip = await self._async_get_public_ip()
 
+            now_iso = datetime.now(timezone.utc).isoformat()
+            self._last_update = now_iso
+
+            ip_changed = current_ip != self._last_ip and self._last_ip is not None
+
+            # Update DNS if IP changed
+            if ip_changed:
+                _LOGGER.info("IP changed from %s to %s", self._last_ip, current_ip)
+                await self._async_update_dns(current_ip)
+                self._last_ip_update = now_iso
+
+            self._last_ip = current_ip
+
             data = {
                 "current_ip": current_ip,
                 "last_ip": self._last_ip,
                 "domain": self.domain,
                 "subdomains": self.subdomains,
-                "ip_changed": current_ip != self._last_ip and self._last_ip is not None,
+                "ip_changed": ip_changed,
+                "last_update": self._last_update,
+                "last_ip_update": self._last_ip_update,
+                "last_certificate_renewal": self._last_certificate_renewal,
                 "ssl_enabled": self.ssl_enabled,
                 "certificate_info": self._certificate_info,
             }
 
-            # Update DNS if IP changed
-            if data["ip_changed"]:
-                _LOGGER.info("IP changed from %s to %s", self._last_ip, current_ip)
-                await self._async_update_dns(current_ip)
-
-            self._last_ip = current_ip
             return data
 
         except Exception as err:
@@ -232,3 +244,4 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
         _LOGGER.info("Forcing certificate renewal...")
         # Certificate renewal logic would go here
         # This would use the CertificateManager from the add-on
+        self._last_certificate_renewal = datetime.now(timezone.utc).isoformat()

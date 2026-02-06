@@ -225,7 +225,9 @@ The add-on creates the following sensors in Home Assistant:
 |--------|-------------|
 | `sensor.onecom_dyndns_ip` | Current public IP address with domain/subdomain info |
 | `sensor.onecom_dyndns_dns_status` | DNS update status (ok/error) |
+| `sensor.onecom_dyndns_last_ip_update` | Timestamp of last IP change / DNS update |
 | `sensor.onecom_dyndns_certificate` | SSL certificate expiry date with days remaining |
+| `sensor.onecom_dyndns_last_certificate_renewal` | Timestamp of last certificate renewal |
 | `sensor.onecom_dyndns_acme_challenge` | Current ACME challenge TXT record value |
 
 These sensors can be used in automations, dashboards, or alerts. For example:
@@ -278,8 +280,10 @@ The integration creates the following entities:
 | Entity | Type | Description |
 |--------|------|-------------|
 | `sensor.current_ip` | Sensor | Current public IP address |
-| `sensor.last_update` | Sensor | Timestamp of last DNS update |
+| `sensor.last_update` | Sensor | Timestamp of last coordinator check |
+| `sensor.last_ip_update` | Sensor | Timestamp of last IP change / DNS update |
 | `sensor.certificate_expiry` | Sensor | SSL certificate expiry date |
+| `sensor.last_certificate_renewal` | Sensor | Timestamp of last certificate renewal |
 | `binary_sensor.dns_status` | Binary Sensor | DNS connectivity status |
 | `binary_sensor.certificate_valid` | Binary Sensor | Certificate validity status |
 

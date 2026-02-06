@@ -74,7 +74,7 @@ class TestCertificateFileOperations:
 
     def test_certificate_directory_exists(self):
         """Test certificate directory creation."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             ssl_dir = os.path.join(tmpdir, 'ssl')
             os.makedirs(ssl_dir, exist_ok=True)
             
@@ -83,7 +83,7 @@ class TestCertificateFileOperations:
 
     def test_write_certificate_files(self):
         """Test writing certificate files."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             cert_path = os.path.join(tmpdir, 'fullchain.pem')
             key_path = os.path.join(tmpdir, 'privkey.pem')
             
@@ -103,7 +103,7 @@ class TestCertificateFileOperations:
 
     def test_certificate_file_permissions(self):
         """Test certificate file permissions (Unix-like systems)."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             key_path = os.path.join(tmpdir, 'privkey.pem')
             
             with open(key_path, 'w') as f:

@@ -13,8 +13,8 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
-from pathlib import Path
 from typing import Optional
 
 import requests
@@ -104,10 +104,10 @@ def send_ha_notification(title: str, message: str, notification_id: str = None):
             timeout=10
         )
         response.raise_for_status()
-        logging.debug(f"Notification sent: {title}")
+        logging.debug("Notification sent: %s", title)
         return True
     except Exception as e:
-        logging.warning(f"Failed to send notification: {e}")
+        logging.warning("Failed to send notification: %s", e)
         return False
 
 
@@ -156,10 +156,10 @@ def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
             timeout=10
         )
         response.raise_for_status()
-        logging.debug(f"Sensor updated: {entity_id} = {state}")
+        logging.debug("Sensor updated: %s = %s", entity_id, state)
         return True
     except Exception as e:
-        logging.warning(f"Failed to update sensor {entity_id}: {e}")
+        logging.warning("Failed to update sensor %s: %s", entity_id, e)
         return False
 
 
@@ -227,7 +227,14 @@ class DynDNSUpdater:
         self.username = options.get("username", "")
         self.password = options.get("password", "")
         self.domain = options.get("domain", "")
-        self.subdomains = options.get("subdomains", [""])
+        # Deduplicate subdomains while preserving order
+        seen = set()
+        subdomains_raw = options.get("subdomains", [""])
+        self.subdomains = []
+        for s in subdomains_raw:
+            if s not in seen:
+                seen.add(s)
+                self.subdomains.append(s)
         self.update_interval = options.get("update_interval", 5)  # minutes
         self.ip_service = options.get("ip_service", "ipify")
         self.log_level = options.get("log_level", "info")
@@ -242,7 +249,10 @@ class DynDNSUpdater:
         self.ssl_force_renewal = options.get("ssl_force_renewal", False)
 
         self._running = True
+        self._stop_event = threading.Event()
         self._last_ip: Optional[str] = None
+        self._last_ip_update: Optional[str] = None
+        self._last_certificate_renewal: Optional[str] = None
         self._api: Optional[OneComAPI] = None
         self._cert_manager: Optional[CertificateManager] = None
 
@@ -294,7 +304,7 @@ class DynDNSUpdater:
             if os.path.exists(LAST_IP_FILE):
                 with open(LAST_IP_FILE, "r") as f:
                     self._last_ip = f.read().strip()
-                    self._logger.debug(f"Loaded last IP: {self._last_ip}")
+                    self._logger.debug("Loaded last IP: %s", self._last_ip)
         except IOError as e:
             self._logger.warning(f"Could not load last IP: {e}")
 
@@ -309,7 +319,7 @@ class DynDNSUpdater:
             with open(LAST_IP_FILE, "w") as f:
                 f.write(ip)
             self._last_ip = ip
-            self._logger.debug(f"Saved IP: {ip}")
+            self._logger.debug("Saved IP: %s", ip)
         except IOError as e:
             self._logger.error(f"Could not save IP: {e}")
 
@@ -322,14 +332,14 @@ class DynDNSUpdater:
         url = IP_SERVICES.get(self.ip_service, IP_SERVICES["ipify"])
 
         try:
-            self._logger.debug(f"Fetching IP from {url}")
+            self._logger.debug("Fetching IP from %s", url)
             response = requests.get(url, timeout=10)
             response.raise_for_status()
             ip = response.text.strip()
 
             # Basic IP validation
             if self._is_valid_ip(ip):
-                self._logger.debug(f"Detected IP: {ip}")
+                self._logger.debug("Detected IP: %s", ip)
                 return ip
             else:
                 self._logger.warning(f"Invalid IP response: {ip}")
@@ -413,7 +423,7 @@ class DynDNSUpdater:
         
         # Check if IP has changed
         if current_ip == self._last_ip:
-            self._logger.debug(f"IP unchanged: {current_ip}")
+            self._logger.debug("IP unchanged: %s", current_ip)
             return
 
         self._logger.info(f"IP changed: {self._last_ip or 'unknown'} -> {current_ip}")
@@ -421,8 +431,10 @@ class DynDNSUpdater:
         # Update DNS records
         if self.update_dns(current_ip):
             self._save_last_ip(current_ip)
+            self._last_ip_update = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
             self._logger.info("DNS update completed successfully")
             self._update_dns_sensor("ok", current_ip)
+            self._update_last_ip_update_sensor()
         else:
             self._logger.error("DNS update failed - will retry on next interval")
             self._update_dns_sensor("error", current_ip)
@@ -439,7 +451,7 @@ class DynDNSUpdater:
                 "domain": self.domain,
                 "subdomains": subdomains_list,
                 "last_update": time.strftime("%Y-%m-%d %H:%M:%S"),
-            }
+            },
         )
     
     def _update_dns_sensor(self, status: str, ip: str):
@@ -455,7 +467,7 @@ class DynDNSUpdater:
                 "current_ip": ip,
                 "subdomains": subdomains_list,
                 "last_update": time.strftime("%Y-%m-%d %H:%M:%S"),
-            }
+            },
         )
     
     def _update_certificate_sensor(self, cert_info: dict):
@@ -479,7 +491,40 @@ class DynDNSUpdater:
                 "valid_from": cert_info.get("not_valid_before", "unknown"),
                 "needs_renewal": cert_info.get("needs_renewal", False),
                 "last_check": time.strftime("%Y-%m-%d %H:%M:%S"),
-            }
+            },
+        )
+
+    def _update_last_ip_update_sensor(self):
+        """Update the 'last IP update' sensor in Home Assistant."""
+        if not self._last_ip_update:
+            return
+        subdomains_list = [f"{s}.{self.domain}" if s else self.domain for s in self.subdomains]
+        update_ha_sensor(
+            "sensor.onecom_dyndns_last_ip_update",
+            self._last_ip_update,
+            {
+                "friendly_name": "One.com DynDNS Last IP Update",
+                "icon": "mdi:ip-network-outline",
+                "device_class": "timestamp",
+                "domain": self.domain,
+                "current_ip": self._last_ip,
+                "subdomains": subdomains_list,
+            },
+        )
+
+    def _update_last_certificate_renewal_sensor(self):
+        """Update the 'last certificate renewal' sensor in Home Assistant."""
+        if not self._last_certificate_renewal:
+            return
+        update_ha_sensor(
+            "sensor.onecom_dyndns_last_certificate_renewal",
+            self._last_certificate_renewal,
+            {
+                "friendly_name": "One.com DynDNS Last Certificate Renewal",
+                "icon": "mdi:certificate-outline",
+                "device_class": "timestamp",
+                "domains": self.ssl_domains if self.ssl_domains else [self.domain],
+            },
         )
 
     def _ssl_event_callback(self, event_type: str, data: dict):
@@ -497,6 +542,11 @@ class DynDNSUpdater:
             cert_info = data.get("certificate", {})
             if cert_info:
                 self._update_certificate_sensor(cert_info)
+            # Track and publish renewal timestamp
+            self._last_certificate_renewal = time.strftime(
+                "%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()
+            )
+            self._update_last_certificate_renewal_sensor()
             
             # Send notification to user
             expiry = cert_info.get("not_valid_after", "unknown") if cert_info else "unknown"
@@ -508,7 +558,7 @@ class DynDNSUpdater:
                     f"**Certificate:** `/ssl/fullchain.pem`\n\n"
                     f"**Action required:** Restart NGINX or Home Assistant to use the new certificate!"
                 ),
-                notification_id="onecom_dyndns_certificate_renewed"
+                notification_id="onecom_dyndns_certificate_renewed",
             )
         elif event_type == "error":
             self._logger.error(f"SSL certificate error: {data.get('error', 'Unknown error')}")
@@ -609,13 +659,12 @@ class DynDNSUpdater:
         interval_seconds = self.update_interval * 60
 
         while self._running:
-            self._logger.debug(f"Sleeping for {self.update_interval} minutes...")
+            self._logger.debug("Sleeping for %s minutes...", self.update_interval)
 
-            # Sleep in smaller intervals to allow for graceful shutdown
-            for _ in range(interval_seconds):
-                if not self._running:
-                    break
-                time.sleep(1)
+            # Block until timeout or stop signal; single syscall replaces
+            # interval_seconds individual sleep(1) calls.
+            if self._stop_event.wait(timeout=interval_seconds):
+                break  # stop() was called
 
             if self._running:
                 self.check_and_update()
@@ -629,6 +678,7 @@ class DynDNSUpdater:
         """Stop the updater gracefully."""
         self._logger.info("Stopping DynDNS updater...")
         self._running = False
+        self._stop_event.set()  # Wake up the main loop immediately
         self._stop_ssl_manager()
 
 

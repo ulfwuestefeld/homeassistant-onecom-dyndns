@@ -118,8 +118,14 @@
       "last_update": {
         "name": "Last Update"
       },
+      "last_ip_update": {
+        "name": "Last IP Update"
+      },
       "certificate_expiry": {
         "name": "Certificate Expiry"
+      },
+      "last_certificate_renewal": {
+        "name": "Last Certificate Renewal"
       }
     },
     "binary_sensor": {

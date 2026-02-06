@@ -412,9 +412,11 @@ class TestUpdateAllSubdomains:
         self.api._logged_in = True
         self.api.session = Mock()
 
-    @patch.object(OneComAPI, 'update_dns_record')
-    def test_update_all_subdomains_success(self, mock_update):
+    @patch.object(OneComAPI, '_update_dns_record_with_cache')
+    @patch.object(OneComAPI, '_get_dns_records')
+    def test_update_all_subdomains_success(self, mock_get_records, mock_update):
         """Test successful update of all subdomains."""
+        mock_get_records.return_value = {"result": {"data": []}}
         mock_update.return_value = True
 
         results = self.api.update_all_subdomains(["www", "api", ""], "1.2.3.4")
@@ -424,11 +426,16 @@ class TestUpdateAllSubdomains:
         # Empty string subdomain is stored as "@" (root domain)
         assert results["@"]["success"] is True
         assert mock_update.call_count == 3
+        # DNS records should be fetched only once
+        mock_get_records.assert_called_once()
 
-    @patch.object(OneComAPI, 'update_dns_record')
-    def test_update_all_subdomains_partial_failure(self, mock_update):
+    @patch.object(OneComAPI, '_update_dns_record_with_cache')
+    @patch.object(OneComAPI, '_get_dns_records')
+    def test_update_all_subdomains_partial_failure(self, mock_get_records, mock_update):
         """Test partial failure in bulk update."""
-        def update_side_effect(subdomain, ip):
+        mock_get_records.return_value = {"result": {"data": []}}
+
+        def update_side_effect(subdomain, ip, records):
             if subdomain == "fail":
                 raise OneComAPIError("Record not found")
             return True

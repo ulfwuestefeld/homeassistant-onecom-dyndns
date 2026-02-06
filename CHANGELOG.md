@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-06
+
+### Added
+
+- **New Sensors**
+  - `sensor.onecom_dyndns_last_ip_update` – Timestamp of last IP change / DNS update
+  - `sensor.onecom_dyndns_last_certificate_renewal` – Timestamp of last certificate renewal
+  - Custom component: `last_ip_update` and `last_certificate_renewal` sensor entities
+  - All new sensors include extra state attributes (domain, current_ip, certificate_expiry, etc.)
+  - SSL-related sensors are only created when SSL is enabled
+
+- **Sensor Test Suite** (`test_sensors.py`)
+  - 45 tests covering all 5 sensor types (custom component + add-on)
+  - Tests for native_value, extra_state_attributes, SSL-conditional creation
+  - Tests for add-on sensor update methods and event-driven flows
+
+### Changed
+
+- **Performance: Reduced CPU usage and memory footprint**
+  - Replaced `time.sleep(1)` polling loop with `threading.Event.wait()` in main loop
+    (300 syscalls/cycle → 1 syscall; instant graceful shutdown)
+  - Replaced `time.sleep(60)` polling loop with `threading.Event.wait()` in certificate renewal loop
+    (720 syscalls/12h-cycle → 1 syscall)
+  - DNS records fetched once per `update_all_subdomains` call instead of N times (1 API call vs N)
+  - SSL context created once and reused across all domain verifications
+  - Debug-level log messages converted to lazy `%s` formatting (no string allocation when disabled)
+
+- **Import cleanup**
+  - Removed unused `from pathlib import Path` (certificate_manager.py, acme_manager.py)
+  - Removed redundant `from datetime import timezone` inside method body
+  - Moved `import traceback` from function-level to module-level (acme_manager.py)
+
+- **Custom component (1.1.0 → 1.2.0)**
+  - Coordinator now correctly populates `last_update` timestamp (was broken / always None)
+  - Coordinator tracks `last_ip_update` and `last_certificate_renewal` timestamps
+  - New constants `ATTR_LAST_IP_UPDATE`, `ATTR_LAST_CERTIFICATE_RENEWAL`
+  - Updated English and German translations for new sensor entities
+
+### Fixed
+
+- `last_update` sensor in custom component coordinator was never populated (always None)
+
 ## [1.2.21] - 2026-01-30
 
 ### Added

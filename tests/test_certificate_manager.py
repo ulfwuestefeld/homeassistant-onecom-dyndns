@@ -148,52 +148,45 @@ class TestCertificateManagerStatus:
 
     def test_save_and_load_status(self):
         """Test saving and loading status."""
-        import certificate_manager as cm
-        
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             status_file = f"{tmpdir}/status.json"
             cert_path = f"{tmpdir}/cert.pem"
             key_path = f"{tmpdir}/key.pem"
 
-            original = cm.CERT_STATUS_FILE
-            cm.CERT_STATUS_FILE = status_file
-            
-            try:
-                manager = CertificateManager(
-                    username="user@example.com",
-                    password="password",
-                    domain="example.com",
-                    email="ssl@example.com",
-                    cert_path=cert_path,
-                    key_path=key_path,
-                )
+            manager = CertificateManager(
+                username="user@example.com",
+                password="password",
+                domain="example.com",
+                email="ssl@example.com",
+                cert_path=cert_path,
+                key_path=key_path,
+                status_file=status_file,
+            )
 
-                test_status = {"status": "valid", "test_key": "test_value"}
-                manager._save_status(test_status)
+            test_status = {"status": "valid", "test_key": "test_value"}
+            manager._save_status(test_status)
 
-                loaded_status = manager._load_status()
+            loaded_status = manager._load_status()
 
-                assert loaded_status["status"] == "valid"
-                assert loaded_status["test_key"] == "test_value"
-                assert "last_updated" in loaded_status
-            finally:
-                cm.CERT_STATUS_FILE = original
+            assert loaded_status["status"] == "valid"
+            assert loaded_status["test_key"] == "test_value"
+            assert "last_updated" in loaded_status
 
     def test_load_status_no_file(self):
         """Test loading status when file doesn't exist."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             status_file = f"{tmpdir}/nonexistent.json"
 
-            with patch('certificate_manager.CERT_STATUS_FILE', status_file):
-                manager = CertificateManager(
-                    username="user@example.com",
-                    password="password",
-                    domain="example.com",
-                    email="ssl@example.com",
-                )
+            manager = CertificateManager(
+                username="user@example.com",
+                password="password",
+                domain="example.com",
+                email="ssl@example.com",
+                status_file=status_file,
+            )
 
-                status = manager._load_status()
-                assert status == {}
+            status = manager._load_status()
+            assert status == {}
 
 
 class TestCertificateManagerCertInfo:
@@ -201,7 +194,7 @@ class TestCertificateManagerCertInfo:
 
     def test_get_certificate_info_no_cert(self):
         """Test getting info when no certificate exists."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             manager = CertificateManager(
                 username="user@example.com",
                 password="password",
@@ -275,7 +268,7 @@ class TestCertificateManagerGetStatus:
 
     def test_get_status_basic(self):
         """Test getting basic status."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             manager = CertificateManager(
                 username="user@example.com",
                 password="password",

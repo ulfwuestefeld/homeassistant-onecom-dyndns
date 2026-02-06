@@ -21,6 +21,8 @@ from .const import (
     CONF_DOMAIN,
     ATTR_CURRENT_IP,
     ATTR_LAST_UPDATE,
+    ATTR_LAST_IP_UPDATE,
+    ATTR_LAST_CERTIFICATE_RENEWAL,
     ATTR_CERTIFICATE_EXPIRY,
     ATTR_CERTIFICATE_DOMAINS,
     ATTR_DAYS_UNTIL_EXPIRY,
@@ -39,10 +41,22 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
         icon="mdi:clock-outline",
     ),
     SensorEntityDescription(
+        key="last_ip_update",
+        translation_key="last_ip_update",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:ip-network-outline",
+    ),
+    SensorEntityDescription(
         key="certificate_expiry",
         translation_key="certificate_expiry",
         device_class=SensorDeviceClass.TIMESTAMP,
         icon="mdi:certificate",
+    ),
+    SensorEntityDescription(
+        key="last_certificate_renewal",
+        translation_key="last_certificate_renewal",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:certificate-outline",
     ),
 )
 
@@ -56,10 +70,12 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     domain = entry.data[CONF_DOMAIN]
 
+    ssl_only_sensors = {"certificate_expiry", "last_certificate_renewal"}
+
     entities = []
     for description in SENSOR_TYPES:
-        # Skip certificate sensor if SSL not enabled
-        if description.key == "certificate_expiry":
+        # Skip certificate-related sensors if SSL not enabled
+        if description.key in ssl_only_sensors:
             if not entry.data.get("ssl_enabled", False):
                 continue
 
@@ -112,10 +128,22 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
                 return datetime.fromisoformat(last_update)
             return None
 
+        if key == "last_ip_update":
+            last_ip_update = self.coordinator.data.get("last_ip_update")
+            if last_ip_update:
+                return datetime.fromisoformat(last_ip_update)
+            return None
+
         if key == "certificate_expiry":
             cert_info = self.coordinator.data.get("certificate_info")
             if cert_info and cert_info.get("not_valid_after"):
                 return datetime.fromisoformat(cert_info["not_valid_after"])
+            return None
+
+        if key == "last_certificate_renewal":
+            last_renewal = self.coordinator.data.get("last_certificate_renewal")
+            if last_renewal:
+                return datetime.fromisoformat(last_renewal)
             return None
 
         return None
@@ -135,6 +163,10 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
             attrs["last_ip"] = self.coordinator.data.get("last_ip")
             attrs["ip_changed"] = self.coordinator.data.get("ip_changed", False)
 
+        if key == "last_ip_update":
+            attrs["domain"] = self._domain
+            attrs["current_ip"] = self.coordinator.data.get("current_ip")
+
         if key == "certificate_expiry":
             cert_info = self.coordinator.data.get("certificate_info")
             if cert_info:
@@ -142,6 +174,12 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
                 attrs["days_remaining"] = cert_info.get("days_remaining")
                 attrs["issuer"] = cert_info.get("issuer", {}).get("organizationName", "Unknown")
                 attrs["needs_renewal"] = cert_info.get("needs_renewal", False)
+
+        if key == "last_certificate_renewal":
+            cert_info = self.coordinator.data.get("certificate_info")
+            if cert_info:
+                attrs["domains"] = cert_info.get("domains", [])
+                attrs["certificate_expiry"] = cert_info.get("not_valid_after")
 
         return attrs
 

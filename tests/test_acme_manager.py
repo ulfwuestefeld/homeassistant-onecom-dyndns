@@ -79,7 +79,7 @@ class TestACMEManagerDirectories:
 
     def test_ensure_directories_creates_paths(self):
         """Test that directories are created."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             onecom_api = Mock()
 
             manager = ACMEManager(
@@ -120,7 +120,7 @@ class TestACMEManagerCertificateExpiry:
         """Test expiry check when no certificate exists."""
         onecom_api = Mock()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             manager = ACMEManager(
                 email="test@example.com",
                 onecom_api=onecom_api,
@@ -134,7 +134,7 @@ class TestACMEManagerCertificateExpiry:
         """Test renewal check when no certificate exists."""
         onecom_api = Mock()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             manager = ACMEManager(
                 email="test@example.com",
                 onecom_api=onecom_api,
@@ -151,7 +151,7 @@ class TestACMEManagerCertificateSaving:
         """Test saving certificate and key."""
         onecom_api = Mock()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             cert_path = f"{tmpdir}/cert.pem"
             key_path = f"{tmpdir}/key.pem"
             account_key_path = f"{tmpdir}/account.key"
@@ -177,6 +177,55 @@ class TestACMEManagerCertificateSaving:
 
             with open(key_path) as f:
                 assert f.read() == key_pem
+
+
+class TestACMEManagerTimezoneHandling:
+    """Tests for timezone-aware certificate expiry comparison."""
+
+    def test_needs_renewal_with_timezone_aware_expiry(self):
+        """Test needs_renewal handles timezone-aware expiry from cryptography."""
+        from datetime import datetime, timedelta, timezone
+
+        onecom_api = Mock()
+        manager = ACMEManager(
+            email="test@example.com",
+            onecom_api=onecom_api,
+        )
+
+        # Simulate a timezone-aware expiry (as returned by cryptography's not_valid_after_utc)
+        future_expiry = datetime.now(timezone.utc) + timedelta(days=60)
+        with patch.object(manager, 'get_certificate_expiry', return_value=future_expiry):
+            assert manager.needs_renewal(days_before_expiry=30) is False
+
+    def test_needs_renewal_with_timezone_aware_expiry_soon(self):
+        """Test needs_renewal correctly detects expiring timezone-aware cert."""
+        from datetime import datetime, timedelta, timezone
+
+        onecom_api = Mock()
+        manager = ACMEManager(
+            email="test@example.com",
+            onecom_api=onecom_api,
+        )
+
+        # Simulate a certificate expiring in 10 days (UTC-aware)
+        soon_expiry = datetime.now(timezone.utc) + timedelta(days=10)
+        with patch.object(manager, 'get_certificate_expiry', return_value=soon_expiry):
+            assert manager.needs_renewal(days_before_expiry=30) is True
+
+    def test_needs_renewal_with_timezone_naive_expiry(self):
+        """Test needs_renewal still works with timezone-naive expiry (fallback)."""
+        from datetime import datetime, timedelta
+
+        onecom_api = Mock()
+        manager = ACMEManager(
+            email="test@example.com",
+            onecom_api=onecom_api,
+        )
+
+        # Simulate a timezone-naive expiry (as returned by older cryptography versions)
+        future_expiry = datetime.now() + timedelta(days=60)
+        with patch.object(manager, 'get_certificate_expiry', return_value=future_expiry):
+            assert manager.needs_renewal(days_before_expiry=30) is False
 
 
 class TestACMEManagerValidation:

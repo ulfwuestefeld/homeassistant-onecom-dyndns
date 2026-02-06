@@ -65,7 +65,7 @@ class TestE2EDynDNSFlow:
         mock_api_class.return_value = mock_api
 
         # Create updater with no previous IP
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(mock_options)
                 
@@ -98,7 +98,7 @@ class TestE2EDynDNSFlow:
         mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             # Create a file with existing IP
             last_ip_file = os.path.join(tmpdir, "last_ip.txt")
             with open(last_ip_file, "w") as f:
@@ -131,7 +131,7 @@ class TestE2EDynDNSFlow:
         }
         mock_api_class.return_value = mock_api
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             # Create a file with old IP
             last_ip_file = os.path.join(tmpdir, "last_ip.txt")
             with open(last_ip_file, "w") as f:
@@ -194,7 +194,7 @@ class TestE2ESSLCertificateFlow:
         }
         mock_cert_manager.return_value = mock_cert
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(ssl_options)
                 updater._start_ssl_manager()
@@ -234,7 +234,7 @@ class TestE2ESSLCertificateFlow:
 
         ssl_options["ssl_force_renewal"] = True
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(ssl_options)
                 updater._start_ssl_manager()
@@ -273,7 +273,7 @@ class TestE2EErrorRecovery:
             Mock(text="1.2.3.4", raise_for_status=Mock()),
         ]
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(mock_options)
                 
@@ -302,7 +302,7 @@ class TestE2EErrorRecovery:
         mock_api.login.side_effect = OneComAPIError("Login failed")
         mock_api_class.return_value = mock_api
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             last_ip_file = os.path.join(tmpdir, "last_ip.txt")
             
             with patch("run.LAST_IP_FILE", last_ip_file):
@@ -334,7 +334,7 @@ class TestE2EErrorRecovery:
         }
         mock_api_class.return_value = mock_api
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(mock_options)
                 result = updater.update_dns("1.2.3.4")
@@ -371,7 +371,7 @@ class TestE2EGracefulShutdown:
         mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(mock_options)
                 
@@ -416,7 +416,7 @@ class TestE2EGracefulShutdown:
         mock_cert.get_certificate_info.return_value = None
         mock_cert_manager.return_value = mock_cert
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(mock_options)
                 updater._start_ssl_manager()
@@ -464,7 +464,7 @@ class TestE2EMultipleSubdomains:
         }
         mock_api_class.return_value = mock_api
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(options)
                 result = updater.update_dns("1.2.3.4")

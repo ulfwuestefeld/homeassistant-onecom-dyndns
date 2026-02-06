@@ -23,9 +23,10 @@ You use state of the art development techniques and architecture.
 # Quality Checklist
 After each significant change, verify:
 - [ ] CHANGELOG.md updated with version and changes
-- [ ] Version number in config.yaml matches changelog
+- [ ] Version number in config.yaml and manifest.json matches changelog
 - [ ] Documentation (DOCS.md, README.md) is current
 - [ ] Test documentation (Test.md) is current
 - [ ] Tests pass and cover new functionality
 - [ ] SBOM (sbom.json, SBOM.md) reflects dependencies
 - [ ] .cursorrules is still accurate
+- [ ] .gitignore covers IDE and build artifacts

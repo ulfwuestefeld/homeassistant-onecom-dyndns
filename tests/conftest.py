@@ -122,14 +122,14 @@ def mock_txt_records():
 @pytest.fixture
 def temp_directory():
     """Provide a temporary directory that is cleaned up after the test."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         yield tmpdir
 
 
 @pytest.fixture
 def temp_cert_paths():
     """Provide temporary certificate paths for testing."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         yield {
             'cert_path': os.path.join(tmpdir, 'cert.pem'),
             'key_path': os.path.join(tmpdir, 'key.pem'),

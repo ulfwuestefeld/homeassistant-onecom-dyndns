@@ -271,6 +271,57 @@ class TestConcurrentOperations:
         assert ("cb1", "test") in results
         assert ("cb2", "test") in results
 
+    @patch("run.OneComAPI")
+    @patch("run.requests.get")
+    @patch("run.update_ha_sensor")
+    def test_concurrent_check_and_update(self, mock_sensor, mock_get, mock_api_class):
+        """Test that concurrent check_and_update calls don't corrupt state."""
+        import threading
+        from run import DynDNSUpdater
+
+        mock_response = Mock()
+        mock_response.text = "1.2.3.4"
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+
+        mock_api = Mock()
+        mock_api.update_all_subdomains.return_value = {
+            "www": {"success": True},
+        }
+        mock_api_class.return_value = mock_api
+
+        options = {
+            "username": "test@example.com",
+            "password": "test",
+            "domain": "example.com",
+            "subdomains": ["www"],
+            "update_interval": 5,
+            "ip_service": "ipify",
+            "log_level": "error",
+            "ssl_enabled": False,
+        }
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+                updater = DynDNSUpdater(options)
+
+                errors = []
+
+                def run_check():
+                    try:
+                        updater.check_and_update()
+                    except Exception as e:
+                        errors.append(e)
+
+                threads = [threading.Thread(target=run_check) for _ in range(5)]
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join(timeout=5)
+
+                # No exceptions should have occurred
+                assert len(errors) == 0
+
 
 class TestNetworkEdgeCases:
     """Tests for network edge cases."""
@@ -333,7 +384,7 @@ class TestFileSystemEdgeCases:
         """Test behavior when last IP file directory doesn't exist."""
         from run import DynDNSUpdater
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             # Non-existent subdirectory
             nonexistent_path = os.path.join(tmpdir, "nonexistent", "subdir", "last_ip.txt")
 
@@ -359,7 +410,7 @@ class TestFileSystemEdgeCases:
         """Test handling of permission errors when reading certificate."""
         from certificate_manager import CertificateManager
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             cert_path = os.path.join(tmpdir, "cert.pem")
             
             # Create file
@@ -502,7 +553,7 @@ class TestMultipleDomainsEdgeCases:
         assert len(updater.subdomains) == 100
 
     def test_duplicate_subdomains(self):
-        """Test with duplicate subdomains in list."""
+        """Test that duplicate subdomains are deduplicated."""
         from run import DynDNSUpdater
 
         options = {
@@ -516,8 +567,40 @@ class TestMultipleDomainsEdgeCases:
         }
 
         updater = DynDNSUpdater(options)
-        # Should handle duplicates (either dedupe or process all)
-        assert "www" in updater.subdomains
+        # Duplicates should be removed while preserving order
+        assert updater.subdomains == ["www", "api"]
+
+    @patch("run.OneComAPI")
+    def test_duplicate_subdomains_single_dns_update(self, mock_api_class):
+        """Test that deduplicated subdomains result in single DNS call per subdomain."""
+        from run import DynDNSUpdater
+
+        options = {
+            "username": "test@example.com",
+            "password": "test",
+            "domain": "example.com",
+            "subdomains": ["www", "www", "api", "www"],  # Duplicates
+            "update_interval": 5,
+            "ip_service": "ipify",
+            "log_level": "error",
+        }
+
+        mock_api = Mock()
+        mock_api.update_all_subdomains.return_value = {
+            "www": {"success": True},
+            "api": {"success": True},
+        }
+        mock_api_class.return_value = mock_api
+
+        updater = DynDNSUpdater(options)
+        result = updater.update_dns("1.2.3.4")
+
+        assert result is True
+        # Should only pass deduplicated subdomains
+        mock_api.update_all_subdomains.assert_called_once_with(
+            ["www", "api"],
+            "1.2.3.4"
+        )
 
 
 if __name__ == "__main__":

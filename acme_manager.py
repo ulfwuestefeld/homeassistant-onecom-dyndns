@@ -10,8 +10,8 @@ import logging
 import os
 import time
 import random
-from datetime import datetime, timedelta
-from pathlib import Path
+import traceback
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple, List, Callable
 from functools import wraps
 
@@ -42,14 +42,16 @@ MAX_RETRIES = 5
 BASE_DELAY = 2  # seconds
 MAX_DELAY = 60  # seconds
 
-# Retryable exceptions
+# Retryable exceptions - only network-related errors that may succeed on retry.
+# requests.exceptions.RequestException covers all requests-library errors (Timeout,
+# ConnectionError, ReadTimeout, ChunkedEncodingError, etc.).
+# Built-in ConnectionError and TimeoutError cover Python-level network errors.
+# Note: OSError is intentionally excluded because it is the base class for
+# PermissionError, FileNotFoundError, etc. which are not retryable.
 RETRYABLE_EXCEPTIONS = (
-    requests.exceptions.Timeout,
-    requests.exceptions.ConnectionError,
-    requests.exceptions.ReadTimeout,
+    requests.exceptions.RequestException,
     ConnectionError,
     TimeoutError,
-    OSError,
 )
 
 
@@ -189,8 +191,9 @@ class ACMEManager:
         with open(self.account_key_path, "wb") as f:
             f.write(key_pem)
 
-        # Set restrictive permissions
-        os.chmod(self.account_key_path, 0o600)
+        # Set restrictive permissions (Unix only - not supported on Windows)
+        if os.name != 'nt':
+            os.chmod(self.account_key_path, 0o600)
 
         return jose.JWKRSA(key=private_key)
 
@@ -232,7 +235,7 @@ class ACMEManager:
         # Ensure the registration is stored on the client if provided
         if regr:
             self._client.net.account = regr
-            _LOGGER.debug(f"Client configured with account URI: {regr.uri}")
+            _LOGGER.debug("Client configured with account URI: %s", regr.uri)
         
         return self._client
 
@@ -288,8 +291,7 @@ class ACMEManager:
             raise ACMEManagerError(f"Network error during account registration: {e}")
                 
         except Exception as e:
-            import traceback
-            _LOGGER.error(f"Exception type: {type(e).__name__}")
+            _LOGGER.error("Exception type: %s", type(e).__name__)
             _LOGGER.error(f"Exception args: {e.args}")
             _LOGGER.error(f"Traceback: {traceback.format_exc()}")
             raise ACMEManagerError(f"Failed to register ACME account: {e}")
@@ -359,7 +361,7 @@ class ACMEManager:
         _LOGGER.info(f"TXT Record Name: {full_txt_name}")
         _LOGGER.info(f"TXT Record Value: {validation}")
         _LOGGER.info(f"=============================")
-        _LOGGER.debug(f"Challenge subdomain (prefix): {challenge_subdomain}")
+        _LOGGER.debug("Challenge subdomain (prefix): %s", challenge_subdomain)
         
         # Notify via callback (e.g., Home Assistant notification)
         if self.challenge_callback:
@@ -406,7 +408,7 @@ class ACMEManager:
                     authz = poll_result
 
                 status = authz.body.status.name
-                _LOGGER.debug(f"Authorization status: {status}")
+                _LOGGER.debug("Authorization status: %s", status)
 
                 if status == "valid":
                     _LOGGER.info(f"Challenge successful for {domain}")
@@ -549,7 +551,8 @@ class ACMEManager:
         try:
             with open(self.cert_path, "w") as f:
                 f.write(cert_pem)
-            os.chmod(self.cert_path, 0o644)
+            if os.name != 'nt':
+                os.chmod(self.cert_path, 0o644)
             
             # Verify file was written
             cert_size = os.path.getsize(self.cert_path)
@@ -563,7 +566,8 @@ class ACMEManager:
         try:
             with open(self.key_path, "w") as f:
                 f.write(key_pem)
-            os.chmod(self.key_path, 0o600)
+            if os.name != 'nt':
+                os.chmod(self.key_path, 0o600)
             
             # Verify file was written
             key_size = os.path.getsize(self.key_path)
@@ -619,7 +623,12 @@ class ACMEManager:
             _LOGGER.info("No certificate found, renewal needed")
             return True
 
-        days_remaining = (expiry - datetime.now()).days
+        # Use timezone-aware comparison to match get_certificate_expiry() which
+        # returns UTC-aware datetimes from cryptography's not_valid_after_utc
+        if expiry.tzinfo is not None:
+            days_remaining = (expiry - datetime.now(timezone.utc)).days
+        else:
+            days_remaining = (expiry - datetime.now()).days
         _LOGGER.info(f"Certificate expires in {days_remaining} days")
 
         if days_remaining <= days_before_expiry:

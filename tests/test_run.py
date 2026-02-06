@@ -159,7 +159,7 @@ class TestSaveAcmeChallengeInfo:
     @patch("run.update_ha_sensor")
     def test_saves_challenge_info_to_file(self, mock_sensor, mock_notification):
         """Test that challenge info is saved to file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             challenge_file = os.path.join(tmpdir, "acme_challenge.json")
             
             with patch("run.ACME_CHALLENGE_FILE", challenge_file):
@@ -181,7 +181,7 @@ class TestSaveAcmeChallengeInfo:
     @patch("run.update_ha_sensor")
     def test_sends_notification(self, mock_sensor, mock_notification):
         """Test that notification is sent."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             with patch("run.ACME_CHALLENGE_FILE", os.path.join(tmpdir, "acme.json")):
                 save_acme_challenge_info("example.com", "_acme.example.com", "token")
 
@@ -193,7 +193,7 @@ class TestSaveAcmeChallengeInfo:
     @patch("run.update_ha_sensor")
     def test_updates_sensor(self, mock_sensor, mock_notification):
         """Test that ACME sensor is updated."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             with patch("run.ACME_CHALLENGE_FILE", os.path.join(tmpdir, "acme.json")):
                 save_acme_challenge_info("example.com", "_acme.example.com", "token")
 
@@ -208,7 +208,7 @@ class TestLoadOptions:
 
     def test_loads_from_options_file(self):
         """Test loading options from JSON file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             options_file = os.path.join(tmpdir, "options.json")
             test_options = {
                 "username": "test@example.com",

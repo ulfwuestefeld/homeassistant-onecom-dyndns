@@ -14,7 +14,6 @@ import threading
 import time
 import traceback
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Optional, Callable, Dict, Any, List
 
 from cryptography import x509
@@ -52,6 +51,7 @@ class CertificateManager:
         renewal_days: int = 30,
         check_interval_hours: int = 12,
         challenge_callback: Optional[Callable[[str, str, str], None]] = None,
+        status_file: Optional[str] = None,
     ):
         """Initialize the Certificate Manager.
 
@@ -67,6 +67,7 @@ class CertificateManager:
             renewal_days: Days before expiry to trigger renewal
             check_interval_hours: Hours between renewal checks
             challenge_callback: Callback function(domain, txt_name, txt_value) for ACME challenges
+            status_file: Path to certificate status file (defaults to CERT_STATUS_FILE)
         """
         self.username = username
         self.password = password
@@ -79,8 +80,10 @@ class CertificateManager:
         self.renewal_days = renewal_days
         self.check_interval = check_interval_hours * 3600
         self.challenge_callback = challenge_callback
+        self.status_file = status_file or CERT_STATUS_FILE
 
         self._running = False
+        self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._last_check: Optional[datetime] = None
         self._last_renewal: Optional[datetime] = None
@@ -92,7 +95,7 @@ class CertificateManager:
 
     def _ensure_directories(self):
         """Ensure all necessary directories exist."""
-        for path in [self.cert_path, self.key_path, CERT_STATUS_FILE]:
+        for path in [self.cert_path, self.key_path, self.status_file]:
             directory = os.path.dirname(path)
             if directory:
                 os.makedirs(directory, exist_ok=True)
@@ -151,7 +154,6 @@ class CertificateManager:
             try:
                 expiry = cert.not_valid_after_utc
                 valid_from = cert.not_valid_before_utc
-                from datetime import timezone
                 now = datetime.now(timezone.utc)
             except AttributeError:
                 # Fallback for older cryptography versions
@@ -187,7 +189,7 @@ class CertificateManager:
         status["last_updated"] = datetime.now().isoformat()
 
         try:
-            with open(CERT_STATUS_FILE, "w") as f:
+            with open(self.status_file, "w") as f:
                 json.dump(status, f, indent=2)
         except IOError as e:
             _LOGGER.warning(f"Failed to save status: {e}")
@@ -198,11 +200,11 @@ class CertificateManager:
         Returns:
             Status dictionary.
         """
-        if not os.path.exists(CERT_STATUS_FILE):
+        if not os.path.exists(self.status_file):
             return {}
 
         try:
-            with open(CERT_STATUS_FILE, "r") as f:
+            with open(self.status_file, "r") as f:
                 return json.load(f)
         except (IOError, json.JSONDecodeError) as e:
             _LOGGER.warning(f"Failed to load status: {e}")
@@ -348,11 +350,10 @@ class CertificateManager:
         self._check_and_renew()
 
         while self._running:
-            # Sleep in small intervals for responsive shutdown
-            sleep_time = 0
-            while sleep_time < self.check_interval and self._running:
-                time.sleep(60)  # Check every minute for shutdown
-                sleep_time += 60
+            # Block until timeout or stop signal; single syscall replaces
+            # check_interval/60 individual sleep(60) calls.
+            if self._stop_event.wait(timeout=self.check_interval):
+                break  # stop() was called
 
             if self._running:
                 self._check_and_renew()
@@ -377,6 +378,7 @@ class CertificateManager:
 
         _LOGGER.info("Stopping certificate manager...")
         self._running = False
+        self._stop_event.set()  # Wake up the renewal loop immediately
 
         if self._thread:
             self._thread.join(timeout=10)
@@ -384,13 +386,21 @@ class CertificateManager:
 
         _LOGGER.info("Certificate manager stopped")
 
-    def verify_online_certificate(self, domain: str, port: int = 443, timeout: int = 10) -> Dict[str, Any]:
+    def verify_online_certificate(
+        self,
+        domain: str,
+        port: int = 443,
+        timeout: int = 10,
+        ssl_context: ssl.SSLContext = None,
+    ) -> Dict[str, Any]:
         """Verify that a valid certificate is served for a domain.
 
         Args:
             domain: The domain to check
             port: The port to connect to (default 443)
             timeout: Connection timeout in seconds
+            ssl_context: Optional pre-created SSLContext (avoids repeated
+                         re-creation when checking multiple domains)
 
         Returns:
             Dictionary with verification results.
@@ -404,7 +414,7 @@ class CertificateManager:
         }
 
         try:
-            context = ssl.create_default_context()
+            context = ssl_context or ssl.create_default_context()
             with socket.create_connection((domain, port), timeout=timeout) as sock:
                 with context.wrap_socket(sock, server_hostname=domain) as ssock:
                     result["reachable"] = True
@@ -470,8 +480,11 @@ class CertificateManager:
         results = {}
         all_valid = True
 
+        # Create SSL context once and reuse for all domain checks
+        shared_ctx = ssl.create_default_context()
+
         for domain in self.ssl_domains:
-            result = self.verify_online_certificate(domain)
+            result = self.verify_online_certificate(domain, ssl_context=shared_ctx)
             results[domain] = result
             if not result["valid"]:
                 all_valid = False

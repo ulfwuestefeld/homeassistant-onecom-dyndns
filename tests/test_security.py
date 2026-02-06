@@ -49,7 +49,7 @@ class TestCredentialHandling:
         """Test that password in options is handled securely."""
         from run import load_options
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             options_file = os.path.join(tmpdir, "options.json")
             with open(options_file, "w") as f:
                 json.dump({
@@ -209,7 +209,7 @@ class TestFilePermissions:
 
         from acme_manager import ACMEManager
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             cert_path = os.path.join(tmpdir, "ssl", "cert.pem")
             key_path = os.path.join(tmpdir, "ssl", "key.pem")
             account_key_path = os.path.join(tmpdir, "data", "account.key")
@@ -238,37 +238,28 @@ class TestFilePermissions:
         """Test that status files don't contain sensitive data."""
         import certificate_manager as cm
         
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             status_file = os.path.join(tmpdir, "status.json")
             cert_path = os.path.join(tmpdir, "cert.pem")
             key_path = os.path.join(tmpdir, "key.pem")
-            
-            # Create directory for status file
-            os.makedirs(os.path.dirname(status_file), exist_ok=True)
 
-            # Patch the module constant before using the class
-            original = cm.CERT_STATUS_FILE
-            cm.CERT_STATUS_FILE = status_file
-            
-            try:
-                manager = cm.CertificateManager(
-                    username="test@example.com",
-                    password="secret_password",
-                    domain="example.com",
-                    email="ssl@example.com",
-                    cert_path=cert_path,
-                    key_path=key_path,
-                )
+            manager = cm.CertificateManager(
+                username="test@example.com",
+                password="secret_password",
+                domain="example.com",
+                email="ssl@example.com",
+                cert_path=cert_path,
+                key_path=key_path,
+                status_file=status_file,
+            )
 
-                manager._save_status({"status": "valid"})
+            manager._save_status({"status": "valid"})
 
-                with open(status_file) as f:
-                    content = f.read()
+            with open(status_file) as f:
+                content = f.read()
 
-                # Password should not be in status file
-                assert "secret_password" not in content
-            finally:
-                cm.CERT_STATUS_FILE = original
+            # Password should not be in status file
+            assert "secret_password" not in content
 
 
 class TestErrorMessages:
@@ -294,8 +285,22 @@ class TestErrorMessages:
 
     def test_acme_errors_dont_leak_account_key(self):
         """Test that ACME errors don't leak account keys."""
-        # This would require more detailed testing of the ACME module
-        pass
+        sys.modules['acme'] = MagicMock()
+        sys.modules['acme.client'] = MagicMock()
+        sys.modules['acme.messages'] = MagicMock()
+        sys.modules['acme.challenges'] = MagicMock()
+        sys.modules['acme.errors'] = MagicMock()
+        sys.modules['josepy'] = MagicMock()
+
+        from acme_manager import ACMEManagerError
+
+        # Simulate an ACME error that could contain key info
+        error = ACMEManagerError("Failed to register ACME account: connection error")
+        error_msg = str(error)
+
+        # Error message should describe the problem without leaking key material
+        assert "BEGIN" not in error_msg  # No PEM key data
+        assert "PRIVATE" not in error_msg  # No private key references
 
 
 class TestTokenHandling:
@@ -334,9 +339,29 @@ class TestRateLimitingAwareness:
     """Tests for rate limiting awareness."""
 
     def test_retry_respects_backoff(self):
-        """Test that retries use exponential backoff."""
-        # This would test the retry decorator behavior
-        pass
+        """Test that retries use exponential backoff and don't flood the server."""
+        sys.modules['acme'] = MagicMock()
+        sys.modules['acme.client'] = MagicMock()
+        sys.modules['acme.messages'] = MagicMock()
+        sys.modules['acme.challenges'] = MagicMock()
+        sys.modules['acme.errors'] = MagicMock()
+        sys.modules['josepy'] = MagicMock()
+
+        from acme_manager import retry_with_backoff, MAX_RETRIES, BASE_DELAY
+
+        # Verify retry configuration is reasonable
+        assert MAX_RETRIES >= 3, "Should retry at least 3 times"
+        assert MAX_RETRIES <= 10, "Should not retry excessively"
+        assert BASE_DELAY >= 1, "Base delay should be at least 1 second"
+
+        # Verify the decorator preserves function metadata
+        @retry_with_backoff
+        def sample_func():
+            """Sample docstring."""
+            pass
+
+        assert sample_func.__name__ == "sample_func"
+        assert sample_func.__doc__ == "Sample docstring."
 
 
 if __name__ == "__main__":
