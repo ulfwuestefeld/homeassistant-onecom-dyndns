@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-02-06
+
+### Added
+
+- **New Entity Types**
+  - `acme_challenge` sensor entity – Displays current ACME DNS-01 challenge TXT value
+    (entity_category: DIAGNOSTIC, disabled by default)
+  - `button.update_dns` – Button to trigger DNS update from UI
+  - `button.check_ip` – Button to trigger IP check from UI
+  - `button.renew_certificate` – Button to trigger certificate renewal (SSL-only)
+  - All buttons are entity_category: CONFIG and appear on the device page
+
+- **Entity Metadata**
+  - `entity_category=DIAGNOSTIC` for `last_update` and `acme_challenge` sensors
+  - `entity_category=CONFIG` for all button entities
+  - `entity_registry_enabled_default=False` for `acme_challenge` (rarely needed)
+  - `button` platform added to PLATFORMS constant
+
+- **Coordinator Enhancements**
+  - `set_acme_challenge()` / `clear_acme_challenge()` methods for ACME challenge lifecycle
+  - `acme_challenge` data included in coordinator update cycle
+
+- **Extended Test Suite** (346 → 378 tests)
+  - Tests for `acme_challenge` sensor (native_value, attributes, null handling)
+  - Tests for entity_category on diagnostic and primary sensors
+  - Tests for binary sensors (dns_status, certificate_valid)
+  - Tests for button entity types, methods, and SSL-conditional creation
+  - Tests for coordinator ACME challenge set/clear
+  - Tests for PLATFORMS and ATTR_ACME_CHALLENGE constants
+
+### Changed
+
+- **Custom component (1.2.0 → 1.3.0)**
+  - SENSOR_TYPES extended from 5 to 6 (+ acme_challenge)
+  - ssl_only_sensors set now includes acme_challenge
+  - Updated English, German translations and strings.json for new entities
+
 ## [1.3.0] - 2026-02-06
 
 ### Added

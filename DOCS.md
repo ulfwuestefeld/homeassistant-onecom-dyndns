@@ -277,15 +277,19 @@ Instead of using the add-on, you can install this as a custom integration with a
 
 The integration creates the following entities:
 
-| Entity | Type | Description |
-|--------|------|-------------|
-| `sensor.current_ip` | Sensor | Current public IP address |
-| `sensor.last_update` | Sensor | Timestamp of last coordinator check |
-| `sensor.last_ip_update` | Sensor | Timestamp of last IP change / DNS update |
-| `sensor.certificate_expiry` | Sensor | SSL certificate expiry date |
-| `sensor.last_certificate_renewal` | Sensor | Timestamp of last certificate renewal |
-| `binary_sensor.dns_status` | Binary Sensor | DNS connectivity status |
-| `binary_sensor.certificate_valid` | Binary Sensor | Certificate validity status |
+| Entity | Type | Category | Description |
+|--------|------|----------|-------------|
+| `sensor.current_ip` | Sensor | — | Current public IP address |
+| `sensor.last_update` | Sensor | Diagnostic | Timestamp of last coordinator check |
+| `sensor.last_ip_update` | Sensor | — | Timestamp of last IP change / DNS update |
+| `sensor.certificate_expiry` | Sensor | — | SSL certificate expiry date (SSL only) |
+| `sensor.last_certificate_renewal` | Sensor | — | Timestamp of last certificate renewal (SSL only) |
+| `sensor.acme_challenge` | Sensor | Diagnostic | ACME DNS-01 challenge TXT value (SSL only, disabled by default) |
+| `binary_sensor.dns_status` | Binary Sensor | — | DNS connectivity status |
+| `binary_sensor.certificate_valid` | Binary Sensor | — | Certificate validity status (SSL only) |
+| `button.update_dns` | Button | Config | Force immediate DNS update |
+| `button.check_ip` | Button | Config | Refresh IP address check |
+| `button.renew_certificate` | Button | Config | Force certificate renewal (SSL only) |
 
 ### Services
 

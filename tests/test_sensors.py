@@ -3,7 +3,9 @@ Tests for all sensor entities.
 
 This covers:
 - Custom component sensors (sensor.py): current_ip, last_update,
-  last_ip_update, certificate_expiry, last_certificate_renewal
+  last_ip_update, certificate_expiry, last_certificate_renewal, acme_challenge
+- Custom component binary sensors (binary_sensor.py): dns_status, certificate_valid
+- Custom component buttons (button.py): update_dns, check_ip, renew_certificate
 - Add-on sensor updates via Supervisor API (run.py): new timestamp sensors
 - Coordinator data flow (__init__.py): timestamp tracking
 """
@@ -35,6 +37,7 @@ def _make_coordinator_data(
     last_certificate_renewal=None,
     ssl_enabled=False,
     certificate_info=None,
+    acme_challenge=None,
     domain="example.com",
     subdomains=None,
 ):
@@ -50,6 +53,7 @@ def _make_coordinator_data(
         "last_certificate_renewal": last_certificate_renewal,
         "ssl_enabled": ssl_enabled,
         "certificate_info": certificate_info,
+        "acme_challenge": acme_challenge,
     }
 
 
@@ -129,6 +133,7 @@ def _ensure_ha_stubs():
         "homeassistant.components",
         "homeassistant.components.sensor",
         "homeassistant.components.binary_sensor",
+        "homeassistant.components.button",
         "homeassistant.config_entries",
         "homeassistant.const",
         "homeassistant.core",
@@ -210,9 +215,33 @@ def _ensure_ha_stubs():
     if not hasattr(aiohttp_client, "async_get_clientsession"):
         aiohttp_client.async_get_clientsession = lambda hass: Mock()
 
+    button_mod = sys.modules["homeassistant.components.button"]
+    if not hasattr(button_mod, "ButtonEntity"):
+        button_mod.ButtonEntity = type("ButtonEntity", (), {})
+    if not hasattr(button_mod, "ButtonEntityDescription"):
+        from dataclasses import dataclass as _dc
+
+        @_dc(frozen=True, kw_only=True)
+        class _BED:
+            key: str = ""
+            translation_key: str | None = None
+            icon: str | None = None
+            entity_category: str | None = None
+            entity_registry_enabled_default: bool = True
+        button_mod.ButtonEntityDescription = _BED
+
     const = sys.modules["homeassistant.const"]
     if not hasattr(const, "Platform"):
-        const.Platform = type("Platform", (), {"SENSOR": "sensor", "BINARY_SENSOR": "binary_sensor"})
+        const.Platform = type("Platform", (), {
+            "SENSOR": "sensor",
+            "BINARY_SENSOR": "binary_sensor",
+            "BUTTON": "button",
+        })
+    if not hasattr(const, "EntityCategory"):
+        class _EntityCategory:
+            DIAGNOSTIC = "diagnostic"
+            CONFIG = "config"
+        const.EntityCategory = _EntityCategory
 
     return created
 
@@ -229,7 +258,7 @@ class TestSensorTypeDefinitions:
         sensor_mod = importlib.import_module("custom_components.onecom_dyndns.sensor")
         importlib.reload(sensor_mod)
 
-        assert len(sensor_mod.SENSOR_TYPES) == 5
+        assert len(sensor_mod.SENSOR_TYPES) == 6
 
     def test_all_expected_keys_present(self):
         """Verify all expected sensor keys exist."""
@@ -245,6 +274,7 @@ class TestSensorTypeDefinitions:
             "last_ip_update",
             "certificate_expiry",
             "last_certificate_renewal",
+            "acme_challenge",
         }
 
     def test_timestamp_sensors_have_device_class(self):
@@ -472,7 +502,7 @@ class TestSSLConditionalSensors:
         sensor_mod = importlib.import_module("custom_components.onecom_dyndns.sensor")
         importlib.reload(sensor_mod)
 
-        ssl_only = {"certificate_expiry", "last_certificate_renewal"}
+        ssl_only = {"certificate_expiry", "last_certificate_renewal", "acme_challenge"}
         keys = set()
         for d in sensor_mod.SENSOR_TYPES:
             if d.key in ssl_only and not ssl_enabled:
@@ -484,6 +514,7 @@ class TestSSLConditionalSensors:
         keys = self._get_sensor_keys(ssl_enabled=False)
         assert "certificate_expiry" not in keys
         assert "last_certificate_renewal" not in keys
+        assert "acme_challenge" not in keys
         assert "current_ip" in keys
         assert "last_update" in keys
         assert "last_ip_update" in keys
@@ -492,9 +523,379 @@ class TestSSLConditionalSensors:
         keys = self._get_sensor_keys(ssl_enabled=True)
         assert "certificate_expiry" in keys
         assert "last_certificate_renewal" in keys
+        assert "acme_challenge" in keys
         assert "current_ip" in keys
         assert "last_update" in keys
         assert "last_ip_update" in keys
+
+
+# ---- acme_challenge sensor ----
+
+class TestACMEChallengeSensor:
+    """Tests for the acme_challenge sensor."""
+
+    def test_returns_txt_value(self):
+        acme = {
+            "domain": "example.com",
+            "txt_name": "_acme-challenge.example.com",
+            "txt_value": "abc123xyz",
+            "timestamp": "2026-02-06T14:00:00+00:00",
+        }
+        data = _make_coordinator_data(acme_challenge=acme, ssl_enabled=True)
+        sensor = _make_sensor("acme_challenge", data, ssl_enabled=True)
+        assert sensor.native_value == "abc123xyz"
+
+    def test_returns_none_when_no_challenge(self):
+        data = _make_coordinator_data(acme_challenge=None, ssl_enabled=True)
+        sensor = _make_sensor("acme_challenge", data, ssl_enabled=True)
+        assert sensor.native_value is None
+
+    def test_returns_none_when_no_data(self):
+        sensor = _make_sensor("acme_challenge", None, ssl_enabled=True)
+        sensor.coordinator.data = None
+        assert sensor.native_value is None
+
+    def test_extra_attributes(self):
+        acme = {
+            "domain": "example.com",
+            "txt_name": "_acme-challenge.example.com",
+            "txt_value": "abc123xyz",
+            "timestamp": "2026-02-06T14:00:00+00:00",
+        }
+        data = _make_coordinator_data(acme_challenge=acme, ssl_enabled=True)
+        sensor = _make_sensor("acme_challenge", data, ssl_enabled=True)
+        attrs = sensor.extra_state_attributes
+        assert attrs["domain"] == "example.com"
+        assert attrs["txt_record_name"] == "_acme-challenge.example.com"
+        assert attrs["txt_record_value"] == "abc123xyz"
+        assert attrs["timestamp"] == "2026-02-06T14:00:00+00:00"
+
+    def test_empty_attributes_when_no_challenge(self):
+        data = _make_coordinator_data(acme_challenge=None, ssl_enabled=True)
+        sensor = _make_sensor("acme_challenge", data, ssl_enabled=True)
+        assert sensor.extra_state_attributes == {}
+
+
+# ---- entity_category tests ----
+
+class TestEntityCategories:
+    """Test that entity_category is set correctly on diagnostic sensors."""
+
+    def test_last_update_is_diagnostic(self):
+        _ensure_ha_stubs()
+        import importlib
+        sensor_mod = importlib.import_module("custom_components.onecom_dyndns.sensor")
+        importlib.reload(sensor_mod)
+
+        for d in sensor_mod.SENSOR_TYPES:
+            if d.key == "last_update":
+                assert d.entity_category == "diagnostic"
+                break
+
+    def test_acme_challenge_is_diagnostic(self):
+        _ensure_ha_stubs()
+        import importlib
+        sensor_mod = importlib.import_module("custom_components.onecom_dyndns.sensor")
+        importlib.reload(sensor_mod)
+
+        for d in sensor_mod.SENSOR_TYPES:
+            if d.key == "acme_challenge":
+                assert d.entity_category == "diagnostic"
+                break
+
+    def test_acme_challenge_disabled_by_default(self):
+        _ensure_ha_stubs()
+        import importlib
+        sensor_mod = importlib.import_module("custom_components.onecom_dyndns.sensor")
+        importlib.reload(sensor_mod)
+
+        for d in sensor_mod.SENSOR_TYPES:
+            if d.key == "acme_challenge":
+                assert d.entity_registry_enabled_default is False
+                break
+
+    def test_primary_sensors_have_no_category(self):
+        _ensure_ha_stubs()
+        import importlib
+        sensor_mod = importlib.import_module("custom_components.onecom_dyndns.sensor")
+        importlib.reload(sensor_mod)
+
+        primary_keys = {"current_ip", "last_ip_update", "certificate_expiry", "last_certificate_renewal"}
+        for d in sensor_mod.SENSOR_TYPES:
+            if d.key in primary_keys:
+                cat = getattr(d, "entity_category", None)
+                assert cat is None, f"Sensor {d.key} should not have entity_category"
+
+
+# ---- Binary sensor tests ----
+
+def _make_binary_sensor(key, coordinator_data, domain="example.com", ssl_enabled=False):
+    """Instantiate a OneComDynDNSBinarySensor with the given key and mock data."""
+    import sys
+    cc_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "custom_components",
+        "onecom_dyndns",
+    )
+    if cc_dir not in sys.path:
+        sys.path.insert(0, cc_dir)
+
+    _ensure_ha_stubs()
+
+    import importlib
+    bs_mod = importlib.import_module("custom_components.onecom_dyndns.binary_sensor")
+    importlib.reload(bs_mod)
+
+    desc = None
+    for d in bs_mod.BINARY_SENSOR_TYPES:
+        if d.key == key:
+            desc = d
+            break
+    assert desc is not None, f"Binary sensor type '{key}' not found"
+
+    coordinator = Mock()
+    coordinator.data = coordinator_data
+
+    entry = Mock()
+    entry.entry_id = "test_entry_id"
+    entry.data = {"domain": domain, "ssl_enabled": ssl_enabled}
+
+    with patch.object(bs_mod.OneComDynDNSBinarySensor, "__init__", lambda self, *a, **kw: None):
+        sensor = bs_mod.OneComDynDNSBinarySensor.__new__(bs_mod.OneComDynDNSBinarySensor)
+
+    sensor.coordinator = coordinator
+    sensor.entity_description = desc
+    sensor._domain = domain
+    sensor._entry = entry
+    sensor._attr_unique_id = f"test_entry_id_{key}"
+    sensor._attr_device_info = None
+    sensor._attr_has_entity_name = True
+
+    return sensor
+
+
+class TestBinarySensorTypes:
+    """Test binary sensor type definitions."""
+
+    def test_binary_sensor_types_count(self):
+        _ensure_ha_stubs()
+        import importlib
+        bs_mod = importlib.import_module("custom_components.onecom_dyndns.binary_sensor")
+        importlib.reload(bs_mod)
+        assert len(bs_mod.BINARY_SENSOR_TYPES) == 2
+
+    def test_all_expected_keys_present(self):
+        _ensure_ha_stubs()
+        import importlib
+        bs_mod = importlib.import_module("custom_components.onecom_dyndns.binary_sensor")
+        importlib.reload(bs_mod)
+        keys = {d.key for d in bs_mod.BINARY_SENSOR_TYPES}
+        assert keys == {"dns_status", "certificate_valid"}
+
+
+class TestDNSStatusBinarySensor:
+    """Tests for the dns_status binary sensor."""
+
+    def test_is_on_when_ip_present(self):
+        data = _make_coordinator_data(current_ip="1.2.3.4")
+        sensor = _make_binary_sensor("dns_status", data)
+        assert sensor.is_on is True
+
+    def test_is_off_when_no_ip(self):
+        data = _make_coordinator_data(current_ip=None)
+        sensor = _make_binary_sensor("dns_status", data)
+        assert sensor.is_on is False
+
+    def test_is_none_when_no_data(self):
+        sensor = _make_binary_sensor("dns_status", None)
+        sensor.coordinator.data = None
+        assert sensor.is_on is None
+
+    def test_extra_attributes(self):
+        data = _make_coordinator_data(current_ip="1.2.3.4", subdomains=["www", "api"])
+        sensor = _make_binary_sensor("dns_status", data)
+        attrs = sensor.extra_state_attributes
+        assert attrs["domain"] == "example.com"
+        assert attrs["current_ip"] == "1.2.3.4"
+        assert attrs["subdomains"] == ["www", "api"]
+
+
+class TestCertificateValidBinarySensor:
+    """Tests for the certificate_valid binary sensor."""
+
+    def test_problem_when_no_cert_info(self):
+        data = _make_coordinator_data(certificate_info=None)
+        sensor = _make_binary_sensor("certificate_valid", data)
+        # True = problem (BinarySensorDeviceClass.PROBLEM)
+        assert sensor.is_on is True
+
+    def test_problem_when_needs_renewal(self):
+        cert_info = {"needs_renewal": True, "days_remaining": 10}
+        data = _make_coordinator_data(certificate_info=cert_info)
+        sensor = _make_binary_sensor("certificate_valid", data)
+        assert sensor.is_on is True
+
+    def test_problem_when_expired(self):
+        cert_info = {"needs_renewal": False, "days_remaining": 0}
+        data = _make_coordinator_data(certificate_info=cert_info)
+        sensor = _make_binary_sensor("certificate_valid", data)
+        assert sensor.is_on is True
+
+    def test_no_problem_when_valid(self):
+        cert_info = {"needs_renewal": False, "days_remaining": 60}
+        data = _make_coordinator_data(certificate_info=cert_info)
+        sensor = _make_binary_sensor("certificate_valid", data)
+        assert sensor.is_on is False
+
+    def test_extra_attributes(self):
+        cert_info = {
+            "not_valid_after": "2026-06-15T12:00:00+00:00",
+            "days_remaining": 60,
+            "domains": ["example.com"],
+        }
+        data = _make_coordinator_data(certificate_info=cert_info)
+        sensor = _make_binary_sensor("certificate_valid", data)
+        attrs = sensor.extra_state_attributes
+        assert attrs["expiry_date"] == "2026-06-15T12:00:00+00:00"
+        assert attrs["days_remaining"] == 60
+        assert attrs["domains"] == ["example.com"]
+
+
+# ---- Button entity tests ----
+
+class TestButtonTypes:
+    """Test button entity type definitions."""
+
+    def test_button_types_count(self):
+        _ensure_ha_stubs()
+        import importlib
+        btn_mod = importlib.import_module("custom_components.onecom_dyndns.button")
+        importlib.reload(btn_mod)
+        assert len(btn_mod.BUTTON_TYPES) == 3
+
+    def test_all_expected_keys_present(self):
+        _ensure_ha_stubs()
+        import importlib
+        btn_mod = importlib.import_module("custom_components.onecom_dyndns.button")
+        importlib.reload(btn_mod)
+        keys = {d.key for d in btn_mod.BUTTON_TYPES}
+        assert keys == {"update_dns", "check_ip", "renew_certificate"}
+
+    def test_all_buttons_have_config_category(self):
+        _ensure_ha_stubs()
+        import importlib
+        btn_mod = importlib.import_module("custom_components.onecom_dyndns.button")
+        importlib.reload(btn_mod)
+        for d in btn_mod.BUTTON_TYPES:
+            assert d.entity_category == "config", (
+                f"Button {d.key} should have CONFIG entity_category"
+            )
+
+    def test_update_dns_button_method(self):
+        _ensure_ha_stubs()
+        import importlib
+        btn_mod = importlib.import_module("custom_components.onecom_dyndns.button")
+        importlib.reload(btn_mod)
+        for d in btn_mod.BUTTON_TYPES:
+            if d.key == "update_dns":
+                assert d.method == "async_force_update_dns"
+                break
+
+    def test_check_ip_button_method(self):
+        _ensure_ha_stubs()
+        import importlib
+        btn_mod = importlib.import_module("custom_components.onecom_dyndns.button")
+        importlib.reload(btn_mod)
+        for d in btn_mod.BUTTON_TYPES:
+            if d.key == "check_ip":
+                assert d.method == "async_refresh"
+                break
+
+    def test_renew_certificate_button_method(self):
+        _ensure_ha_stubs()
+        import importlib
+        btn_mod = importlib.import_module("custom_components.onecom_dyndns.button")
+        importlib.reload(btn_mod)
+        for d in btn_mod.BUTTON_TYPES:
+            if d.key == "renew_certificate":
+                assert d.method == "async_force_renew_certificate"
+                break
+
+    def test_ssl_disabled_skips_renew_button(self):
+        """When SSL is not enabled, renew_certificate button should not be created."""
+        _ensure_ha_stubs()
+        import importlib
+        btn_mod = importlib.import_module("custom_components.onecom_dyndns.button")
+        importlib.reload(btn_mod)
+
+        ssl_only = {"renew_certificate"}
+        ssl_enabled = False
+        keys = set()
+        for d in btn_mod.BUTTON_TYPES:
+            if d.key in ssl_only and not ssl_enabled:
+                continue
+            keys.add(d.key)
+
+        assert "renew_certificate" not in keys
+        assert "update_dns" in keys
+        assert "check_ip" in keys
+
+    def test_ssl_enabled_includes_renew_button(self):
+        _ensure_ha_stubs()
+        import importlib
+        btn_mod = importlib.import_module("custom_components.onecom_dyndns.button")
+        importlib.reload(btn_mod)
+
+        keys = {d.key for d in btn_mod.BUTTON_TYPES}
+        assert "renew_certificate" in keys
+
+
+# ---- Coordinator ACME challenge methods ----
+
+class TestCoordinatorACMEChallenge:
+    """Test coordinator ACME challenge set/clear methods."""
+
+    def _make_coordinator(self):
+        """Create a minimal coordinator-like object for testing set/clear."""
+        _ensure_ha_stubs()
+        import importlib
+        init_mod = importlib.import_module("custom_components.onecom_dyndns")
+        importlib.reload(init_mod)
+
+        coordinator_cls = init_mod.OneComDynDNSCoordinator
+
+        # Build a mock coordinator (bypass __init__)
+        with patch.object(coordinator_cls, "__init__", lambda self, *a, **kw: None):
+            coord = coordinator_cls.__new__(coordinator_cls)
+
+        coord._acme_challenge = None
+        return coord, init_mod
+
+    def test_set_acme_challenge(self):
+        coord, init_mod = self._make_coordinator()
+        coord.set_acme_challenge(
+            domain="example.com",
+            txt_name="_acme-challenge.example.com",
+            txt_value="test-value-123",
+        )
+        assert coord._acme_challenge is not None
+        assert coord._acme_challenge["domain"] == "example.com"
+        assert coord._acme_challenge["txt_name"] == "_acme-challenge.example.com"
+        assert coord._acme_challenge["txt_value"] == "test-value-123"
+        assert "timestamp" in coord._acme_challenge
+
+    def test_clear_acme_challenge(self):
+        coord, init_mod = self._make_coordinator()
+        coord._acme_challenge = {"domain": "x", "txt_name": "y", "txt_value": "z"}
+        coord.clear_acme_challenge()
+        assert coord._acme_challenge is None
+
+    def test_set_then_clear(self):
+        coord, init_mod = self._make_coordinator()
+        coord.set_acme_challenge("example.com", "_acme-challenge.example.com", "val")
+        assert coord._acme_challenge is not None
+        coord.clear_acme_challenge()
+        assert coord._acme_challenge is None
 
 
 # ---------------------------------------------------------------------------
@@ -854,6 +1255,7 @@ class TestCoordinatorTimestampTracking:
             "last_update",
             "last_ip_update",
             "last_certificate_renewal",
+            "acme_challenge",
         }
         assert expected_keys.issubset(data.keys())
 
@@ -877,8 +1279,20 @@ class TestSensorConstants:
 
         assert hasattr(const_mod, "ATTR_LAST_IP_UPDATE")
         assert hasattr(const_mod, "ATTR_LAST_CERTIFICATE_RENEWAL")
+        assert hasattr(const_mod, "ATTR_ACME_CHALLENGE")
         assert const_mod.ATTR_LAST_IP_UPDATE == "last_ip_update"
         assert const_mod.ATTR_LAST_CERTIFICATE_RENEWAL == "last_certificate_renewal"
+        assert const_mod.ATTR_ACME_CHALLENGE == "acme_challenge"
+
+    def test_platforms_include_button(self):
+        """Verify that PLATFORMS includes button."""
+        _ensure_ha_stubs()
+        import importlib
+        const_mod = importlib.import_module("custom_components.onecom_dyndns.const")
+        importlib.reload(const_mod)
+        assert "button" in const_mod.PLATFORMS
+        assert "sensor" in const_mod.PLATFORMS
+        assert "binary_sensor" in const_mod.PLATFORMS
 
 
 if __name__ == "__main__":

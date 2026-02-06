@@ -126,6 +126,9 @@
       },
       "last_certificate_renewal": {
         "name": "Last Certificate Renewal"
+      },
+      "acme_challenge": {
+        "name": "ACME Challenge"
       }
     },
     "binary_sensor": {
@@ -134,6 +137,17 @@
       },
       "certificate_valid": {
         "name": "Certificate Valid"
+      }
+    },
+    "button": {
+      "update_dns": {
+        "name": "Update DNS"
+      },
+      "check_ip": {
+        "name": "Check IP"
+      },
+      "renew_certificate": {
+        "name": "Renew Certificate"
       }
     }
   }

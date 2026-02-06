@@ -34,7 +34,7 @@ IP_SERVICES: Final = {
 }
 
 # Platforms
-PLATFORMS: Final = ["sensor", "binary_sensor"]
+PLATFORMS: Final = ["sensor", "binary_sensor", "button"]
 
 # Services
 SERVICE_UPDATE_DNS: Final = "update_dns"
@@ -50,6 +50,7 @@ ATTR_LAST_CERTIFICATE_RENEWAL: Final = "last_certificate_renewal"
 ATTR_CERTIFICATE_EXPIRY: Final = "certificate_expiry"
 ATTR_CERTIFICATE_DOMAINS: Final = "certificate_domains"
 ATTR_DAYS_UNTIL_EXPIRY: Final = "days_until_expiry"
+ATTR_ACME_CHALLENGE: Final = "acme_challenge"
 
 # Update coordinator
 UPDATE_INTERVAL_SECONDS: Final = 60

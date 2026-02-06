@@ -109,5 +109,46 @@
       "name": "Check IP",
       "description": "Check the current public IP address"
     }
+  },
+  "entity": {
+    "sensor": {
+      "current_ip": {
+        "name": "Current IP"
+      },
+      "last_update": {
+        "name": "Last Update"
+      },
+      "last_ip_update": {
+        "name": "Last IP Update"
+      },
+      "certificate_expiry": {
+        "name": "Certificate Expiry"
+      },
+      "last_certificate_renewal": {
+        "name": "Last Certificate Renewal"
+      },
+      "acme_challenge": {
+        "name": "ACME Challenge"
+      }
+    },
+    "binary_sensor": {
+      "dns_status": {
+        "name": "DNS Status"
+      },
+      "certificate_valid": {
+        "name": "Certificate Valid"
+      }
+    },
+    "button": {
+      "update_dns": {
+        "name": "Update DNS"
+      },
+      "check_ip": {
+        "name": "Check IP"
+      },
+      "renew_certificate": {
+        "name": "Renew Certificate"
+      }
+    }
   }
 }

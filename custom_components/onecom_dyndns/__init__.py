@@ -146,6 +146,7 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
         self._last_ip_update: str | None = None
         self._last_certificate_renewal: str | None = None
         self._certificate_info: dict[str, Any] | None = None
+        self._acme_challenge: dict[str, str] | None = None
 
         super().__init__(
             hass,
@@ -184,6 +185,7 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
                 "last_certificate_renewal": self._last_certificate_renewal,
                 "ssl_enabled": self.ssl_enabled,
                 "certificate_info": self._certificate_info,
+                "acme_challenge": self._acme_challenge,
             }
 
             return data
@@ -245,3 +247,18 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
         # Certificate renewal logic would go here
         # This would use the CertificateManager from the add-on
         self._last_certificate_renewal = datetime.now(timezone.utc).isoformat()
+
+    def set_acme_challenge(
+        self, domain: str, txt_name: str, txt_value: str
+    ) -> None:
+        """Store the current ACME DNS-01 challenge information."""
+        self._acme_challenge = {
+            "domain": domain,
+            "txt_name": txt_name,
+            "txt_value": txt_value,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def clear_acme_challenge(self) -> None:
+        """Clear the ACME challenge after successful validation."""
+        self._acme_challenge = None

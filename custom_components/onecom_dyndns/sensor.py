@@ -11,6 +11,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -26,6 +27,7 @@ from .const import (
     ATTR_CERTIFICATE_EXPIRY,
     ATTR_CERTIFICATE_DOMAINS,
     ATTR_DAYS_UNTIL_EXPIRY,
+    ATTR_ACME_CHALLENGE,
 )
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
@@ -38,6 +40,7 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
         key="last_update",
         translation_key="last_update",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:clock-outline",
     ),
     SensorEntityDescription(
@@ -58,6 +61,13 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         icon="mdi:certificate-outline",
     ),
+    SensorEntityDescription(
+        key="acme_challenge",
+        translation_key="acme_challenge",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:shield-key",
+    ),
 )
 
 
@@ -70,7 +80,7 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     domain = entry.data[CONF_DOMAIN]
 
-    ssl_only_sensors = {"certificate_expiry", "last_certificate_renewal"}
+    ssl_only_sensors = {"certificate_expiry", "last_certificate_renewal", "acme_challenge"}
 
     entities = []
     for description in SENSOR_TYPES:
@@ -146,6 +156,12 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
                 return datetime.fromisoformat(last_renewal)
             return None
 
+        if key == "acme_challenge":
+            acme = self.coordinator.data.get("acme_challenge")
+            if acme:
+                return acme.get("txt_value")
+            return None
+
         return None
 
     @property
@@ -180,6 +196,14 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
             if cert_info:
                 attrs["domains"] = cert_info.get("domains", [])
                 attrs["certificate_expiry"] = cert_info.get("not_valid_after")
+
+        if key == "acme_challenge":
+            acme = self.coordinator.data.get("acme_challenge")
+            if acme:
+                attrs["domain"] = acme.get("domain")
+                attrs["txt_record_name"] = acme.get("txt_name")
+                attrs["txt_record_value"] = acme.get("txt_value")
+                attrs["timestamp"] = acme.get("timestamp")
 
         return attrs
 
