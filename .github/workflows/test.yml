@@ -15,7 +15,7 @@ jobs:
     
     strategy:
       matrix:
-        python-version: ['3.11']
+        python-version: ['3.12', '3.13']
     
     steps:
     - name: Checkout repository
@@ -39,7 +39,7 @@ jobs:
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-report
+        name: coverage-report-${{ matrix.python-version }}
         path: htmlcov/
         retention-days: 30
 
@@ -58,10 +58,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.11
+    - name: Set up Python 3.13
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.13'
         cache: 'pip'
 
     - name: Install linting tools
