@@ -190,17 +190,13 @@ class TestSaveAcmeChallengeInfo:
         assert "ACME DNS Challenge" in call_args[1]["title"]
 
     @patch("run.send_ha_notification")
-    @patch("run.update_ha_sensor")
-    def test_updates_sensor(self, mock_sensor, mock_notification):
-        """Test that ACME sensor is updated."""
+    def test_does_not_call_update_ha_sensor(self, mock_notification):
+        """Test that save_acme_challenge_info no longer calls update_ha_sensor (state file replaces it)."""
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             with patch("run.ACME_CHALLENGE_FILE", os.path.join(tmpdir, "acme.json")):
-                save_acme_challenge_info("example.com", "_acme.example.com", "token")
-
-        mock_sensor.assert_called_once()
-        call_args = mock_sensor.call_args
-        assert call_args[0][0] == "sensor.onecom_dyndns_acme_challenge"
-        assert call_args[0][1] == "token"
+                with patch("run.update_ha_sensor") as mock_sensor:
+                    save_acme_challenge_info("example.com", "_acme.example.com", "token")
+                    mock_sensor.assert_not_called()
 
 
 class TestLoadOptions:

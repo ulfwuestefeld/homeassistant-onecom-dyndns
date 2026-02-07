@@ -336,20 +336,8 @@ def save_acme_challenge_info(domain: str, txt_name: str, txt_value: str):
         message=notification_message,
         notification_id="onecom_dyndns_acme_challenge"
     )
-    
-    # Update ACME challenge sensor
-    update_ha_sensor(
-        "sensor.onecom_dyndns_acme_challenge",
-        txt_value,
-        {
-            "friendly_name": "ACME Challenge",
-            "icon": "mdi:shield-key",
-            "domain": domain,
-            "txt_record_name": txt_name,
-            "txt_record_value": txt_value,
-            "timestamp": challenge_info["timestamp"],
-        }
-    )
+    # The ACME challenge data is picked up by _write_state_file() from
+    # the ACME_CHALLENGE_FILE, so the custom component gets it automatically.
 
 
 class DynDNSUpdater:
@@ -556,9 +544,6 @@ class DynDNSUpdater:
             self._write_state_file(dns_status="error")
             return
 
-        # Update IP sensor regardless of change
-        self._update_ip_sensor(current_ip)
-        
         # Check if IP has changed
         if current_ip == self._last_ip:
             self._logger.debug("IP unchanged: %s", current_ip)
@@ -572,16 +557,22 @@ class DynDNSUpdater:
             self._save_last_ip(current_ip)
             self._last_ip_update = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
             self._logger.info("DNS update completed successfully")
-            self._update_dns_sensor("ok", current_ip)
-            self._update_last_ip_update_sensor()
             self._write_state_file(current_ip=current_ip, dns_status="ok")
         else:
             self._logger.error("DNS update failed - will retry on next interval")
-            self._update_dns_sensor("error", current_ip)
             self._write_state_file(current_ip=current_ip, dns_status="error")
 
+    # ------------------------------------------------------------------
+    # Legacy sensor update methods (deprecated since 1.3.4)
+    #
+    # These pushed state directly to the HA REST API, creating orphaned
+    # entities not linked to any device.  Replaced by _write_state_file()
+    # which the custom component reads via its DataUpdateCoordinator.
+    # Kept for backward compatibility but no longer called.
+    # ------------------------------------------------------------------
+
     def _update_ip_sensor(self, ip: str):
-        """Update the IP sensor in Home Assistant."""
+        """Update the IP sensor in Home Assistant (deprecated)."""
         subdomains_list = [f"{s}.{self.domain}" if s else self.domain for s in self.subdomains]
         update_ha_sensor(
             "sensor.onecom_dyndns_ip",
@@ -596,7 +587,7 @@ class DynDNSUpdater:
         )
     
     def _update_dns_sensor(self, status: str, ip: str):
-        """Update the DNS status sensor in Home Assistant."""
+        """Update the DNS status sensor in Home Assistant (deprecated)."""
         subdomains_list = [f"{s}.{self.domain}" if s else self.domain for s in self.subdomains]
         update_ha_sensor(
             "sensor.onecom_dyndns_dns_status",
@@ -756,13 +747,10 @@ class DynDNSUpdater:
                     self._last_ip_update = time.strftime(
                         "%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()
                     )
-                    self._update_dns_sensor("ok", self._last_ip)
-                    self._update_last_ip_update_sensor()
                     self._write_state_file(
                         current_ip=self._last_ip, dns_status="ok"
                     )
                 else:
-                    self._update_dns_sensor("error", self._last_ip)
                     self._write_state_file(
                         current_ip=self._last_ip, dns_status="error"
                     )
@@ -794,15 +782,11 @@ class DynDNSUpdater:
             self._logger.info("SSL certificate renewed successfully")
             domains = data.get("domains", [])
             self._logger.info(f"Certificate domains: {', '.join(domains)}")
-            # Update certificate sensor
             cert_info = data.get("certificate", {})
-            if cert_info:
-                self._update_certificate_sensor(cert_info)
-            # Track and publish renewal timestamp
+            # Track renewal timestamp
             self._last_certificate_renewal = time.strftime(
                 "%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()
             )
-            self._update_last_certificate_renewal_sensor()
             
             # Send notification to user
             expiry = cert_info.get("not_valid_after", "unknown") if cert_info else "unknown"
@@ -883,11 +867,9 @@ class DynDNSUpdater:
             self._cert_manager.start()
 
             self._logger.info("SSL certificate manager started")
-            
-            # Update certificate sensor with current info
-            cert_info = self._cert_manager.get_certificate_info()
-            if cert_info:
-                self._update_certificate_sensor(cert_info)
+
+            # Write initial state so custom component can show cert info
+            self._write_state_file(current_ip=self._last_ip, dns_status="ok")
 
         except Exception as e:
             self._logger.error(f"Failed to start SSL certificate manager: {e}")

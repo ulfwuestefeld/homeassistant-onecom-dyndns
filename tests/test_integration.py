@@ -174,7 +174,7 @@ class TestSensorUpdatesIntegration:
     @patch("run.requests.post")
     @patch("run.requests.get")
     def test_all_sensors_updated_on_ip_change(self, mock_get, mock_post, mock_options):
-        """Test that all sensors are updated when IP changes."""
+        """Test that state file is written when IP changes."""
         from run import DynDNSUpdater
 
         # Mock IP service
@@ -189,7 +189,9 @@ class TestSensorUpdatesIntegration:
         mock_post.return_value = mock_ha_response
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            state_file = os.path.join(tmpdir, "state.json")
+            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")), \
+                 patch("run.ADDON_STATE_FILE", state_file):
                 with patch("run.OneComAPI") as mock_api_class:
                     mock_api = Mock()
                     mock_api.update_all_subdomains.return_value = {
@@ -200,12 +202,12 @@ class TestSensorUpdatesIntegration:
                     updater = DynDNSUpdater(mock_options)
                     updater.check_and_update()
 
-                    # Verify sensor update calls
-                    sensor_calls = [
-                        call for call in mock_post.call_args_list
-                        if "states/sensor" in str(call)
-                    ]
-                    assert len(sensor_calls) >= 1
+                    # Verify state file was written with correct data
+                    assert os.path.isfile(state_file)
+                    with open(state_file) as f:
+                        state = json.load(f)
+                    assert state["current_ip"] == "1.2.3.4"
+                    assert state["dns_status"] == "ok"
 
 
 class TestCallbackIntegration:

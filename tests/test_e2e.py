@@ -66,7 +66,8 @@ class TestE2EDynDNSFlow:
 
         # Create updater with no previous IP
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")), \
+                 patch("run.ADDON_STATE_FILE", os.path.join(tmpdir, "state.json")):
                 updater = DynDNSUpdater(mock_options)
                 
                 # Run check and update
@@ -83,8 +84,13 @@ class TestE2EDynDNSFlow:
                 )
                 mock_api.logout.assert_called_once()
 
-                # Verify IP sensor was updated
-                assert mock_sensor.call_count >= 1
+                # Verify state file was written (replaces update_ha_sensor)
+                state_file = os.path.join(tmpdir, "state.json")
+                assert os.path.isfile(state_file)
+                with open(state_file) as f:
+                    state = json.load(f)
+                assert state["current_ip"] == "1.2.3.4"
+                assert state["dns_status"] == "ok"
 
     @patch("run.requests.get")
     @patch("run.OneComAPI")

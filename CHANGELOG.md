@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.3] - 2026-02-06
+## [1.3.4] - 2026-02-07
 
 ### Changed
 
@@ -22,10 +22,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`/config/.onecom_dyndns_commands.json`) that the add-on picks up and executes,
   instead of the integration performing the action itself
 
+### Removed
+
+- **Direct Supervisor API sensor updates** (`update_ha_sensor()` calls) removed from
+  `check_and_update()`, `_ssl_event_callback()`, `_start_ssl_manager()`,
+  `save_acme_challenge_info()` and `_check_commands()`.  These created orphaned entities
+  not linked to the add-on device and caused `502 Bad Gateway` errors during startup
+  when HA Core was not yet ready.  The state file replaces this mechanism entirely.
+  The legacy `_update_*_sensor()` methods are kept (marked deprecated) for compatibility.
+
 ### Added
 
 - **Integration Icon**: `icon.png` added to custom component directory so the
   integration displays the same icon as the add-on in the HA Integrations page
+- **Auto-Discovery**: `async_step_hassio()` now auto-creates the config entry
+  immediately when the add-on publishes discovery, eliminating the manual
+  confirmation step. Entities appear on the add-on device without user interaction.
 - `"after_dependencies": ["hassio"]` in `manifest.json` ensures the Supervisor
   creates the add-on device before the integration attaches entities to it
 - `ADDON_STATE_FILE` and `ADDON_COMMAND_FILE` constants in `const.py`
@@ -124,7 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Custom component (1.2.0 → 1.3.3)**
+- **Custom component (1.2.0 → 1.3.4)**
   - SENSOR_TYPES extended from 5 to 6 (+ acme_challenge)
   - ssl_only_sensors set now includes acme_challenge
   - Updated English, German translations and strings.json for new entities

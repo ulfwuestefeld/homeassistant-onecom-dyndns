@@ -960,12 +960,14 @@ class TestAddonLastIPUpdateSensor:
 
             mock_sensor.assert_not_called()
 
-    def test_ip_change_triggers_sensor_update(self):
-        """Test that check_and_update sets last_ip_update on IP change."""
+    def test_ip_change_triggers_state_file_write(self):
+        """Test that check_and_update writes state file on IP change."""
         from run import DynDNSUpdater
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            state_file = os.path.join(tmpdir, "state.json")
+            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")), \
+                 patch("run.ADDON_STATE_FILE", state_file):
                 mock_response = Mock()
                 mock_response.text = "5.6.7.8"
                 mock_response.raise_for_status = Mock()
@@ -979,21 +981,20 @@ class TestAddonLastIPUpdateSensor:
                         }
                         mock_api_class.return_value = mock_api
 
-                        with patch("run.update_ha_sensor") as mock_sensor:
+                        with patch("run.update_ha_sensor"):
                             updater = DynDNSUpdater(self.options)
-                            # First check to establish baseline
                             updater._last_ip = "1.2.3.3"
                             updater.check_and_update()
 
                             # Verify last_ip_update was set
                             assert updater._last_ip_update is not None
 
-                            # Verify sensor was updated
-                            sensor_calls = [
-                                c for c in mock_sensor.call_args_list
-                                if c[0][0] == "sensor.onecom_dyndns_last_ip_update"
-                            ]
-                            assert len(sensor_calls) == 1
+                            # Verify state file contains correct data
+                            assert os.path.isfile(state_file)
+                            with open(state_file) as f:
+                                state = json.load(f)
+                            assert state["current_ip"] == "5.6.7.8"
+                            assert state["last_ip_update"] is not None
 
     def test_no_ip_change_does_not_update_sensor(self):
         """Test that no sensor update happens if IP is unchanged."""
@@ -1068,12 +1069,15 @@ class TestAddonLastCertificateRenewalSensor:
 
             mock_sensor.assert_not_called()
 
-    def test_ssl_event_renewed_triggers_sensor(self):
-        """Test that a renewal event updates the sensor."""
+    def test_ssl_event_renewed_updates_state_file(self):
+        """Test that a renewal event writes the state file."""
         from run import DynDNSUpdater
 
-        with patch("run.send_ha_notification"):
-            with patch("run.update_ha_sensor") as mock_sensor:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            state_file = os.path.join(tmpdir, "state.json")
+            with patch("run.send_ha_notification"), \
+                 patch("run.update_ha_sensor"), \
+                 patch("run.ADDON_STATE_FILE", state_file):
                 updater = DynDNSUpdater(self.options)
                 updater._ssl_event_callback("renewed", {
                     "domains": ["example.com", "www.example.com"],
@@ -1087,12 +1091,11 @@ class TestAddonLastCertificateRenewalSensor:
                 # Verify renewal timestamp was set
                 assert updater._last_certificate_renewal is not None
 
-                # Verify sensor was called
-                renewal_calls = [
-                    c for c in mock_sensor.call_args_list
-                    if c[0][0] == "sensor.onecom_dyndns_last_certificate_renewal"
-                ]
-                assert len(renewal_calls) == 1
+                # Verify state file was written
+                assert os.path.isfile(state_file)
+                with open(state_file) as f:
+                    state = json.load(f)
+                assert state["last_certificate_renewal"] is not None
 
 
 # ---------------------------------------------------------------------------
@@ -1635,7 +1638,7 @@ def _ensure_config_flow_stubs():
 
 
 class TestConfigFlowHassioDiscovery:
-    """Tests for async_step_hassio() and async_step_hassio_confirm()."""
+    """Tests for async_step_hassio() auto-create behaviour."""
 
     def _get_flow_class(self):
         """Import and return the OneComDynDNSConfigFlow class."""
@@ -1645,8 +1648,8 @@ class TestConfigFlowHassioDiscovery:
         importlib.reload(cf_mod)
         return cf_mod.OneComDynDNSConfigFlow
 
-    def test_hassio_discovery_with_valid_domain(self):
-        """async_step_hassio should proceed to confirm step with valid domain."""
+    def test_hassio_discovery_auto_creates_entry(self):
+        """async_step_hassio should auto-create a config entry with valid domain."""
         import asyncio
 
         async def _run():
@@ -1663,13 +1666,15 @@ class TestConfigFlowHassioDiscovery:
             }
 
             result = await flow.async_step_hassio(discovery_info)
-            assert result["type"] == "form"
-            assert result["step_id"] == "hassio_confirm"
+            assert result["type"] == "create_entry"
+            assert result["title"] == "One.com DynDNS - example.com"
+            assert result["data"]["domain"] == "example.com"
+            assert result["data"]["addon_slug"] == "homeassistant-onecom-dyndns"
 
         asyncio.run(_run())
 
-    def test_hassio_discovery_stores_addon_slug(self):
-        """async_step_hassio should store the addon slug in _data."""
+    def test_hassio_discovery_includes_addon_slug(self):
+        """async_step_hassio should include the addon slug in entry data."""
         import asyncio
 
         async def _run():
@@ -1685,8 +1690,8 @@ class TestConfigFlowHassioDiscovery:
                 },
             }
 
-            await flow.async_step_hassio(discovery_info)
-            assert flow._data.get("addon_slug") == "homeassistant-onecom-dyndns"
+            result = await flow.async_step_hassio(discovery_info)
+            assert result["data"]["addon_slug"] == "homeassistant-onecom-dyndns"
 
         asyncio.run(_run())
 
@@ -1733,41 +1738,30 @@ class TestConfigFlowHassioDiscovery:
 
         asyncio.run(_run())
 
-    def test_hassio_confirm_creates_entry(self):
-        """async_step_hassio_confirm with user_input creates a config entry."""
+    def test_hassio_entry_contains_full_config(self):
+        """Auto-created entry should contain the full add-on configuration."""
         import asyncio
 
         async def _run():
             FlowClass = self._get_flow_class()
             flow = FlowClass()
-            flow._data = {
-                "domain": "example.com",
-                "username": "user@one.com",
-                "password": "secret",
-                "addon_slug": "homeassistant-onecom-dyndns",
+
+            discovery_info = {
+                "addon": "homeassistant-onecom-dyndns",
+                "config": {
+                    "domain": "example.com",
+                    "username": "user@one.com",
+                    "password": "secret",
+                    "ssl_enabled": True,
+                    "update_interval": 10,
+                },
             }
 
-            result = await flow.async_step_hassio_confirm(user_input={})
+            result = await flow.async_step_hassio(discovery_info)
             assert result["type"] == "create_entry"
-            assert result["title"] == "example.com"
-            assert result["data"]["domain"] == "example.com"
-            assert result["data"]["addon_slug"] == "homeassistant-onecom-dyndns"
-
-        asyncio.run(_run())
-
-    def test_hassio_confirm_shows_form_without_input(self):
-        """async_step_hassio_confirm without user_input shows confirmation form."""
-        import asyncio
-
-        async def _run():
-            FlowClass = self._get_flow_class()
-            flow = FlowClass()
-            flow._data = {"domain": "example.com"}
-
-            result = await flow.async_step_hassio_confirm(user_input=None)
-            assert result["type"] == "form"
-            assert result["step_id"] == "hassio_confirm"
-            assert result["description_placeholders"]["domain"] == "example.com"
+            assert result["data"]["username"] == "user@one.com"
+            assert result["data"]["ssl_enabled"] is True
+            assert result["data"]["update_interval"] == 10
 
         asyncio.run(_run())
 
@@ -1793,8 +1787,8 @@ class TestConfigFlowHassioDiscovery:
 
         asyncio.run(_run())
 
-    def test_hassio_uses_discovery_config(self):
-        """async_step_hassio should extract config from discovery_info."""
+    def test_hassio_uses_custom_addon_slug(self):
+        """async_step_hassio should use the addon slug from discovery info."""
         import asyncio
 
         async def _run():
@@ -1811,11 +1805,31 @@ class TestConfigFlowHassioDiscovery:
                 },
             }
 
-            await flow.async_step_hassio(discovery_info)
-            assert flow._data["domain"] == "example.com"
-            assert flow._data["username"] == "admin"
-            assert flow._data["ssl_enabled"] is True
-            assert flow._data["addon_slug"] == "my-custom-addon"
+            result = await flow.async_step_hassio(discovery_info)
+            assert result["data"]["addon_slug"] == "my-custom-addon"
+            assert result["data"]["ssl_enabled"] is True
+
+        asyncio.run(_run())
+
+    def test_hassio_title_includes_domain(self):
+        """The auto-created entry title should include the domain name."""
+        import asyncio
+
+        async def _run():
+            FlowClass = self._get_flow_class()
+            flow = FlowClass()
+
+            discovery_info = {
+                "addon": "homeassistant-onecom-dyndns",
+                "config": {
+                    "domain": "mysite.org",
+                    "username": "user@one.com",
+                    "password": "pw",
+                },
+            }
+
+            result = await flow.async_step_hassio(discovery_info)
+            assert result["title"] == "One.com DynDNS - mysite.org"
 
         asyncio.run(_run())
 
