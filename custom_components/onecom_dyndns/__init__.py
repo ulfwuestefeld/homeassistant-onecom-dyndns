@@ -62,6 +62,29 @@ async def _async_detect_addon(hass: HomeAssistant) -> str | None:
     return None
 
 
+async def _async_remove_standalone_device(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> None:
+    """Remove the old standalone device after switching to add-on mode.
+
+    When the integration was initially set up in standalone mode it created a
+    device with ``identifiers={(DOMAIN, entry_id)}``.  After switching to
+    add-on mode, entities attach to the Supervisor device instead, leaving the
+    old device orphaned.  This helper cleans it up so the user does not see a
+    stale "One.com DynDNS Updater - …" device alongside the add-on device.
+    """
+    from homeassistant.helpers import device_registry as dr
+
+    dev_reg = dr.async_get(hass)
+    old_device = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    if old_device:
+        dev_reg.async_remove_device(old_device.id)
+        _LOGGER.info(
+            "Removed old standalone device %s after switching to add-on mode",
+            old_device.id,
+        )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up One.com DynDNS from a config entry."""
     hass.data.setdefault(DOMAIN, {})
@@ -80,6 +103,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 addon_slug,
                 entry.entry_id,
             )
+            # Remove the old standalone device so we don't leave orphans
+            await _async_remove_standalone_device(hass, entry)
 
     # Create coordinator
     coordinator = OneComDynDNSCoordinator(hass, entry)

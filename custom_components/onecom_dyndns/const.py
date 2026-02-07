@@ -81,6 +81,10 @@ def get_device_info(entry_id: str, domain: str, addon_slug: str | None = None):
     if addon_slug:
         return DeviceInfo(
             identifiers={("hassio", addon_slug)},
+            name="One.com DynDNS Updater",
+            manufacturer="ulfwuestefeld",
+            model="DynDNS Updater",
+            configuration_url="https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns",
         )
 
     return DeviceInfo(

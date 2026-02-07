@@ -1373,9 +1373,10 @@ class TestGetDeviceInfo:
 
         # Our stub DeviceInfo returns a dict of keyword args
         assert info["identifiers"] == {("hassio", "homeassistant-onecom-dyndns")}
-        # Should NOT contain standalone fields
-        assert "name" not in info
-        assert "manufacturer" not in info
+        # Should contain fallback name/manufacturer for when Supervisor device
+        # is not yet created (prevents "Unnamed Device" in UI)
+        assert info["name"] == "One.com DynDNS Updater"
+        assert info["manufacturer"] == "ulfwuestefeld"
 
     def test_without_addon_slug_returns_standalone_device(self):
         """When addon_slug is None, DeviceInfo has full standalone metadata."""
