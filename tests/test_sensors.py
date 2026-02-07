@@ -10,10 +10,13 @@ This covers:
 - Coordinator data flow (__init__.py): timestamp tracking
 """
 
+import asyncio
+import json
 import os
 import tempfile
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
 import pytest
@@ -207,7 +210,13 @@ def _ensure_ha_stubs():
     if not hasattr(coordinator_mod, "CoordinatorEntity"):
         coordinator_mod.CoordinatorEntity = type("CoordinatorEntity", (), {"__init__": lambda self, coord: None})
     if not hasattr(coordinator_mod, "DataUpdateCoordinator"):
-        coordinator_mod.DataUpdateCoordinator = type("DataUpdateCoordinator", (), {})
+        class _StubDataUpdateCoordinator:
+            """Stub that accepts the same __init__ args as the real class."""
+            def __init__(self, hass=None, logger=None, *, name="", update_interval=None, **kwargs):
+                self.hass = hass
+                self.name = name
+                self.update_interval = update_interval
+        coordinator_mod.DataUpdateCoordinator = _StubDataUpdateCoordinator
     if not hasattr(coordinator_mod, "UpdateFailed"):
         coordinator_mod.UpdateFailed = type("UpdateFailed", (Exception,), {})
 
@@ -1265,6 +1274,31 @@ class TestCoordinatorTimestampTracking:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Part 5a: State file constants
+# ---------------------------------------------------------------------------
+
+
+class TestAddonStateFileConstants:
+    """Verify that state/command file constants exist."""
+
+    def test_addon_state_file_constant(self):
+        _ensure_ha_stubs()
+        import importlib
+        const_mod = importlib.import_module("custom_components.onecom_dyndns.const")
+        importlib.reload(const_mod)
+        assert hasattr(const_mod, "ADDON_STATE_FILE")
+        assert const_mod.ADDON_STATE_FILE == ".onecom_dyndns_state.json"
+
+    def test_addon_command_file_constant(self):
+        _ensure_ha_stubs()
+        import importlib
+        const_mod = importlib.import_module("custom_components.onecom_dyndns.const")
+        importlib.reload(const_mod)
+        assert hasattr(const_mod, "ADDON_COMMAND_FILE")
+        assert const_mod.ADDON_COMMAND_FILE == ".onecom_dyndns_commands.json"
+
+
 class TestSensorConstants:
     """Verify that all required constants are defined."""
 
@@ -1885,6 +1919,253 @@ class TestButtonAsyncSetupEntryConditional:
         keys = self._simulate_setup_entry(ssl_enabled=True)
         assert len(keys) == 3
         assert "renew_certificate" in keys
+
+
+# ---------------------------------------------------------------------------
+# Part 7: Coordinator Add-on Mode (state file reading / command writing)
+# ---------------------------------------------------------------------------
+
+def _make_addon_coordinator(hass_mock, state_file_path, command_file_path, extra_data=None):
+    """Create a OneComDynDNSCoordinator in add-on mode for testing."""
+    _ensure_ha_stubs()
+    import importlib
+    init_mod = importlib.import_module("custom_components.onecom_dyndns")
+    importlib.reload(init_mod)
+
+    entry_data = {
+        "username": "user@example.com",
+        "password": "pass123",
+        "domain": "example.com",
+        "subdomains": ["www", ""],
+        "update_interval": 5,
+        "ip_service": "ipify",
+        "ssl_enabled": False,
+        "addon_slug": "homeassistant-onecom-dyndns",
+    }
+    if extra_data:
+        entry_data.update(extra_data)
+
+    entry = Mock()
+    entry.data = entry_data
+    entry.entry_id = "test-entry-123"
+
+    # hass.config.path() should join with the temp directory
+    config_dir = str(Path(state_file_path).parent)
+    hass_mock.config.path = lambda f: os.path.join(config_dir, f)
+
+    coordinator = init_mod.OneComDynDNSCoordinator(hass_mock, entry)
+    return coordinator
+
+
+class TestCoordinatorAddonMode:
+    """Verify coordinator reads from the add-on state file."""
+
+    def _make_hass(self):
+        hass = Mock()
+        hass.async_add_executor_job = Mock(
+            side_effect=lambda fn, *args: asyncio.get_event_loop().run_in_executor(None, fn, *args)
+        )
+        return hass
+
+    def test_addon_mode_detected(self, tmp_path):
+        """Coordinator should detect add-on mode from addon_slug."""
+        state_file = tmp_path / ".onecom_dyndns_state.json"
+        cmd_file = tmp_path / ".onecom_dyndns_commands.json"
+        hass = self._make_hass()
+        coordinator = _make_addon_coordinator(hass, str(state_file), str(cmd_file))
+        assert coordinator._addon_mode is True
+
+    def test_standalone_mode_when_no_slug(self, tmp_path):
+        """Coordinator should fall back to standalone mode without addon_slug."""
+        _ensure_ha_stubs()
+        import importlib
+        init_mod = importlib.import_module("custom_components.onecom_dyndns")
+        importlib.reload(init_mod)
+
+        entry = Mock()
+        entry.data = {
+            "username": "u", "password": "p", "domain": "d.com",
+            "update_interval": 5, "ip_service": "ipify",
+        }
+        hass = self._make_hass()
+        coordinator = init_mod.OneComDynDNSCoordinator(hass, entry)
+        assert coordinator._addon_mode is False
+
+    def test_reads_state_file(self, tmp_path):
+        """In add-on mode, _async_update_data should read the state file."""
+        state_file = tmp_path / ".onecom_dyndns_state.json"
+        state = {
+            "current_ip": "5.6.7.8",
+            "last_ip": "5.6.7.7",
+            "domain": "example.com",
+            "subdomains": ["www.example.com"],
+            "ip_changed": False,
+            "dns_status": "ok",
+            "last_update": "2026-02-06T12:00:00+00:00",
+            "last_ip_update": "2026-02-06T10:00:00+00:00",
+            "last_certificate_renewal": None,
+            "ssl_enabled": False,
+            "certificate_info": None,
+            "acme_challenge": None,
+        }
+        state_file.write_text(json.dumps(state))
+
+        hass = self._make_hass()
+        coordinator = _make_addon_coordinator(hass, str(state_file), str(tmp_path / "cmd.json"))
+
+        async def _run():
+            data = await coordinator._async_read_addon_state()
+            assert data["current_ip"] == "5.6.7.8"
+            assert data["dns_status"] == "ok"
+            assert data["domain"] == "example.com"
+
+        asyncio.run(_run())
+
+    def test_returns_defaults_when_no_state_file(self, tmp_path):
+        """If the state file does not exist yet, safe defaults should be returned."""
+        state_file = tmp_path / ".onecom_dyndns_state.json"
+        # Do NOT create the file
+
+        hass = self._make_hass()
+        coordinator = _make_addon_coordinator(hass, str(state_file), str(tmp_path / "cmd.json"))
+
+        async def _run():
+            data = await coordinator._async_read_addon_state()
+            assert data["current_ip"] is None
+            assert data["dns_status"] == "unknown"
+            assert data["domain"] == "example.com"
+
+        asyncio.run(_run())
+
+    def test_returns_defaults_on_invalid_json(self, tmp_path):
+        """Malformed state file should not crash the coordinator."""
+        state_file = tmp_path / ".onecom_dyndns_state.json"
+        state_file.write_text("{INVALID JSON")
+
+        hass = self._make_hass()
+        coordinator = _make_addon_coordinator(hass, str(state_file), str(tmp_path / "cmd.json"))
+
+        async def _run():
+            data = await coordinator._async_read_addon_state()
+            assert data["current_ip"] is None
+
+        asyncio.run(_run())
+
+
+class TestCoordinatorCommandFile:
+    """Verify coordinator writes commands for the add-on."""
+
+    def _make_hass(self):
+        hass = Mock()
+        hass.async_add_executor_job = Mock(
+            side_effect=lambda fn, *args: asyncio.get_event_loop().run_in_executor(None, fn, *args)
+        )
+        return hass
+
+    def test_force_update_dns_writes_command(self, tmp_path):
+        """async_force_update_dns should write update_dns command."""
+        state_file = tmp_path / ".onecom_dyndns_state.json"
+        cmd_file = tmp_path / ".onecom_dyndns_commands.json"
+        hass = self._make_hass()
+        coordinator = _make_addon_coordinator(hass, str(state_file), str(cmd_file))
+
+        # Mock async_refresh to avoid HA interaction
+        refresh_called = False
+
+        async def fake_refresh():
+            nonlocal refresh_called
+            refresh_called = True
+
+        coordinator.async_refresh = fake_refresh
+
+        async def _run():
+            await coordinator.async_force_update_dns()
+
+        asyncio.run(_run())
+
+        assert cmd_file.exists()
+        data = json.loads(cmd_file.read_text())
+        assert data["command"] == "update_dns"
+        assert "timestamp" in data
+
+    def test_force_renew_certificate_writes_command(self, tmp_path):
+        """async_force_renew_certificate should write renew_certificate command."""
+        state_file = tmp_path / ".onecom_dyndns_state.json"
+        cmd_file = tmp_path / ".onecom_dyndns_commands.json"
+        hass = self._make_hass()
+        coordinator = _make_addon_coordinator(
+            hass, str(state_file), str(cmd_file), extra_data={"ssl_enabled": True}
+        )
+
+        coordinator.async_refresh = lambda: asyncio.sleep(0)
+
+        async def _run():
+            await coordinator.async_force_renew_certificate()
+
+        asyncio.run(_run())
+
+        assert cmd_file.exists()
+        data = json.loads(cmd_file.read_text())
+        assert data["command"] == "renew_certificate"
+
+    def test_standalone_mode_does_not_write_command(self, tmp_path):
+        """In standalone mode, force update should NOT write a command file."""
+        _ensure_ha_stubs()
+        import importlib
+        init_mod = importlib.import_module("custom_components.onecom_dyndns")
+        importlib.reload(init_mod)
+
+        entry = Mock()
+        entry.data = {
+            "username": "u", "password": "p", "domain": "d.com",
+            "subdomains": [""], "update_interval": 5, "ip_service": "ipify",
+        }
+        hass = self._make_hass()
+        coordinator = init_mod.OneComDynDNSCoordinator(hass, entry)
+
+        # In standalone mode with no _last_ip, force_update_dns is a no-op
+        async def _run():
+            await coordinator.async_force_update_dns()
+
+        asyncio.run(_run())
+
+        cmd_file = tmp_path / ".onecom_dyndns_commands.json"
+        assert not cmd_file.exists()
+
+
+class TestCoordinatorUpdateInterval:
+    """Verify coordinator uses shorter interval in add-on mode."""
+
+    def _make_hass(self):
+        hass = Mock()
+        hass.async_add_executor_job = Mock()
+        return hass
+
+    def test_addon_mode_uses_30s_interval(self, tmp_path):
+        """In add-on mode, polling interval should be 30 seconds."""
+        from datetime import timedelta
+        state_file = tmp_path / ".onecom_dyndns_state.json"
+        cmd_file = tmp_path / ".onecom_dyndns_commands.json"
+        hass = self._make_hass()
+        coordinator = _make_addon_coordinator(hass, str(state_file), str(cmd_file))
+        assert coordinator.update_interval == timedelta(seconds=30)
+
+    def test_standalone_mode_uses_config_interval(self, tmp_path):
+        """In standalone mode, polling interval should match config."""
+        from datetime import timedelta
+        _ensure_ha_stubs()
+        import importlib
+        init_mod = importlib.import_module("custom_components.onecom_dyndns")
+        importlib.reload(init_mod)
+
+        entry = Mock()
+        entry.data = {
+            "username": "u", "password": "p", "domain": "d.com",
+            "update_interval": 10, "ip_service": "ipify",
+        }
+        hass = self._make_hass()
+        coordinator = init_mod.OneComDynDNSCoordinator(hass, entry)
+        assert coordinator.update_interval == timedelta(minutes=10)
 
 
 if __name__ == "__main__":

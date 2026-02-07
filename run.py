@@ -44,6 +44,10 @@ LAST_IP_FILE = "/data/last_ip.txt"
 OPTIONS_FILE = "/data/options.json"
 ACME_CHALLENGE_FILE = "/data/acme_challenge.json"
 
+# Shared state/command files (accessible by both add-on and HA core via /config/)
+ADDON_STATE_FILE = "/config/.onecom_dyndns_state.json"
+ADDON_COMMAND_FILE = "/config/.onecom_dyndns_commands.json"
+
 # Home Assistant Supervisor API
 def get_supervisor_token():
     """Get the Supervisor token from various possible sources."""
@@ -549,6 +553,7 @@ class DynDNSUpdater:
 
         if not current_ip:
             self._logger.warning("Could not determine public IP")
+            self._write_state_file(dns_status="error")
             return
 
         # Update IP sensor regardless of change
@@ -557,6 +562,7 @@ class DynDNSUpdater:
         # Check if IP has changed
         if current_ip == self._last_ip:
             self._logger.debug("IP unchanged: %s", current_ip)
+            self._write_state_file(current_ip=current_ip, dns_status="ok")
             return
 
         self._logger.info(f"IP changed: {self._last_ip or 'unknown'} -> {current_ip}")
@@ -568,9 +574,11 @@ class DynDNSUpdater:
             self._logger.info("DNS update completed successfully")
             self._update_dns_sensor("ok", current_ip)
             self._update_last_ip_update_sensor()
+            self._write_state_file(current_ip=current_ip, dns_status="ok")
         else:
             self._logger.error("DNS update failed - will retry on next interval")
             self._update_dns_sensor("error", current_ip)
+            self._write_state_file(current_ip=current_ip, dns_status="error")
 
     def _update_ip_sensor(self, ip: str):
         """Update the IP sensor in Home Assistant."""
@@ -660,6 +668,121 @@ class DynDNSUpdater:
             },
         )
 
+    # ------------------------------------------------------------------
+    # Shared state / command files for the custom component integration
+    # ------------------------------------------------------------------
+
+    def _write_state_file(self, current_ip=None, dns_status="unknown"):
+        """Write the current add-on state to a JSON file.
+
+        The custom component reads this file via its DataUpdateCoordinator
+        instead of independently polling IP services or DNS.
+        """
+        cert_info = None
+        if self._cert_manager:
+            try:
+                cert_info = self._cert_manager.get_certificate_info()
+            except Exception:
+                pass
+
+        # Read current ACME challenge (if any)
+        acme_challenge = None
+        try:
+            if os.path.isfile(ACME_CHALLENGE_FILE):
+                with open(ACME_CHALLENGE_FILE, "r") as f:
+                    acme_challenge = json.load(f)
+        except (IOError, json.JSONDecodeError):
+            pass
+
+        subdomains_list = [
+            f"{s}.{self.domain}" if s else self.domain
+            for s in self.subdomains
+        ]
+
+        state = {
+            "current_ip": current_ip or self._last_ip,
+            "last_ip": self._last_ip,
+            "domain": self.domain,
+            "subdomains": subdomains_list,
+            "ip_changed": current_ip is not None and current_ip != self._last_ip,
+            "dns_status": dns_status,
+            "last_update": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()),
+            "last_ip_update": self._last_ip_update,
+            "last_certificate_renewal": self._last_certificate_renewal,
+            "ssl_enabled": self.ssl_enabled,
+            "certificate_info": cert_info,
+            "acme_challenge": acme_challenge,
+        }
+
+        try:
+            tmp_path = ADDON_STATE_FILE + ".tmp"
+            with open(tmp_path, "w") as f:
+                json.dump(state, f, indent=2)
+            # Atomic replace to avoid partial reads
+            os.replace(tmp_path, ADDON_STATE_FILE)
+            self._logger.debug("State file written: %s", ADDON_STATE_FILE)
+        except Exception as exc:
+            self._logger.debug("Failed to write state file: %s", exc)
+
+    def _check_commands(self):
+        """Check for and execute commands from the custom component.
+
+        The custom component writes a command JSON file when a user presses
+        a button (e.g. "Update DNS", "Renew Certificate").  The add-on
+        picks up the command, executes it, and deletes the file.
+        """
+        if not os.path.isfile(ADDON_COMMAND_FILE):
+            return
+
+        try:
+            with open(ADDON_COMMAND_FILE, "r") as f:
+                cmd = json.load(f)
+            # Remove the command file immediately so it isn't executed twice
+            os.remove(ADDON_COMMAND_FILE)
+        except (IOError, json.JSONDecodeError) as exc:
+            self._logger.debug("Could not read command file: %s", exc)
+            try:
+                os.remove(ADDON_COMMAND_FILE)
+            except OSError:
+                pass
+            return
+
+        command = cmd.get("command", "")
+        self._logger.info("Received command: %s", command)
+
+        if command == "update_dns":
+            if self._last_ip:
+                if self.update_dns(self._last_ip):
+                    self._last_ip_update = time.strftime(
+                        "%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()
+                    )
+                    self._update_dns_sensor("ok", self._last_ip)
+                    self._update_last_ip_update_sensor()
+                    self._write_state_file(
+                        current_ip=self._last_ip, dns_status="ok"
+                    )
+                else:
+                    self._update_dns_sensor("error", self._last_ip)
+                    self._write_state_file(
+                        current_ip=self._last_ip, dns_status="error"
+                    )
+        elif command == "check_ip":
+            self.check_and_update()
+        elif command == "renew_certificate":
+            if self._cert_manager and self.ssl_enabled:
+                try:
+                    if self._cert_manager.request_certificate(force=True):
+                        self._logger.info("Forced certificate renewal succeeded")
+                    else:
+                        self._logger.error("Forced certificate renewal failed")
+                except Exception as exc:
+                    self._logger.error("Certificate renewal error: %s", exc)
+                self._write_state_file(
+                    current_ip=self._last_ip, dns_status="ok"
+                )
+        else:
+            self._logger.warning("Unknown command: %s", command)
+
     def _ssl_event_callback(self, event_type: str, data: dict):
         """Handle SSL certificate events.
 
@@ -693,6 +816,8 @@ class DynDNSUpdater:
                 ),
                 notification_id="onecom_dyndns_certificate_renewed",
             )
+            # Update state file so the custom component picks up the change
+            self._write_state_file(current_ip=self._last_ip, dns_status="ok")
         elif event_type == "error":
             self._logger.error(f"SSL certificate error: {data.get('error', 'Unknown error')}")
         elif event_type == "expiring":
@@ -788,18 +913,25 @@ class DynDNSUpdater:
         # Initial check
         self.check_and_update()
 
-        # Main loop
+        # Main loop – wake up every 5 seconds to check for commands,
+        # but only run the full IP check on the configured interval.
         interval_seconds = self.update_interval * 60
+        elapsed = 0.0
+        poll_interval = 5  # seconds between command checks
 
         while self._running:
-            self._logger.debug("Sleeping for %s minutes...", self.update_interval)
-
-            # Block until timeout or stop signal; single syscall replaces
-            # interval_seconds individual sleep(1) calls.
-            if self._stop_event.wait(timeout=interval_seconds):
+            if self._stop_event.wait(timeout=poll_interval):
                 break  # stop() was called
 
+            elapsed += poll_interval
+
+            # Check for commands from the custom component every cycle
             if self._running:
+                self._check_commands()
+
+            # Full IP check on the configured interval
+            if self._running and elapsed >= interval_seconds:
+                elapsed = 0.0
                 self.check_and_update()
 
         # Stop SSL manager

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -28,13 +30,15 @@ from .const import (
     CONF_SSL_STAGING,
     CONF_SSL_RENEWAL_DAYS,
     CONF_SSL_CHECK_INTERVAL,
+    CONF_ADDON_SLUG,
     DEFAULT_UPDATE_INTERVAL,
     SERVICE_UPDATE_DNS,
     SERVICE_RENEW_CERTIFICATE,
     SERVICE_CHECK_IP,
     IP_SERVICES,
+    ADDON_STATE_FILE,
+    ADDON_COMMAND_FILE,
 )
-from .onecom_api import OneComAPI, OneComAPIError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -119,20 +123,45 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
 
 class OneComDynDNSCoordinator(DataUpdateCoordinator):
-    """Coordinator for One.com DynDNS updates."""
+    """Coordinator for One.com DynDNS updates.
+
+    When the integration was discovered from the add-on (``addon_slug`` is
+    set in the config entry), the coordinator reads the shared state file
+    written by the add-on instead of independently polling IP services.
+    Button presses and service calls write a command file that the add-on
+    picks up within seconds.
+
+    When running standalone (no add-on), the coordinator falls back to
+    direct IP polling and DNS updates.
+    """
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize the coordinator."""
         self.entry = entry
-        self.session = async_get_clientsession(hass)
 
-        # Configuration
-        self.username = entry.data[CONF_USERNAME]
-        self.password = entry.data[CONF_PASSWORD]
-        self.domain = entry.data[CONF_DOMAIN]
+        # Detect add-on mode
+        self._addon_mode = bool(entry.data.get(CONF_ADDON_SLUG))
+
+        if self._addon_mode:
+            # In add-on mode we read from the state file.
+            # Resolve the path relative to HA's config directory.
+            self._state_file = Path(hass.config.path(ADDON_STATE_FILE))
+            self._command_file = Path(hass.config.path(ADDON_COMMAND_FILE))
+            _LOGGER.info(
+                "Add-on mode: reading state from %s", self._state_file
+            )
+        else:
+            self._state_file = None
+            self._command_file = None
+            self.session = async_get_clientsession(hass)
+
+        # Configuration (used in standalone mode and for entity metadata)
+        self.domain = entry.data.get(CONF_DOMAIN, "")
         self.subdomains = entry.data.get(CONF_SUBDOMAINS, [""])
         self.ip_service = entry.data.get(CONF_IP_SERVICE, "ipify")
-        self.update_interval_minutes = entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+        self.update_interval_minutes = entry.data.get(
+            CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+        )
 
         # SSL Configuration
         self.ssl_enabled = entry.data.get(CONF_SSL_ENABLED, False)
@@ -140,7 +169,7 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
         self.ssl_domains = entry.data.get(CONF_SSL_DOMAINS, [])
         self.ssl_staging = entry.data.get(CONF_SSL_STAGING, False)
 
-        # State
+        # Standalone-mode state (not used in add-on mode)
         self._last_ip: str | None = None
         self._last_update: str | None = None
         self._last_ip_update: str | None = None
@@ -148,38 +177,90 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
         self._certificate_info: dict[str, Any] | None = None
         self._acme_challenge: dict[str, str] | None = None
 
+        # In add-on mode, poll more frequently so button feedback is fast
+        interval = timedelta(seconds=30) if self._addon_mode else timedelta(
+            minutes=self.update_interval_minutes
+        )
+
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(minutes=self.update_interval_minutes),
+            update_interval=interval,
         )
 
+    # ------------------------------------------------------------------
+    # Data fetching
+    # ------------------------------------------------------------------
+
     async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch data from One.com."""
+        """Fetch data – from add-on state file or by direct polling."""
+        if self._addon_mode:
+            return await self._async_read_addon_state()
+        return await self._async_poll_directly()
+
+    async def _async_read_addon_state(self) -> dict[str, Any]:
+        """Read the state file written by the add-on."""
         try:
-            # Get current public IP
+            data = await self.hass.async_add_executor_job(
+                self._read_state_file_sync
+            )
+            if data is not None:
+                return data
+        except Exception as err:
+            _LOGGER.debug("Could not read add-on state file: %s", err)
+
+        # State file not yet available – return safe defaults
+        return {
+            "current_ip": None,
+            "last_ip": None,
+            "domain": self.domain,
+            "subdomains": self.subdomains,
+            "ip_changed": False,
+            "dns_status": "unknown",
+            "last_update": None,
+            "last_ip_update": None,
+            "last_certificate_renewal": None,
+            "ssl_enabled": self.ssl_enabled,
+            "certificate_info": None,
+            "acme_challenge": None,
+        }
+
+    def _read_state_file_sync(self) -> dict[str, Any] | None:
+        """Synchronous helper to read the JSON state file."""
+        if self._state_file is None or not self._state_file.is_file():
+            return None
+        with open(self._state_file, "r") as fh:
+            return json.load(fh)
+
+    async def _async_poll_directly(self) -> dict[str, Any]:
+        """Standalone mode: poll IP services and update DNS directly."""
+        try:
             current_ip = await self._async_get_public_ip()
 
             now_iso = datetime.now(timezone.utc).isoformat()
             self._last_update = now_iso
 
-            ip_changed = current_ip != self._last_ip and self._last_ip is not None
+            ip_changed = (
+                current_ip != self._last_ip and self._last_ip is not None
+            )
 
-            # Update DNS if IP changed
             if ip_changed:
-                _LOGGER.info("IP changed from %s to %s", self._last_ip, current_ip)
+                _LOGGER.info(
+                    "IP changed from %s to %s", self._last_ip, current_ip
+                )
                 await self._async_update_dns(current_ip)
                 self._last_ip_update = now_iso
 
             self._last_ip = current_ip
 
-            data = {
+            return {
                 "current_ip": current_ip,
                 "last_ip": self._last_ip,
                 "domain": self.domain,
                 "subdomains": self.subdomains,
                 "ip_changed": ip_changed,
+                "dns_status": "ok" if current_ip else "error",
                 "last_update": self._last_update,
                 "last_ip_update": self._last_ip_update,
                 "last_certificate_renewal": self._last_certificate_renewal,
@@ -188,13 +269,13 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
                 "acme_challenge": self._acme_challenge,
             }
 
-            return data
-
         except Exception as err:
-            raise UpdateFailed(f"Error communicating with One.com: {err}") from err
+            raise UpdateFailed(
+                f"Error communicating with One.com: {err}"
+            ) from err
 
     async def _async_get_public_ip(self) -> str:
-        """Get the current public IP address."""
+        """Get the current public IP address (standalone mode only)."""
         url = IP_SERVICES.get(self.ip_service, IP_SERVICES["ipify"])
 
         try:
@@ -207,11 +288,14 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
             raise
 
     async def _async_update_dns(self, ip: str) -> bool:
-        """Update DNS records at One.com."""
+        """Update DNS records at One.com (standalone mode only)."""
         try:
-            api = OneComAPI(self.username, self.password, self.domain)
+            from .onecom_api import OneComAPI, OneComAPIError
 
-            # Run blocking I/O in executor
+            username = self.entry.data[CONF_USERNAME]
+            password = self.entry.data[CONF_PASSWORD]
+            api = OneComAPI(username, password, self.domain)
+
             await self.hass.async_add_executor_job(api.login)
 
             for subdomain in self.subdomains:
@@ -219,34 +303,77 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
                     await self.hass.async_add_executor_job(
                         api.update_dns_record, subdomain, ip
                     )
-                    _LOGGER.info("Updated DNS for %s.%s to %s",
-                                subdomain or "@", self.domain, ip)
+                    _LOGGER.info(
+                        "Updated DNS for %s.%s to %s",
+                        subdomain or "@",
+                        self.domain,
+                        ip,
+                    )
                 except OneComAPIError as err:
-                    _LOGGER.error("Failed to update %s.%s: %s",
-                                 subdomain or "@", self.domain, err)
+                    _LOGGER.error(
+                        "Failed to update %s.%s: %s",
+                        subdomain or "@",
+                        self.domain,
+                        err,
+                    )
 
             await self.hass.async_add_executor_job(api.logout)
             return True
 
-        except OneComAPIError as err:
+        except Exception as err:
             _LOGGER.error("DNS update failed: %s", err)
             return False
 
+    # ------------------------------------------------------------------
+    # Commands (button presses / service calls)
+    # ------------------------------------------------------------------
+
+    def _write_command_sync(self, command: str) -> None:
+        """Synchronous helper: write a command for the add-on to pick up."""
+        if self._command_file is None:
+            return
+        payload = {
+            "command": command,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        tmp = str(self._command_file) + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(payload, fh)
+        Path(tmp).replace(self._command_file)
+
     async def async_force_update_dns(self) -> None:
         """Force a DNS update."""
-        if self._last_ip:
-            await self._async_update_dns(self._last_ip)
+        if self._addon_mode:
+            await self.hass.async_add_executor_job(
+                self._write_command_sync, "update_dns"
+            )
+            # Refresh after a short delay so the UI updates quickly
+            await asyncio.sleep(2)
+            await self.async_refresh()
+        else:
+            if self._last_ip:
+                await self._async_update_dns(self._last_ip)
 
     async def async_force_renew_certificate(self) -> None:
         """Force certificate renewal."""
-        if not self.ssl_enabled:
-            _LOGGER.warning("SSL is not enabled")
-            return
+        if self._addon_mode:
+            await self.hass.async_add_executor_job(
+                self._write_command_sync, "renew_certificate"
+            )
+            await asyncio.sleep(2)
+            await self.async_refresh()
+        else:
+            if not self.ssl_enabled:
+                _LOGGER.warning("SSL is not enabled")
+                return
+            _LOGGER.info("Forcing certificate renewal...")
+            self._last_certificate_renewal = datetime.now(
+                timezone.utc
+            ).isoformat()
 
-        _LOGGER.info("Forcing certificate renewal...")
-        # Certificate renewal logic would go here
-        # This would use the CertificateManager from the add-on
-        self._last_certificate_renewal = datetime.now(timezone.utc).isoformat()
+    # ------------------------------------------------------------------
+    # ACME challenge helpers (standalone mode)
+    # ------------------------------------------------------------------
 
     def set_acme_challenge(
         self, domain: str, txt_name: str, txt_value: str

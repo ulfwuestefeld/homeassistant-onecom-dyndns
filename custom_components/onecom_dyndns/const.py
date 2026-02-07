@@ -61,6 +61,11 @@ ATTR_ACME_CHALLENGE: Final = "acme_challenge"
 # Update coordinator
 UPDATE_INTERVAL_SECONDS: Final = 60
 
+# Shared state file written by the add-on, read by the integration
+ADDON_STATE_FILE: Final = ".onecom_dyndns_state.json"
+# Command file written by the integration, read by the add-on
+ADDON_COMMAND_FILE: Final = ".onecom_dyndns_commands.json"
+
 
 def get_device_info(entry_id: str, domain: str, addon_slug: str | None = None):
     """Build DeviceInfo, attaching to the Supervisor add-on device when possible.

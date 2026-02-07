@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-02-06
+
+### Changed
+
+- **Add-on↔Integration Architecture**: Custom component now reads state from the
+  add-on via a shared state file (`/config/.onecom_dyndns_state.json`) instead of
+  independently polling IP services and updating DNS records.  This eliminates
+  redundant network calls and ensures the entities always display the same data the
+  add-on produces.
+  - Add-on writes state file after every check cycle and SSL events
+  - Add-on checks for command file every 5 seconds (button presses / service calls)
+  - Coordinator in add-on mode polls the state file every 30 seconds
+  - Standalone mode (without add-on) retains the original direct-polling behaviour
+- Button presses (Update DNS, Check IP, Renew Certificate) now write a command file
+  (`/config/.onecom_dyndns_commands.json`) that the add-on picks up and executes,
+  instead of the integration performing the action itself
+
+### Added
+
+- **Integration Icon**: `icon.png` added to custom component directory so the
+  integration displays the same icon as the add-on in the HA Integrations page
+- `"after_dependencies": ["hassio"]` in `manifest.json` ensures the Supervisor
+  creates the add-on device before the integration attaches entities to it
+- `ADDON_STATE_FILE` and `ADDON_COMMAND_FILE` constants in `const.py`
+- `DynDNSUpdater._write_state_file()` – writes current add-on state as JSON
+- `DynDNSUpdater._check_commands()` – reads and executes commands from integration
+- `OneComDynDNSCoordinator._async_read_addon_state()` – reads shared state file
+- `OneComDynDNSCoordinator._write_command_sync()` – writes command for add-on
+- `OneComDynDNSCoordinator._async_poll_directly()` – standalone-mode fallback
+- **Extended Test Suite** (422 → 445 tests)
+  - Tests for `_write_state_file()` (5 cases: JSON validity, FQDN subdomains,
+    certificate info, write error handling, ip_changed flag)
+  - Tests for `_check_commands()` (6 cases: no file, update_dns, check_ip,
+    invalid JSON, unknown command, renew_certificate)
+  - Tests for coordinator add-on mode (5 cases: mode detection, standalone fallback,
+    reads state file, default on missing file, default on invalid JSON)
+  - Tests for command file writing (3 cases: update_dns, renew_certificate,
+    standalone no-write)
+  - Tests for state/command file constants (2 cases)
+  - Tests for update interval (2 cases: 30s add-on vs config standalone)
+
 ## [1.3.2] - 2026-02-06
 
 ### Added
@@ -83,7 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Custom component (1.2.0 → 1.3.2)**
+- **Custom component (1.2.0 → 1.3.3)**
   - SENSOR_TYPES extended from 5 to 6 (+ acme_challenge)
   - ssl_only_sensors set now includes acme_challenge
   - Updated English, German translations and strings.json for new entities

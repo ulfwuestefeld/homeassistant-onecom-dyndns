@@ -771,5 +771,212 @@ class TestPublishAddonDiscovery:
         assert config["ssl_check_interval"] == 12
 
 
+# ---------------------------------------------------------------------------
+# Tests for _write_state_file() and _check_commands()
+# ---------------------------------------------------------------------------
+
+class TestWriteStateFile:
+    """Tests for the DynDNSUpdater._write_state_file method."""
+
+    def setup_method(self):
+        self.options = {
+            "username": "test@example.com",
+            "password": "testpassword",
+            "domain": "example.com",
+            "subdomains": ["www", ""],
+            "update_interval": 5,
+            "ip_service": "ipify",
+            "log_level": "error",
+            "ssl_enabled": False,
+        }
+
+    def test_writes_json_to_state_file(self, tmp_path):
+        """State file should be valid JSON with expected keys."""
+        state_file = str(tmp_path / "state.json")
+
+        with patch("run.ADDON_STATE_FILE", state_file):
+            with patch("run.update_ha_sensor"):
+                updater = DynDNSUpdater(self.options)
+                updater._last_ip = "1.2.3.4"
+                updater._write_state_file(current_ip="1.2.3.4", dns_status="ok")
+
+        assert os.path.isfile(state_file)
+        with open(state_file) as f:
+            data = json.load(f)
+
+        assert data["current_ip"] == "1.2.3.4"
+        assert data["domain"] == "example.com"
+        assert data["dns_status"] == "ok"
+        assert data["ssl_enabled"] is False
+        assert "last_update" in data
+        assert "subdomains" in data
+
+    def test_state_file_contains_subdomains_as_fqdn(self, tmp_path):
+        """Subdomains should be expanded to full domain names."""
+        state_file = str(tmp_path / "state.json")
+
+        with patch("run.ADDON_STATE_FILE", state_file):
+            with patch("run.update_ha_sensor"):
+                updater = DynDNSUpdater(self.options)
+                updater._write_state_file(current_ip="1.2.3.4", dns_status="ok")
+
+        with open(state_file) as f:
+            data = json.load(f)
+
+        assert "www.example.com" in data["subdomains"]
+        assert "example.com" in data["subdomains"]
+
+    def test_state_file_includes_certificate_info(self, tmp_path):
+        """Certificate info from the cert manager should be included."""
+        state_file = str(tmp_path / "state.json")
+        opts = self.options.copy()
+        opts["ssl_enabled"] = True
+        opts["ssl_email"] = "ssl@example.com"
+
+        with patch("run.ADDON_STATE_FILE", state_file):
+            with patch("run.update_ha_sensor"):
+                updater = DynDNSUpdater(opts)
+                mock_cert_mgr = Mock()
+                mock_cert_mgr.get_certificate_info.return_value = {
+                    "not_valid_after": "2026-06-15",
+                    "days_remaining": 120,
+                }
+                updater._cert_manager = mock_cert_mgr
+                updater._write_state_file(current_ip="5.6.7.8", dns_status="ok")
+
+        with open(state_file) as f:
+            data = json.load(f)
+
+        assert data["certificate_info"] is not None
+        assert data["certificate_info"]["days_remaining"] == 120
+
+    def test_state_file_handles_write_error(self, tmp_path):
+        """Should not raise even if the state file cannot be written."""
+        with patch("run.ADDON_STATE_FILE", "/nonexistent/dir/state.json"):
+            with patch("run.update_ha_sensor"):
+                updater = DynDNSUpdater(self.options)
+                # Should not raise
+                updater._write_state_file(current_ip="1.2.3.4", dns_status="ok")
+
+    def test_state_file_ip_changed_flag(self, tmp_path):
+        """ip_changed should be True when current_ip differs from last_ip."""
+        state_file = str(tmp_path / "state.json")
+
+        with patch("run.ADDON_STATE_FILE", state_file):
+            with patch("run.update_ha_sensor"):
+                updater = DynDNSUpdater(self.options)
+                updater._last_ip = "1.1.1.1"
+                updater._write_state_file(current_ip="2.2.2.2", dns_status="ok")
+
+        with open(state_file) as f:
+            data = json.load(f)
+
+        assert data["ip_changed"] is True
+
+
+class TestCheckCommands:
+    """Tests for the DynDNSUpdater._check_commands method."""
+
+    def setup_method(self):
+        self.options = {
+            "username": "test@example.com",
+            "password": "testpassword",
+            "domain": "example.com",
+            "subdomains": ["www", ""],
+            "update_interval": 5,
+            "ip_service": "ipify",
+            "log_level": "error",
+            "ssl_enabled": False,
+        }
+
+    def test_no_command_file_does_nothing(self, tmp_path):
+        """Should return silently when no command file exists."""
+        cmd_file = str(tmp_path / "commands.json")
+
+        with patch("run.ADDON_COMMAND_FILE", cmd_file):
+            with patch("run.ADDON_STATE_FILE", str(tmp_path / "state.json")):
+                with patch("run.update_ha_sensor"):
+                    updater = DynDNSUpdater(self.options)
+                    updater._check_commands()  # Should not raise
+
+    def test_update_dns_command_triggers_dns_update(self, tmp_path):
+        """update_dns command should call update_dns."""
+        cmd_file = tmp_path / "commands.json"
+        cmd_file.write_text(json.dumps({"command": "update_dns"}))
+
+        with patch("run.ADDON_COMMAND_FILE", str(cmd_file)):
+            with patch("run.ADDON_STATE_FILE", str(tmp_path / "state.json")):
+                with patch("run.update_ha_sensor"):
+                    updater = DynDNSUpdater(self.options)
+                    updater._last_ip = "1.2.3.4"
+
+                    with patch.object(updater, "update_dns", return_value=True) as mock_dns:
+                        updater._check_commands()
+                        mock_dns.assert_called_once_with("1.2.3.4")
+
+        # Command file should be removed
+        assert not cmd_file.exists()
+
+    def test_check_ip_command_triggers_check_and_update(self, tmp_path):
+        """check_ip command should call check_and_update."""
+        cmd_file = tmp_path / "commands.json"
+        cmd_file.write_text(json.dumps({"command": "check_ip"}))
+
+        with patch("run.ADDON_COMMAND_FILE", str(cmd_file)):
+            with patch("run.ADDON_STATE_FILE", str(tmp_path / "state.json")):
+                with patch("run.update_ha_sensor"):
+                    updater = DynDNSUpdater(self.options)
+
+                    with patch.object(updater, "check_and_update") as mock_check:
+                        updater._check_commands()
+                        mock_check.assert_called_once()
+
+    def test_invalid_json_command_file_is_removed(self, tmp_path):
+        """Invalid JSON in command file should be handled gracefully."""
+        cmd_file = tmp_path / "commands.json"
+        cmd_file.write_text("NOT JSON {{")
+
+        with patch("run.ADDON_COMMAND_FILE", str(cmd_file)):
+            with patch("run.ADDON_STATE_FILE", str(tmp_path / "state.json")):
+                with patch("run.update_ha_sensor"):
+                    updater = DynDNSUpdater(self.options)
+                    updater._check_commands()  # Should not raise
+
+        assert not cmd_file.exists()
+
+    def test_unknown_command_is_ignored(self, tmp_path):
+        """Unknown command should log a warning but not crash."""
+        cmd_file = tmp_path / "commands.json"
+        cmd_file.write_text(json.dumps({"command": "unknown_action"}))
+
+        with patch("run.ADDON_COMMAND_FILE", str(cmd_file)):
+            with patch("run.ADDON_STATE_FILE", str(tmp_path / "state.json")):
+                with patch("run.update_ha_sensor"):
+                    updater = DynDNSUpdater(self.options)
+                    updater._check_commands()  # Should not raise
+
+        assert not cmd_file.exists()
+
+    def test_renew_certificate_command(self, tmp_path):
+        """renew_certificate command should call cert manager."""
+        cmd_file = tmp_path / "commands.json"
+        cmd_file.write_text(json.dumps({"command": "renew_certificate"}))
+        opts = self.options.copy()
+        opts["ssl_enabled"] = True
+        opts["ssl_email"] = "ssl@example.com"
+
+        with patch("run.ADDON_COMMAND_FILE", str(cmd_file)):
+            with patch("run.ADDON_STATE_FILE", str(tmp_path / "state.json")):
+                with patch("run.update_ha_sensor"):
+                    updater = DynDNSUpdater(opts)
+                    mock_cert = Mock()
+                    mock_cert.request_certificate.return_value = True
+                    mock_cert.get_certificate_info.return_value = None
+                    updater._cert_manager = mock_cert
+
+                    updater._check_commands()
+                    mock_cert.request_certificate.assert_called_once_with(force=True)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
