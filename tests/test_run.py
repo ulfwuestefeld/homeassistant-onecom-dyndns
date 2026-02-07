@@ -737,7 +737,7 @@ class TestPublishAddonDiscovery:
 
         call_args = mock_post.call_args
         payload = call_args[1]["json"]
-        assert payload["addon"] == "homeassistant-onecom-dyndns"
+        assert "addon" not in payload  # Supervisor infers addon from token
         assert payload["service"] == "onecom_dyndns"
         config = payload["config"]
         assert config["username"] == "user@one.com"

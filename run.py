@@ -230,7 +230,6 @@ def publish_addon_discovery(options: dict, retries: int = 5, delay: int = 10):
     }
 
     discovery_data = {
-        "addon": "homeassistant-onecom-dyndns",
         "service": "onecom_dyndns",
         "config": _build_discovery_config(options),
     }

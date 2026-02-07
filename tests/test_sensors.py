@@ -1391,7 +1391,7 @@ class TestGetDeviceInfo:
         )
 
         assert info["identifiers"] == {("onecom_dyndns", "entry_456")}
-        assert info["name"] == "One.com DynDNS - mysite.org"
+        assert info["name"] == "One.com DynDNS Updater - mysite.org"
         assert info["manufacturer"] == "ulfwuestefeld"
         assert info["model"] == "DynDNS Updater"
         assert info["configuration_url"] == "https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns"
@@ -1667,7 +1667,7 @@ class TestConfigFlowHassioDiscovery:
 
             result = await flow.async_step_hassio(discovery_info)
             assert result["type"] == "create_entry"
-            assert result["title"] == "One.com DynDNS - example.com"
+            assert result["title"] == "One.com DynDNS Updater - example.com"
             assert result["data"]["domain"] == "example.com"
             assert result["data"]["addon_slug"] == "homeassistant-onecom-dyndns"
 
@@ -1829,7 +1829,7 @@ class TestConfigFlowHassioDiscovery:
             }
 
             result = await flow.async_step_hassio(discovery_info)
-            assert result["title"] == "One.com DynDNS - mysite.org"
+            assert result["title"] == "One.com DynDNS Updater - mysite.org"
 
         asyncio.run(_run())
 

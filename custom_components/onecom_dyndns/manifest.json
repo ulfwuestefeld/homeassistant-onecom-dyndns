@@ -1,6 +1,6 @@
 {
   "domain": "onecom_dyndns",
-  "name": "One.com DynDNS",
+  "name": "One.com DynDNS Updater",
   "after_dependencies": ["hassio"],
   "codeowners": ["@ulfwuestefeld"],
   "config_flow": true,

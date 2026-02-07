@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "hassio_confirm": {
-        "title": "One.com DynDNS (Add-on)",
-        "description": "Das One.com DynDNS Add-on wurde erkannt. Möchten Sie Entitäten für die Domain **{domain}** erstellen?"
+        "title": "One.com DynDNS Updater (Add-on)",
+        "description": "Das One.com DynDNS Updater Add-on wurde erkannt. Möchten Sie Entitäten für die Domain **{domain}** erstellen?"
       },
       "user": {
         "title": "One.com Anmeldung",
@@ -87,7 +87,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "One.com DynDNS Optionen",
+        "title": "One.com DynDNS Updater Optionen",
         "description": "Aktualisierungseinstellungen und SSL-Optionen konfigurieren",
         "data": {
           "update_interval": "Aktualisierungsintervall",

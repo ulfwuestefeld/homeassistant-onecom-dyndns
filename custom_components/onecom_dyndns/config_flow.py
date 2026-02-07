@@ -87,7 +87,7 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Auto-create the entry – no user confirmation required because
         # all configuration is already provided by the add-on.
         return self.async_create_entry(
-            title=f"One.com DynDNS - {domain}",
+            title=f"One.com DynDNS Updater - {domain}",
             data=config,
         )
 
