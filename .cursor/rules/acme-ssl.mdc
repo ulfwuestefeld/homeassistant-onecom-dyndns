@@ -1,0 +1,75 @@
+---
+description: ACME / Let's Encrypt / SSL certificate conventions
+globs: "{acme_manager.py,certificate_manager.py,**/onecom_api.py}"
+alwaysApply: false
+---
+
+# ACME & SSL Conventions
+
+This project uses Let's Encrypt with **DNS-01 challenges** via the One.com DNS API.
+
+## DNS-01 Challenge Flow
+
+1. ACME client receives a token from Let's Encrypt
+2. Client creates a TXT record at `_acme-challenge.<<DOMAIN>>` derived from the token + account key
+3. Wait for DNS propagation (verified against Google DNS `8.8.8.8`)
+4. Let's Encrypt queries DNS for the TXT record
+5. On match → certificate is issued; client cleans up old TXT records
+
+Key implementation details:
+- TXT record TTL must be ≥ 600s (One.com minimum)
+- For subdomains: record is `_acme-challenge.<subdomain>` (e.g. `_acme-challenge.homeassistant`)
+- Old `_acme-challenge*` records are cleaned up before creating new ones
+- If record already exists with same content → treat as success
+- If record exists with different content → delete and recreate
+
+Reference: [Challenge Types](https://letsencrypt.org/docs/challenge-types/)
+
+## Rate Limits (Production)
+
+| Limit | Value | Refill |
+|---|---|---|
+| New orders per account | 300 / 3 hours | 1 every 36s |
+| Certificates per registered domain | 50 / 7 days | 1 every 202 min |
+| Certificates per exact set of identifiers | 5 / 7 days | 1 every 34 hours |
+| Authorization failures per identifier | 5 / hour | 1 every 12 min |
+
+**Renewals** (same set of identifiers) are largely exempt from rate limits.
+Revoking certificates does **not** reset limits.
+
+Reference: [Rate Limits](https://letsencrypt.org/docs/rate-limits/)
+
+## Staging vs Production
+
+| | Production | Staging |
+|---|---|---|
+| ACME URL | `acme-v02.api.letsencrypt.org/directory` | `acme-staging-v02.api.letsencrypt.org/directory` |
+| Certificates trusted | Yes | No (not in browser trust stores) |
+| Orders per account | 300 / 3h | 1500 / 3h |
+| Certs per domain | 50 / 7 days | 30000 / second |
+
+**Always use staging** (`ssl_staging: true`) when:
+- Developing or testing the ACME flow
+- Debugging DNS propagation issues
+- Verifying challenge record creation
+
+The `ACMEManager` constructor accepts `staging: bool` which selects the URL.
+Staging requires a separate ACME account (handled automatically by the library).
+
+Reference: [Staging Environment](https://letsencrypt.org/docs/staging-environment/)
+
+## Implementation Guidelines
+
+- **Graceful shutdown**: `ACMEManager` and `CertificateManager` share a `threading.Event`
+  (`_stop_event`). All polling loops use `event.wait(timeout=...)` instead of `time.sleep()`.
+  Call `manager.stop()` to interrupt in-progress challenges immediately.
+- **Account key**: Persisted at `/data/acme/account.key`; reused across renewals.
+  Losing the key requires re-registration (counts against rate limits).
+- **Certificate storage**: `/ssl/fullchain.pem` (cert + chain) and `/ssl/privkey.pem`.
+  Files must be readable by NGINX/HA proxy.
+- **Renewal check**: `certificate_manager.py` checks every `ssl_check_interval` hours
+  (default: 12). Renews when certificate expires within `ssl_renewal_days` (default: 30).
+- **Force renewal**: `ssl_force_renewal: true` in add-on options triggers immediate
+  renewal regardless of expiry. Useful when adding new domains to an existing certificate.
+- **Error recovery**: On ACME failure, log the error and retry on next check interval.
+  Never retry immediately in a tight loop (respects rate limits).

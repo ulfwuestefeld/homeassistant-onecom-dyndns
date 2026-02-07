@@ -8,12 +8,28 @@ alwaysApply: false
 
 - Domain: `onecom_dyndns`; integration name: "One.com DynDNS Updater"
 - `manifest.json` must have `"after_dependencies": ["hassio"]`
-- `get_device_info()` in `const.py` — use `("hassio", addon_slug)` for add-on mode
 - Config flow: `async_step_hassio()` auto-creates entry, no user confirmation
 - Coordinator reads state file in add-on mode; polls IP directly in standalone mode
 - Translations in `strings.json`, `translations/en.json`, `translations/de.json`
 - Entity categories: Diagnostic for `last_update` / `acme_challenge`; Config for buttons
 - SSL-only entities gated by `ssl_enabled` flag in coordinator data
+
+## Device Info
+
+`get_device_info()` in `const.py` provides **full metadata in both modes**:
+
+- **Add-on mode** (`addon_slug` set): `identifiers={("hassio", addon_slug)}` plus
+  `name="One.com DynDNS Updater"`, `manufacturer`, `model`, `configuration_url`
+  (fallback for when the Supervisor device doesn't exist yet)
+- **Standalone mode**: `identifiers={(DOMAIN, entry_id)}` with full standalone metadata
+
+## Add-on Mode Detection & Cleanup
+
+In `async_setup_entry()`:
+1. If no `CONF_ADDON_SLUG`, check for state file via `_async_detect_addon()`
+2. If found, update entry data with `hass.config_entries.async_update_entry(entry, data=new_data)`
+   — **Note**: this is a synchronous method despite the `async_` prefix, no `await` needed
+3. Call `_async_remove_standalone_device()` to delete the orphaned device from the registry
 
 ## Adding New Sensors
 

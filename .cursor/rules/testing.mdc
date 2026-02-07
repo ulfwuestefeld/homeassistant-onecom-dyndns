@@ -7,10 +7,36 @@ alwaysApply: false
 # Testing Conventions
 
 - Framework: pytest (no pytest-asyncio; use `asyncio.run()` for async tests)
+- CI: Python 3.12 + 3.13 matrix on Ubuntu (GitHub Actions)
 - Mock HA stubs via `_ensure_ha_stubs()` before importing component modules
-- Use `tmp_path` fixture for file-based tests (state file, command file)
+- Use `tmp_path` fixture for file-based tests (state file, command file, certificates)
 - Always `importlib.reload()` component modules after stubbing to pick up changes
 - Test naming: `Test<Class>.test_<behaviour>` — describe the expected outcome
+
+## CI-Safe Path Handling
+
+Never use default system paths (`/ssl`, `/data`) in tests — they require root permissions
+on the CI runner. Always pass `tmp_path`-based paths for `cert_path`, `key_path`, and
+`status_file` when creating `CertificateManager` instances in tests.
+
+```python
+# BAD — fails on CI with PermissionError: [Errno 13] Permission denied: '/ssl'
+manager = CertificateManager(
+    username="test@example.com", password="pw",
+    domain="example.com", email="ssl@example.com",
+)
+
+# GOOD — uses pytest tmp_path fixture
+manager = CertificateManager(
+    username="test@example.com", password="pw",
+    domain="example.com", email="ssl@example.com",
+    cert_path=str(tmp_path / "fullchain.pem"),
+    key_path=str(tmp_path / "privkey.pem"),
+    status_file=str(tmp_path / "cert_status.json"),
+)
+```
+
+## Async Test Pattern
 
 ```python
 # Typical async test pattern without pytest-asyncio

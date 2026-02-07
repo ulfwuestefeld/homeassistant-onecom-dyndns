@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.7] - 2026-02-07
+
+### Changed
+
+- **CI: Python version updated** from 3.11 to **3.12 + 3.13** in the test matrix,
+  matching the current Home Assistant Core requirement (Python 3.13 since HA 2024.12).
+  Lint job also updated from Python 3.11 to 3.13.
+  Coverage artifacts now include the Python version in their name for matrix uniqueness.
+
+### Fixed
+
+- **Add-on device naming**: `get_device_info()` now provides `name`, `manufacturer`,
+  `model`, and `configuration_url` even in add-on mode. Previously only `identifiers`
+  were set, causing an "Unnamed Device" in the HA UI when the Supervisor device was
+  not yet created.
+- **Orphaned standalone device cleanup**: New `_async_remove_standalone_device()` in
+  `__init__.py` automatically removes the old standalone device
+  (`identifiers={(DOMAIN, entry_id)}`) when the integration switches to add-on mode,
+  preventing duplicate devices in the UI.
+
 ## [1.3.6] - 2026-02-07
 
 ### Added
@@ -224,7 +244,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Custom component (1.2.0 → 1.3.6)**
+- **Custom component (1.2.0 → 1.3.7)**
   - SENSOR_TYPES extended from 5 to 6 (+ acme_challenge)
   - ssl_only_sensors set now includes acme_challenge
   - Updated English, German translations and strings.json for new entities

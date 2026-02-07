@@ -11,7 +11,7 @@
 
 Before running the tests, you need to install the following:
 
-1. **Python 3.11+**
+1. **Python 3.12+**
    - Download: https://www.python.org/downloads/
    - Verify installation: `python --version`
 
@@ -164,7 +164,7 @@ pip install pytest-cov
 
 Bevor Sie die Tests ausführen können, müssen Sie folgendes installieren:
 
-1. **Python 3.11+**
+1. **Python 3.12+**
    - Download: https://www.python.org/downloads/
    - Installation prüfen: `python --version`
 

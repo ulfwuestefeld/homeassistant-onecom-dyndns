@@ -599,7 +599,7 @@ class TestStopEventPropagation:
     @patch.object(CertificateManager, 'get_certificate_info')
     @patch("certificate_manager.OneComAPI")
     @patch("certificate_manager.ACMEManager")
-    def test_stop_event_passed_to_acme_manager(self, mock_acme, mock_api, mock_info):
+    def test_stop_event_passed_to_acme_manager(self, mock_acme, mock_api, mock_info, tmp_path):
         """Test that CertificateManager passes its _stop_event to ACMEManager."""
         mock_info.return_value = None
 
@@ -618,6 +618,9 @@ class TestStopEventPropagation:
             password="password",
             domain="example.com",
             email="ssl@example.com",
+            cert_path=str(tmp_path / "fullchain.pem"),
+            key_path=str(tmp_path / "privkey.pem"),
+            status_file=str(tmp_path / "cert_status.json"),
         )
 
         manager.request_certificate()
@@ -630,7 +633,7 @@ class TestStopEventPropagation:
     @patch.object(CertificateManager, 'get_certificate_info')
     @patch("certificate_manager.OneComAPI")
     @patch("certificate_manager.ACMEManager")
-    def test_stop_during_certificate_request_signals_acme(self, mock_acme, mock_api, mock_info):
+    def test_stop_during_certificate_request_signals_acme(self, mock_acme, mock_api, mock_info, tmp_path):
         """Test that CertificateManager.stop() signals the shared event."""
         import threading
 
@@ -649,6 +652,9 @@ class TestStopEventPropagation:
             password="password",
             domain="example.com",
             email="ssl@example.com",
+            cert_path=str(tmp_path / "fullchain.pem"),
+            key_path=str(tmp_path / "privkey.pem"),
+            status_file=str(tmp_path / "cert_status.json"),
         )
 
         # Simulate stop being called

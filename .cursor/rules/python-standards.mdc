@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Python Standards
 
-- Target Python 3.11; use `from __future__ import annotations` in component files
+- Target Python 3.12+; use `from __future__ import annotations` in component files
 - Use `typing.Final` for constants, type hints everywhere
 - Lazy log formatting: `_LOGGER.debug("msg %s", val)` not f-strings
 - Use `threading.Event.wait()` instead of `time.sleep()` in loops (interruptible)
