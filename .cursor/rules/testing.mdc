@@ -1,0 +1,26 @@
+---
+description: Testing conventions for pytest test files
+globs: "tests/test_*.py"
+alwaysApply: false
+---
+
+# Testing Conventions
+
+- Framework: pytest (no pytest-asyncio; use `asyncio.run()` for async tests)
+- Mock HA stubs via `_ensure_ha_stubs()` before importing component modules
+- Use `tmp_path` fixture for file-based tests (state file, command file)
+- Always `importlib.reload()` component modules after stubbing to pick up changes
+- Test naming: `Test<Class>.test_<behaviour>` — describe the expected outcome
+
+```python
+# Typical async test pattern without pytest-asyncio
+def test_reads_state_file(self, tmp_path):
+    hass = self._make_hass()
+    coordinator = _make_addon_coordinator(hass, str(tmp_path / "state.json"), ...)
+
+    async def _run():
+        data = await coordinator._async_read_addon_state()
+        assert data["current_ip"] == "1.2.3.4"
+
+    asyncio.run(_run())
+```

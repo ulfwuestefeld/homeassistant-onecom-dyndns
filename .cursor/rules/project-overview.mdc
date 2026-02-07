@@ -1,0 +1,21 @@
+---
+description: Project overview and architecture for One.com DynDNS Updater
+alwaysApply: true
+---
+
+# One.com DynDNS Updater
+
+- Home Assistant Add-on + Custom Integration for dynamic DNS at One.com with automatic SSL
+- Language: Python 3.11
+- Key technologies: One.com API, Let's Encrypt (ACME), DNS-01 challenge
+
+## Architecture
+
+- **Add-on** (`run.py`): Single source of truth for IP checks, DNS updates, SSL.
+  Writes state → `/config/.onecom_dyndns_state.json`; reads commands ← `/config/.onecom_dyndns_commands.json`.
+- **Custom Component** (`custom_components/onecom_dyndns/`): Reads state file via
+  `DataUpdateCoordinator` (30 s). Buttons/services write command file.
+  Entities attach to Supervisor device via `identifiers={("hassio", addon_slug)}`.
+- **Discovery**: Add-on publishes `POST /discovery` with retries; integration also
+  auto-detects the add-on via state file.
+- **Standalone mode**: Without the add-on the integration polls IP services directly.

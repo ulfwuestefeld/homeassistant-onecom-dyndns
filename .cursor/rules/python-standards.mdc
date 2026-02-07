@@ -1,0 +1,24 @@
+---
+description: Python coding standards for the project
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Python Standards
+
+- Target Python 3.11; use `from __future__ import annotations` in component files
+- Use `typing.Final` for constants, type hints everywhere
+- Lazy log formatting: `_LOGGER.debug("msg %s", val)` not f-strings
+- Use `threading.Event.wait()` instead of `time.sleep()` in loops (interruptible)
+- One `OneComAPI` login per update cycle, shared across subdomains
+- SSL context created once and reused
+
+```python
+# BAD
+logging.info(f"IP changed to {ip}")
+time.sleep(interval)
+
+# GOOD
+logging.info("IP changed to %s", ip)
+self._stop_event.wait(timeout=interval)
+```

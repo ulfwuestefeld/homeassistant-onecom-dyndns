@@ -1,0 +1,22 @@
+---
+description: Quality checklist to run after every significant change
+alwaysApply: true
+---
+
+# Quality Checklist
+
+After each significant change, verify:
+
+- [ ] CHANGELOG.md updated with version and changes
+- [ ] Version in config.yaml, manifest.json, sbom.json, SBOM.md matches CHANGELOG
+- [ ] Documentation (DOCS.md, README.md) is current
+- [ ] Test documentation (Test.md) is current
+- [ ] Tests pass and cover new functionality (`pytest tests/ -q`)
+- [ ] SBOM (sbom.json, SBOM.md) reflects dependencies and date
+- [ ] .gitignore covers IDE and build artifacts
+
+## Resources
+
+- Home Assistant Developer Docs: https://developers.home-assistant.io/
+- Let's Encrypt: https://letsencrypt.org/docs/
+- GitHub: https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns
