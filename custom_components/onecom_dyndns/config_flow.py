@@ -269,7 +269,7 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             # Otherwise, create the entry
             return self.async_create_entry(
-                title=self._data[CONF_DOMAIN],
+                title=f"One.com DynDNS Updater - {self._data[CONF_DOMAIN]}",
                 data=self._data,
             )
 
@@ -321,7 +321,7 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors[CONF_SSL_EMAIL] = "ssl_email_required"
             else:
                 return self.async_create_entry(
-                    title=self._data[CONF_DOMAIN],
+                    title=f"One.com DynDNS Updater - {self._data[CONF_DOMAIN]}",
                     data=self._data,
                 )
 

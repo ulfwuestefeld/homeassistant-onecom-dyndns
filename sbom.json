@@ -1,10 +1,10 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
-  "serialNumber": "urn:uuid:onecom-dyndns-sbom-2026-02-07-v1.3.5",
+  "serialNumber": "urn:uuid:onecom-dyndns-sbom-2026-02-07-v1.3.6",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-02-06T00:00:00Z",
+    "timestamp": "2026-02-07T00:00:00Z",
     "tools": [
       {
         "vendor": "Manual",
@@ -16,7 +16,7 @@
       "type": "application",
       "bom-ref": "onecom-dyndns",
       "name": "One.com DynDNS Updater",
-      "version": "1.3.5",
+      "version": "1.3.6",
       "description": "Home Assistant add-on for dynamic DNS updates at One.com with automatic SSL certificates",
       "licenses": [
         {

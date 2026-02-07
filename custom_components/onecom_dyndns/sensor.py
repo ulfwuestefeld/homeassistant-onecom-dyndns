@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Final
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -31,7 +31,7 @@ from .const import (
     get_device_info,
 )
 
-SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
+SENSOR_TYPES: Final[tuple[SensorEntityDescription, ...]] = (
     SensorEntityDescription(
         key="current_ip",
         translation_key="current_ip",

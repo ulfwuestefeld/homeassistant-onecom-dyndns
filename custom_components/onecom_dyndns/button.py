@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Final
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.config_entries import ConfigEntry
@@ -22,7 +22,7 @@ class OneComButtonEntityDescription(ButtonEntityDescription):
     method: str
 
 
-BUTTON_TYPES: tuple[OneComButtonEntityDescription, ...] = (
+BUTTON_TYPES: Final[tuple[OneComButtonEntityDescription, ...]] = (
     OneComButtonEntityDescription(
         key="update_dns",
         translation_key="update_dns",

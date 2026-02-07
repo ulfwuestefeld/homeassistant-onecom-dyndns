@@ -1,8 +1,8 @@
 # Software Bill of Materials (SBOM)
 
 **Project:** One.com DynDNS Updater  
-**Version:** 1.3.5  
-**Date:** 2026-02-06  
+**Version:** 1.3.6  
+**Date:** 2026-02-07  
 **License:** MIT  
 
 ## Overview
@@ -13,7 +13,7 @@ This document provides a complete inventory of all software components used in t
 
 | Component | Version | License | Description |
 |-----------|---------|---------|-------------|
-| One.com DynDNS Updater | 1.3.5 | MIT | Main application |
+| One.com DynDNS Updater | 1.3.6 | MIT | Main application |
 
 ### Source Files
 
@@ -102,7 +102,7 @@ This document provides a complete inventory of all software components used in t
 ## Dependency Graph
 
 ```
-One.com DynDNS Updater (1.3.5)
+One.com DynDNS Updater (1.3.6)
 ├── Python 3.11
 │   └── Alpine Linux 3.18
 │       ├── openssl

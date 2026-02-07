@@ -5,6 +5,8 @@ This module provides functionality to interact with One.com's DNS management
 through their web interface.
 """
 
+from __future__ import annotations
+
 import logging
 import re
 import time
@@ -140,7 +142,7 @@ class OneComAPI:
         except requests.RequestException as e:
             raise OneComAPIError(f"Login request failed: {e}")
 
-        _LOGGER.debug(f"Login response URL: {response.url}")
+        _LOGGER.debug("Login response URL: %s", response.url)
 
         # Check if login was successful by looking for admin panel indicators
         if "logout" in response.text.lower() or "dns" in response.url.lower() or "/admin" in response.url:
@@ -153,7 +155,7 @@ class OneComAPI:
 
         # Log detailed debug information if we're still on account.one.com
         if "account.one.com" in response.url:
-            _LOGGER.debug(f"Still on account.one.com after login attempt")
+            _LOGGER.debug("Still on account.one.com after login attempt")
 
             # Extract any error message from the page - try multiple patterns
             error_patterns = [
@@ -167,7 +169,7 @@ class OneComAPI:
             for pattern in error_patterns:
                 match = re.search(pattern, response.text, re.IGNORECASE | re.DOTALL)
                 if match and match.group(1).strip():
-                    _LOGGER.error(f"Login error from One.com: {match.group(1).strip()}")
+                    _LOGGER.error("Login error from One.com: %s", match.group(1).strip())
                     break
 
         # Check for specific credential errors (but not "ungültiger code" which is OAuth error)
@@ -197,7 +199,7 @@ class OneComAPI:
                 self._logged_in = True
                 return True
         except Exception as e:
-            _LOGGER.debug(f"Verification request failed: {e}")
+            _LOGGER.debug("Verification request failed: %s", e)
 
         _LOGGER.warning("Login status uncertain - proceeding anyway")
         self._logged_in = True
@@ -258,7 +260,7 @@ class OneComAPI:
 
             return domains
         except Exception as e:
-            _LOGGER.warning(f"Could not fetch domains: {e}")
+            _LOGGER.warning("Could not fetch domains: %s", e)
             return []
 
     def get_subdomains(self) -> List[str]:
@@ -285,7 +287,7 @@ class OneComAPI:
         if not self._logged_in or not self.session:
             raise OneComAPIError("Not logged in")
 
-        _LOGGER.debug(f"Updating DNS record for '{subdomain or '@'}' to {ip_address}")
+        _LOGGER.debug("Updating DNS record for '%s' to %s", subdomain or '@', ip_address)
 
         records = self._get_dns_records()
         result = self._find_record_id(subdomain, records)
@@ -322,7 +324,7 @@ class OneComAPI:
                 headers=headers
             )
             response.raise_for_status()
-            _LOGGER.info(f"Successfully updated '{subdomain or '@'}.{self.domain}' to {ip_address}")
+            _LOGGER.info("Successfully updated '%s.%s' to %s", subdomain or '@', self.domain, ip_address)
             return True
         except requests.RequestException as e:
             raise OneComAPIError(f"Failed to update DNS record: {e}")

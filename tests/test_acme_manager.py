@@ -244,6 +244,61 @@ class TestACMEManagerValidation:
             manager.obtain_certificate([])
 
 
+class TestACMEManagerStopEvent:
+    """Tests for ACMEManager stop event and graceful shutdown."""
+
+    def test_default_stop_event_created(self):
+        """Test that a private stop_event is created when none provided."""
+        import threading
+
+        manager = ACMEManager(
+            email="test@example.com",
+            onecom_api=Mock(),
+        )
+
+        assert isinstance(manager._stop_event, threading.Event)
+        assert not manager._stop_event.is_set()
+
+    def test_external_stop_event_used(self):
+        """Test that an externally provided stop_event is used."""
+        import threading
+
+        ext_event = threading.Event()
+        manager = ACMEManager(
+            email="test@example.com",
+            onecom_api=Mock(),
+            stop_event=ext_event,
+        )
+
+        assert manager._stop_event is ext_event
+
+    def test_stop_sets_event(self):
+        """Test that stop() sets the event."""
+        manager = ACMEManager(
+            email="test@example.com",
+            onecom_api=Mock(),
+        )
+
+        assert not manager._stop_event.is_set()
+        manager.stop()
+        assert manager._stop_event.is_set()
+
+    def test_shared_stop_event_propagates(self):
+        """Test that setting a shared event is visible in ACMEManager."""
+        import threading
+
+        shared = threading.Event()
+        manager = ACMEManager(
+            email="test@example.com",
+            onecom_api=Mock(),
+            stop_event=shared,
+        )
+
+        assert not manager._stop_event.is_set()
+        shared.set()
+        assert manager._stop_event.is_set()
+
+
 class TestACMEManagerError:
     """Tests for ACMEManagerError exception."""
 

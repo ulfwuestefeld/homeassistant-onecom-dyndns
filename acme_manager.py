@@ -8,8 +8,9 @@ with DNS-01 challenge validation through One.com.
 import json
 import logging
 import os
-import time
 import random
+import threading
+import time
 import traceback
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple, List, Callable
@@ -78,13 +79,15 @@ def retry_with_backoff(func):
                     total_delay = delay + jitter
                     
                     _LOGGER.warning(
-                        f"Network error (attempt {attempt + 1}/{MAX_RETRIES}): {type(e).__name__}"
+                        "Network error (attempt %s/%s): %s",
+                        attempt + 1, MAX_RETRIES, type(e).__name__,
                     )
-                    _LOGGER.info(f"Retrying in {total_delay:.1f} seconds...")
+                    _LOGGER.info("Retrying in %.1f seconds...", total_delay)
                     time.sleep(total_delay)
                 else:
                     _LOGGER.error(
-                        f"All {MAX_RETRIES} attempts failed: {type(e).__name__}: {e}"
+                        "All %s attempts failed: %s: %s",
+                        MAX_RETRIES, type(e).__name__, e,
                     )
         
         # Re-raise the last exception after all retries failed
@@ -110,6 +113,7 @@ class ACMEManager:
         cert_path: str = DEFAULT_CERT_PATH,
         key_path: str = DEFAULT_KEY_PATH,
         challenge_callback: Optional[Callable[[str, str, str], None]] = None,
+        stop_event: Optional[threading.Event] = None,
     ):
         """Initialize the ACME Manager.
 
@@ -122,6 +126,8 @@ class ACMEManager:
             key_path: Path to store private key
             challenge_callback: Optional callback function(domain, txt_name, txt_value)
                                called when an ACME challenge is created
+            stop_event: Optional threading.Event for graceful shutdown signalling.
+                       If not provided, a private event is created.
         """
         self.email = email
         self.onecom_api = onecom_api
@@ -134,8 +140,13 @@ class ACMEManager:
         self.directory_url = LETSENCRYPT_STAGING if staging else LETSENCRYPT_PRODUCTION
         self._account_key: Optional[jose.JWKRSA] = None
         self._client: Optional[client.ClientV2] = None
+        self._stop_event = stop_event or threading.Event()
 
-        _LOGGER.info(f"ACME Manager initialized (staging={staging})")
+        _LOGGER.info("ACME Manager initialized (staging=%s)", staging)
+
+    def stop(self):
+        """Signal the manager to abort any in-progress challenge polling."""
+        self._stop_event.set()
 
     def _ensure_directories(self):
         """Ensure all necessary directories exist."""
@@ -256,7 +267,7 @@ class ACMEManager:
         # Get initial client without registration
         acme_client = self._get_client()
 
-        _LOGGER.info(f"Registering ACME account for {self.email}")
+        _LOGGER.info("Registering ACME account for %s", self.email)
 
         try:
             # Register or retrieve existing account
@@ -266,13 +277,13 @@ class ACMEManager:
             )
             _LOGGER.debug("Calling new_account...")
             regr = self._call_new_account(acme_client, new_reg)
-            _LOGGER.info(f"ACME account registered (URI: {regr.uri})")
+            _LOGGER.info("ACME account registered (URI: %s)", regr.uri)
             
         except acme_errors.ConflictError as e:
             # Account already exists - this is expected for existing accounts
             # The exception contains the account URI
             account_uri = str(e.location) if hasattr(e, 'location') else (e.args[0] if e.args else None)
-            _LOGGER.info(f"ACME account already exists at: {account_uri}")
+            _LOGGER.info("ACME account already exists at: %s", account_uri)
             
             # Query the existing account to get the registration resource
             if account_uri:
@@ -292,8 +303,8 @@ class ACMEManager:
                 
         except Exception as e:
             _LOGGER.error("Exception type: %s", type(e).__name__)
-            _LOGGER.error(f"Exception args: {e.args}")
-            _LOGGER.error(f"Traceback: {traceback.format_exc()}")
+            _LOGGER.error("Exception args: %s", e.args)
+            _LOGGER.error("Traceback: %s", traceback.format_exc())
             raise ACMEManagerError(f"Failed to register ACME account: {e}")
         
         # Store the registration
@@ -302,7 +313,7 @@ class ACMEManager:
         # Update the existing client's network account for Key ID signing
         _LOGGER.debug("Updating client with registration...")
         self._client.net.account = regr
-        _LOGGER.info(f"ACME client ready with account: {regr.uri}")
+        _LOGGER.info("ACME client ready with account: %s", regr.uri)
         
         return regr
 
@@ -356,11 +367,11 @@ class ACMEManager:
         # Build the full DNS name for the TXT record
         full_txt_name = f"{challenge_subdomain}.{self.onecom_api.domain}"
         
-        _LOGGER.info(f"Setting up DNS-01 challenge for {domain}")
-        _LOGGER.info(f"=== ACME DNS-01 Challenge ===")
-        _LOGGER.info(f"TXT Record Name: {full_txt_name}")
-        _LOGGER.info(f"TXT Record Value: {validation}")
-        _LOGGER.info(f"=============================")
+        _LOGGER.info("Setting up DNS-01 challenge for %s", domain)
+        _LOGGER.info("=== ACME DNS-01 Challenge ===")
+        _LOGGER.info("TXT Record Name: %s", full_txt_name)
+        _LOGGER.info("TXT Record Value: %s", validation)
+        _LOGGER.info("=============================")
         _LOGGER.debug("Challenge subdomain (prefix): %s", challenge_subdomain)
         
         # Notify via callback (e.g., Home Assistant notification)
@@ -368,12 +379,12 @@ class ACMEManager:
             try:
                 self.challenge_callback(domain, full_txt_name, validation)
             except Exception as e:
-                _LOGGER.warning(f"Challenge callback failed: {e}")
+                _LOGGER.warning("Challenge callback failed: %s", e)
 
         record_id = None
         try:
             # Create TXT record
-            _LOGGER.info(f"Creating TXT record at One.com...")
+            _LOGGER.info("Creating TXT record at One.com...")
             record_id = self.onecom_api.create_txt_record(
                 subdomain=challenge_subdomain,
                 content=validation,
@@ -385,12 +396,14 @@ class ACMEManager:
                 subdomain=challenge_subdomain,
                 expected_content=validation,
                 timeout=180,
-                interval=10
+                interval=10,
+                stop_event=self._stop_event,
             ):
                 _LOGGER.warning("DNS propagation timeout, attempting validation anyway...")
 
-            # Additional wait for safety
-            time.sleep(5)
+            # Additional wait for safety (interruptible)
+            if self._stop_event.wait(timeout=5):
+                return False  # Shutdown requested
 
             # Answer the challenge (needs the full ChallengeBody with .url)
             self._client.answer_challenge(challenge_body, response)
@@ -411,27 +424,28 @@ class ACMEManager:
                 _LOGGER.debug("Authorization status: %s", status)
 
                 if status == "valid":
-                    _LOGGER.info(f"Challenge successful for {domain}")
+                    _LOGGER.info("Challenge successful for %s", domain)
                     return True
                 elif status == "invalid":
-                    _LOGGER.error(f"Challenge failed for {domain}")
+                    _LOGGER.error("Challenge failed for %s", domain)
                     return False
 
-                time.sleep(5)
+                if self._stop_event.wait(timeout=5):
+                    return False  # Shutdown requested
 
-            _LOGGER.error(f"Challenge timeout for {domain}")
+            _LOGGER.error("Challenge timeout for %s", domain)
             return False
 
         except OneComAPIError as e:
-            _LOGGER.error(f"DNS operation failed: {e}")
-            _LOGGER.error(f"If automatic creation fails, you can manually create the TXT record:")
-            _LOGGER.error(f"  Name: {full_txt_name}")
-            _LOGGER.error(f"  Type: TXT")
-            _LOGGER.error(f"  Value: {validation}")
+            _LOGGER.error("DNS operation failed: %s", e)
+            _LOGGER.error("If automatic creation fails, you can manually create the TXT record:")
+            _LOGGER.error("  Name: %s", full_txt_name)
+            _LOGGER.error("  Type: TXT")
+            _LOGGER.error("  Value: %s", validation)
             return False
 
         except Exception as e:
-            _LOGGER.error(f"Challenge failed: {e}")
+            _LOGGER.error("Challenge failed: %s", e)
             return False
 
         finally:
@@ -440,7 +454,7 @@ class ACMEManager:
                 try:
                     self.onecom_api.delete_txt_record(record_id)
                 except OneComAPIError as e:
-                    _LOGGER.warning(f"Failed to cleanup challenge record: {e}")
+                    _LOGGER.warning("Failed to cleanup challenge record: %s", e)
 
     def obtain_certificate(self, domains: List[str]) -> Tuple[str, str]:
         """Obtain a certificate for the specified domains.
@@ -465,7 +479,7 @@ class ACMEManager:
         self.register_account()
         _LOGGER.debug("ACME account ready")
 
-        _LOGGER.info(f"Requesting certificate for: {', '.join(domains)}")
+        _LOGGER.info("Requesting certificate for: %s", ', '.join(domains))
 
         try:
             # Generate CSR private key
@@ -497,7 +511,7 @@ class ACMEManager:
             # Process each authorization
             for authz in order.authorizations:
                 domain = authz.body.identifier.value
-                _LOGGER.info(f"Processing authorization for {domain}")
+                _LOGGER.info("Processing authorization for %s", domain)
 
                 # Find DNS-01 challenge
                 dns_challenge = None
@@ -544,8 +558,8 @@ class ACMEManager:
         """
         self._ensure_directories()
 
-        _LOGGER.info(f"Saving certificate to {self.cert_path}")
-        _LOGGER.info(f"Saving private key to {self.key_path}")
+        _LOGGER.info("Saving certificate to %s", self.cert_path)
+        _LOGGER.info("Saving private key to %s", self.key_path)
 
         # Save certificate
         try:
@@ -557,9 +571,9 @@ class ACMEManager:
             # Verify file was written
             cert_size = os.path.getsize(self.cert_path)
             cert_mtime = os.path.getmtime(self.cert_path)
-            _LOGGER.info(f"Certificate saved: {cert_size} bytes, modified: {cert_mtime}")
+            _LOGGER.info("Certificate saved: %s bytes, modified: %s", cert_size, cert_mtime)
         except Exception as e:
-            _LOGGER.error(f"Failed to save certificate: {e}")
+            _LOGGER.error("Failed to save certificate: %s", e)
             raise
 
         # Save private key
@@ -572,15 +586,15 @@ class ACMEManager:
             # Verify file was written
             key_size = os.path.getsize(self.key_path)
             key_mtime = os.path.getmtime(self.key_path)
-            _LOGGER.info(f"Private key saved: {key_size} bytes, modified: {key_mtime}")
+            _LOGGER.info("Private key saved: %s bytes, modified: %s", key_size, key_mtime)
         except Exception as e:
-            _LOGGER.error(f"Failed to save private key: {e}")
+            _LOGGER.error("Failed to save private key: %s", e)
             raise
         
         _LOGGER.info("="*50)
         _LOGGER.info("CERTIFICATE UPDATE COMPLETE")
-        _LOGGER.info(f"Certificate: {self.cert_path}")
-        _LOGGER.info(f"Private Key: {self.key_path}")
+        _LOGGER.info("Certificate: %s", self.cert_path)
+        _LOGGER.info("Private Key: %s", self.key_path)
         _LOGGER.info("NOTE: Restart NGINX or Home Assistant to use new certificate!")
         _LOGGER.info("="*50)
 
@@ -605,7 +619,7 @@ class ACMEManager:
                 return cert.not_valid_after
 
         except Exception as e:
-            _LOGGER.warning(f"Failed to read certificate expiry: {e}")
+            _LOGGER.warning("Failed to read certificate expiry: %s", e)
             return None
 
     def needs_renewal(self, days_before_expiry: int = 30) -> bool:
@@ -629,10 +643,10 @@ class ACMEManager:
             days_remaining = (expiry - datetime.now(timezone.utc)).days
         else:
             days_remaining = (expiry - datetime.now()).days
-        _LOGGER.info(f"Certificate expires in {days_remaining} days")
+        _LOGGER.info("Certificate expires in %s days", days_remaining)
 
         if days_remaining <= days_before_expiry:
-            _LOGGER.info(f"Certificate will expire soon, renewal needed")
+            _LOGGER.info("Certificate will expire soon, renewal needed")
             return True
 
         return False
@@ -651,7 +665,7 @@ class ACMEManager:
             self.save_certificate(cert_pem, key_pem)
             return True
         except ACMEManagerError as e:
-            _LOGGER.error(f"Failed to obtain certificate: {e}")
+            _LOGGER.error("Failed to obtain certificate: %s", e)
             return False
 
     def renew_if_needed(self, domains: List[str], days_before_expiry: int = 30) -> bool:

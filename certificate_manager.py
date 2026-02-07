@@ -89,9 +89,9 @@ class CertificateManager:
         self._last_renewal: Optional[datetime] = None
         self._callbacks: List[Callable[[str, Dict[str, Any]], None]] = []
 
-        _LOGGER.info(f"Certificate Manager initialized for {domain}")
-        _LOGGER.info(f"SSL domains: {', '.join(self.ssl_domains)}")
-        _LOGGER.info(f"Staging mode: {staging}")
+        _LOGGER.info("Certificate Manager initialized for %s", domain)
+        _LOGGER.info("SSL domains: %s", ', '.join(self.ssl_domains))
+        _LOGGER.info("Staging mode: %s", staging)
 
     def _ensure_directories(self):
         """Ensure all necessary directories exist."""
@@ -119,7 +119,7 @@ class CertificateManager:
             try:
                 callback(event_type, data)
             except Exception as e:
-                _LOGGER.warning(f"Callback error: {e}")
+                _LOGGER.warning("Callback error: %s", e)
 
     def get_certificate_info(self) -> Optional[Dict[str, Any]]:
         """Get information about the current certificate.
@@ -175,7 +175,7 @@ class CertificateManager:
             }
 
         except Exception as e:
-            _LOGGER.error(f"Failed to read certificate info: {e}")
+            _LOGGER.error("Failed to read certificate info: %s", e)
             return None
 
     def _save_status(self, status: Dict[str, Any]):
@@ -192,7 +192,7 @@ class CertificateManager:
             with open(self.status_file, "w") as f:
                 json.dump(status, f, indent=2)
         except IOError as e:
-            _LOGGER.warning(f"Failed to save status: {e}")
+            _LOGGER.warning("Failed to save status: %s", e)
 
     def _load_status(self) -> Dict[str, Any]:
         """Load certificate status from file.
@@ -207,7 +207,7 @@ class CertificateManager:
             with open(self.status_file, "r") as f:
                 return json.load(f)
         except (IOError, json.JSONDecodeError) as e:
-            _LOGGER.warning(f"Failed to load status: {e}")
+            _LOGGER.warning("Failed to load status: %s", e)
             return {}
 
     def request_certificate(self, force: bool = False) -> bool:
@@ -226,8 +226,8 @@ class CertificateManager:
         if cert_info and not force:
             if not cert_info["needs_renewal"]:
                 _LOGGER.info(
-                    f"Certificate still valid for {cert_info['days_remaining']} days, "
-                    "skipping renewal"
+                    "Certificate still valid for %s days, skipping renewal",
+                    cert_info['days_remaining'],
                 )
                 return True
 
@@ -240,7 +240,7 @@ class CertificateManager:
             # Clean up any old ACME challenge records
             api.cleanup_acme_records()
 
-            # Create ACME manager
+            # Create ACME manager (share stop_event for graceful shutdown)
             acme = ACMEManager(
                 email=self.email,
                 onecom_api=api,
@@ -248,6 +248,7 @@ class CertificateManager:
                 cert_path=self.cert_path,
                 key_path=self.key_path,
                 challenge_callback=self.challenge_callback,
+                stop_event=self._stop_event,
             )
 
             # Obtain certificate
@@ -295,7 +296,7 @@ class CertificateManager:
         except Exception as e:
             error_msg = f"Unexpected error ({type(e).__name__}): {e}"
             _LOGGER.error(error_msg)
-            _LOGGER.error(f"Traceback:\n{traceback.format_exc()}")
+            _LOGGER.error("Traceback:\n%s", traceback.format_exc())
             self._save_status({"status": "error", "error": error_msg})
             self._notify("error", {"error": error_msg})
             return False
@@ -317,10 +318,10 @@ class CertificateManager:
             return
 
         days_remaining = cert_info["days_remaining"]
-        _LOGGER.info(f"Certificate expires in {days_remaining} days")
+        _LOGGER.info("Certificate expires in %s days", days_remaining)
 
         if days_remaining <= self.renewal_days:
-            _LOGGER.info(f"Certificate expiring soon, starting renewal...")
+            _LOGGER.info("Certificate expiring soon, starting renewal...")
             self._notify("expiring", {
                 "days_remaining": days_remaining,
                 "domains": cert_info["domains"],
@@ -340,7 +341,7 @@ class CertificateManager:
         # Log summary
         valid_count = sum(1 for r in online_results.values() if r["valid"])
         total_count = len(online_results)
-        _LOGGER.info(f"Online certificate verification: {valid_count}/{total_count} domains valid")
+        _LOGGER.info("Online certificate verification: %s/%s domains valid", valid_count, total_count)
 
     def _renewal_loop(self):
         """Background loop for automatic renewal checks."""
@@ -450,24 +451,24 @@ class CertificateManager:
                     result["domain_covered"] = domain_covered
                     result["valid"] = domain_covered
 
-                    _LOGGER.info(f"Online certificate for {domain}: valid={domain_covered}, issuer={issuer.get('organizationName', 'Unknown')}")
+                    _LOGGER.info("Online certificate for %s: valid=%s, issuer=%s", domain, domain_covered, issuer.get('organizationName', 'Unknown'))
 
         except socket.timeout:
             result["error"] = "Connection timeout"
-            _LOGGER.warning(f"Certificate check for {domain}: timeout")
+            _LOGGER.warning("Certificate check for %s: timeout", domain)
         except socket.gaierror as e:
             result["error"] = f"DNS resolution failed: {e}"
-            _LOGGER.warning(f"Certificate check for {domain}: DNS failed")
+            _LOGGER.warning("Certificate check for %s: DNS failed", domain)
         except ssl.SSLCertVerificationError as e:
             result["error"] = f"Certificate verification failed: {e}"
             result["reachable"] = True
-            _LOGGER.error(f"Certificate check for {domain}: SSL error - {e}")
+            _LOGGER.error("Certificate check for %s: SSL error - %s", domain, e)
         except ConnectionRefusedError:
             result["error"] = "Connection refused - no HTTPS server"
-            _LOGGER.warning(f"Certificate check for {domain}: connection refused")
+            _LOGGER.warning("Certificate check for %s: connection refused", domain)
         except Exception as e:
             result["error"] = f"{type(e).__name__}: {e}"
-            _LOGGER.error(f"Certificate check for {domain}: {e}")
+            _LOGGER.error("Certificate check for %s: %s", domain, e)
 
         return result
 

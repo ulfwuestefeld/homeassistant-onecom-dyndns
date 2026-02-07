@@ -5,10 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.6] - 2026-02-07
+
+### Added
+
+- **`discovery` field in `config.yaml`**: Declares `onecom_dyndns` as a discovered
+  integration, aligning with Home Assistant add-on best practices
+- **GitHub Templates**: Bug report, feature request, and pull request templates
+  in `.github/` for better contributor guidance
+- **Architecture section in README.md**: Documents the state/command file mechanism,
+  discovery retry logic, and add-on ↔ integration communication flow
+- **Entity list in README.md features**: Sensors, binary sensors, and buttons now
+  listed in the Features section
+- **DOCS.md: Add-on Mode vs. Standalone Mode**: Clear comparison of both modes with
+  data source, button behaviour, device attachment, and configuration differences
+- **DOCS.md: State File Format**: Full JSON structure documentation for
+  `/config/.onecom_dyndns_state.json`
+- **DOCS.md: Command File Format**: JSON structure and supported commands for
+  `/config/.onecom_dyndns_commands.json`
+- **DOCS.md: Button Behaviour table**: Shows how each button works in add-on vs.
+  standalone mode
+
+### Fixed
+
+- **ACMEManager graceful shutdown**: Added `stop_event` parameter to `ACMEManager.__init__`
+  and a `stop()` method. `CertificateManager` now shares its `_stop_event` with
+  `ACMEManager`, so `CertificateManager.stop()` interrupts in-progress DNS propagation
+  waits and challenge polling loops immediately. Previously the event was never set,
+  so `wait()` calls always timed out instead of allowing graceful interruption.
+  Also replaced the non-interruptible `time.sleep(5)` safety wait with
+  `self._stop_event.wait(timeout=5)`.
+
+### Changed
+
+- **Cursor Rules** extended with 2 new rule files and updates to 4 existing ones:
+  - `python-standards.mdc`: Error handling patterns (specific exceptions, traceback
+    logging, `@retry_with_backoff`, credential safety)
+  - `quality-checklist.mdc`: Detailed version bump process listing all 5 files to update
+  - `ha-integration.mdc`: Workflows for adding sensors, buttons, services; translation
+    management (two systems documented)
+  - `project-overview.mdc`: Build & deployment conventions (Docker, architectures, CI)
+  - New `file-structure.mdc`: Directory layout and naming conventions
+  - New `security.mdc`: Credential handling, API security, file permissions, network security
+
 ## [1.3.5] - 2026-02-07
 
 ### Changed
 
+- **Lazy Log Formatting**: Converted all 111 f-string logging calls across 5 source
+  files (`run.py`, `acme_manager.py`, `certificate_manager.py`, `onecom_api.py`,
+  `custom_components/.../onecom_api.py`) to lazy `%s`-formatting. Arguments are only
+  interpolated when the log level is active, reducing unnecessary string allocations.
+- **Interruptible Polling Loops**: Replaced `time.sleep()` with `threading.Event.wait()`
+  in the ACME authorization polling loop (`acme_manager.py`) and DNS propagation
+  polling loop (`onecom_api.py`), enabling graceful shutdown during long waits.
+- **`typing.Final` for Constants**: Added `Final` annotation to `SENSOR_TYPES`,
+  `BINARY_SENSOR_TYPES`, and `BUTTON_TYPES` in the custom component entity modules.
+- **`from __future__ import annotations`**: Added to `custom_components/.../onecom_api.py`
+  for consistency with all other component files.
+- **Consistent Config Flow Entry Titles**: Manual setup via `async_step_options()` and
+  `async_step_ssl()` now produces entry titles "One.com DynDNS Updater - {domain}"
+  matching the auto-discovery path.
+- **Cursor Rules Migration**: Replaced monolithic `.cursorrules` with 5 focused
+  `.cursor/rules/*.mdc` files (project-overview, python-standards, testing,
+  ha-integration, quality-checklist) following Cursor best practices.
 - **Add-on↔Integration Architecture**: Custom component now reads state from the
   add-on via a shared state file (`/config/.onecom_dyndns_state.json`) instead of
   independently polling IP services and updating DNS records.  This eliminates
@@ -71,6 +131,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Integration Name**: Renamed from "One.com DynDNS" to **"One.com DynDNS Updater"**
+  across `manifest.json`, config flow entry titles, standalone device name, and all
+  translations (`strings.json`, `en.json`, `de.json`)
+- **Discovery Payload**: Removed the `addon` key from the Supervisor
+  `POST /discovery` request body. The Supervisor infers the calling add-on from the
+  bearer token; sending it explicitly caused `400 Bad Request` errors.
 - **Metadata**: `manifest.json` codeowners, documentation URL, and issue tracker
   URL now point to `@ulfwuestefeld` / GitHub repository
 - **Device Info**: Standalone device shows `manufacturer: ulfwuestefeld` and
@@ -158,7 +224,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Custom component (1.2.0 → 1.3.5)**
+- **Custom component (1.2.0 → 1.3.6)**
   - SENSOR_TYPES extended from 5 to 6 (+ acme_challenge)
   - ssl_only_sensors set now includes acme_challenge
   - Updated English, German translations and strings.json for new entities

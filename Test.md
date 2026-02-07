@@ -352,11 +352,11 @@ pytest tests/ -v
 
 | Metric | Value |
 |--------|-------|
-| Test Files / Test-Dateien | 19 |
-| Estimated Tests / Geschätzte Tests | ~452 |
+| Test Files / Test-Dateien | 17 (+conftest.py) |
+| Estimated Tests / Geschätzte Tests | ~458 |
 | Test Categories / Test-Kategorien | 8 |
 | Coverage Target / Coverage-Ziel | >80% |
 
 ---
 
-*Last updated / Zuletzt aktualisiert: 2026-02-06*
+*Last updated / Zuletzt aktualisiert: 2026-02-07*

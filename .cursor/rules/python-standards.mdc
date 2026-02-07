@@ -22,3 +22,22 @@ time.sleep(interval)
 logging.info("IP changed to %s", ip)
 self._stop_event.wait(timeout=interval)
 ```
+
+## Error Handling
+
+- Catch specific exceptions first, then generic `Exception` as fallback
+- Always log errors with lazy formatting: `_LOGGER.error("Error: %s", err)`
+- For unexpected errors, log traceback: `_LOGGER.error("Traceback:\n%s", traceback.format_exc())`
+- Save error state to status files when applicable
+- Use `@retry_with_backoff` decorator for network operations (5 retries, exponential delay)
+- Never log passwords or credentials (validated in `test_security.py`)
+
+```python
+# Error handling pattern
+try:
+    result = api.update_record(subdomain, ip)
+except OneComAPIError as e:
+    _LOGGER.warning("API error for %s: %s", subdomain, e)
+except Exception:
+    _LOGGER.error("Unexpected error:\n%s", traceback.format_exc())
+```

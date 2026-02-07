@@ -16,6 +16,14 @@ alwaysApply: true
 - **Custom Component** (`custom_components/onecom_dyndns/`): Reads state file via
   `DataUpdateCoordinator` (30 s). Buttons/services write command file.
   Entities attach to Supervisor device via `identifiers={("hassio", addon_slug)}`.
-- **Discovery**: Add-on publishes `POST /discovery` with retries; integration also
-  auto-detects the add-on via state file.
+- **Discovery**: Add-on publishes `POST /discovery` with retries (5 attempts, increasing delay);
+  integration also auto-detects the add-on via state file.
 - **Standalone mode**: Without the add-on the integration polls IP services directly.
+
+## Build & Deployment
+
+- **Docker**: Base image `ghcr.io/home-assistant/{arch}-base-python:3.11-alpine3.18`
+- **Architectures**: armhf, armv7, aarch64, amd64, i386 (configured in `build.yaml`)
+- **Add-on startup**: `run.py` → deploys custom component to `/config/custom_components/`,
+  publishes discovery, then enters main loop
+- **CI**: GitHub Actions (`.github/workflows/test.yml`) — pytest + flake8 + Codecov

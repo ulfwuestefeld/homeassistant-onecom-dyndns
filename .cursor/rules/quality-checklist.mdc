@@ -15,6 +15,18 @@ After each significant change, verify:
 - [ ] SBOM (sbom.json, SBOM.md) reflects dependencies and date
 - [ ] .gitignore covers IDE and build artifacts
 
+## Version Bump Process
+
+When releasing a new version, update **all** of these files:
+
+1. `config.yaml` → `version: "X.Y.Z"`
+2. `custom_components/onecom_dyndns/manifest.json` → `"version": "X.Y.Z"`
+3. `sbom.json` → `"version": "X.Y.Z"` and `"serialNumber": "...vX.Y.Z"`
+4. `SBOM.md` → Version string, table row, dependency graph
+5. `CHANGELOG.md` → New `## [X.Y.Z] - YYYY-MM-DD` section; update "Custom component" range
+
+Verify with: `grep -r "old.version"` to find any missed occurrences.
+
 ## Resources
 
 - Home Assistant Developer Docs: https://developers.home-assistant.io/

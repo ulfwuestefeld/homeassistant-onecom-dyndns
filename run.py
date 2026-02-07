@@ -346,9 +346,9 @@ def save_acme_challenge_info(domain: str, txt_name: str, txt_value: str):
     try:
         with open(ACME_CHALLENGE_FILE, "w") as f:
             json.dump(challenge_info, f, indent=2)
-        logging.info(f"ACME challenge info saved to {ACME_CHALLENGE_FILE}")
+        logging.info("ACME challenge info saved to %s", ACME_CHALLENGE_FILE)
     except Exception as e:
-        logging.warning(f"Failed to save ACME challenge info: {e}")
+        logging.warning("Failed to save ACME challenge info: %s", e)
     
     # Send Home Assistant notification
     notification_message = (
@@ -414,18 +414,18 @@ class DynDNSUpdater:
         self._load_last_ip()
 
         self._logger.info("One.com DynDNS Updater initialized")
-        self._logger.info(f"Domain: {self.domain}")
-        self._logger.info(f"Subdomains: {', '.join(s or '@' for s in self.subdomains)}")
-        self._logger.info(f"Update interval: {self.update_interval} minutes")
-        self._logger.info(f"SSL enabled: {self.ssl_enabled}")
+        self._logger.info("Domain: %s", self.domain)
+        self._logger.info("Subdomains: %s", ', '.join(s or '@' for s in self.subdomains))
+        self._logger.info("Update interval: %s minutes", self.update_interval)
+        self._logger.info("SSL enabled: %s", self.ssl_enabled)
         
         # Debug: Log available supervisor tokens
-        self._logger.info(f"SUPERVISOR_TOKEN available: {bool(SUPERVISOR_TOKEN)}")
+        self._logger.info("SUPERVISOR_TOKEN available: %s", bool(SUPERVISOR_TOKEN))
         if not SUPERVISOR_TOKEN:
             # List all environment variables starting with SUPER or HASS for debugging
             relevant_envs = {k: '***' for k, v in os.environ.items() 
                            if k.upper().startswith(('SUPER', 'HASS', 'HOME'))}
-            self._logger.info(f"Relevant environment variables: {list(relevant_envs.keys())}")
+            self._logger.info("Relevant environment variables: %s", list(relevant_envs.keys()))
             # Check for token files
             token_paths = [
                 "/run/s6/container_environment/SUPERVISOR_TOKEN",
@@ -433,7 +433,7 @@ class DynDNSUpdater:
             ]
             for path in token_paths:
                 exists = os.path.exists(path)
-                self._logger.info(f"Token file {path}: {'exists' if exists else 'not found'}")
+                self._logger.info("Token file %s: %s", path, 'exists' if exists else 'not found')
 
     def _setup_logging(self):
         """Configure logging based on options."""
@@ -457,7 +457,7 @@ class DynDNSUpdater:
                     self._last_ip = f.read().strip()
                     self._logger.debug("Loaded last IP: %s", self._last_ip)
         except IOError as e:
-            self._logger.warning(f"Could not load last IP: {e}")
+            self._logger.warning("Could not load last IP: %s", e)
 
     def _save_last_ip(self, ip: str):
         """Save the current IP to file.
@@ -472,7 +472,7 @@ class DynDNSUpdater:
             self._last_ip = ip
             self._logger.debug("Saved IP: %s", ip)
         except IOError as e:
-            self._logger.error(f"Could not save IP: {e}")
+            self._logger.error("Could not save IP: %s", e)
 
     def get_public_ip(self) -> Optional[str]:
         """Get the current public IP address.
@@ -493,11 +493,11 @@ class DynDNSUpdater:
                 self._logger.debug("Detected IP: %s", ip)
                 return ip
             else:
-                self._logger.warning(f"Invalid IP response: {ip}")
+                self._logger.warning("Invalid IP response: %s", ip)
                 return None
 
         except requests.RequestException as e:
-            self._logger.error(f"Failed to get public IP: {e}")
+            self._logger.error("Failed to get public IP: %s", e)
             return None
 
     def _is_valid_ip(self, ip: str) -> bool:
@@ -526,7 +526,7 @@ class DynDNSUpdater:
         Returns:
             True if all updates were successful.
         """
-        self._logger.info(f"Updating DNS records to {ip}")
+        self._logger.info("Updating DNS records to %s", ip)
 
         try:
             # Create API client and login
@@ -543,19 +543,19 @@ class DynDNSUpdater:
             success_count = sum(1 for r in results.values() if r["success"])
             total_count = len(results)
 
-            self._logger.info(f"Updated {success_count}/{total_count} DNS records")
+            self._logger.info("Updated %s/%s DNS records", success_count, total_count)
 
             # Log individual results
             for subdomain, result in results.items():
                 if result["success"]:
-                    self._logger.info(f"  ✓ {subdomain}.{self.domain}")
+                    self._logger.info("  ✓ %s.%s", subdomain, self.domain)
                 else:
-                    self._logger.error(f"  ✗ {subdomain}.{self.domain}: {result['error']}")
+                    self._logger.error("  ✗ %s.%s: %s", subdomain, self.domain, result['error'])
 
             return success_count == total_count
 
         except OneComAPIError as e:
-            self._logger.error(f"DNS update failed: {e}")
+            self._logger.error("DNS update failed: %s", e)
             return False
 
     def check_and_update(self):
@@ -576,7 +576,7 @@ class DynDNSUpdater:
             self._write_state_file(current_ip=current_ip, dns_status="ok")
             return
 
-        self._logger.info(f"IP changed: {self._last_ip or 'unknown'} -> {current_ip}")
+        self._logger.info("IP changed: %s -> %s", self._last_ip or 'unknown', current_ip)
 
         # Update DNS records
         if self.update_dns(current_ip):
@@ -807,7 +807,7 @@ class DynDNSUpdater:
         if event_type == "renewed":
             self._logger.info("SSL certificate renewed successfully")
             domains = data.get("domains", [])
-            self._logger.info(f"Certificate domains: {', '.join(domains)}")
+            self._logger.info("Certificate domains: %s", ', '.join(domains))
             cert_info = data.get("certificate", {})
             # Track renewal timestamp
             self._last_certificate_renewal = time.strftime(
@@ -829,20 +829,20 @@ class DynDNSUpdater:
             # Update state file so the custom component picks up the change
             self._write_state_file(current_ip=self._last_ip, dns_status="ok")
         elif event_type == "error":
-            self._logger.error(f"SSL certificate error: {data.get('error', 'Unknown error')}")
+            self._logger.error("SSL certificate error: %s", data.get('error', 'Unknown error'))
         elif event_type == "expiring":
             days = data.get("days_remaining", 0)
-            self._logger.warning(f"SSL certificate expiring in {days} days, renewal started")
+            self._logger.warning("SSL certificate expiring in %s days, renewal started", days)
         elif event_type == "expiring_soon":
             days = data.get("days_remaining", 0)
-            self._logger.info(f"SSL certificate will expire in {days} days")
+            self._logger.info("SSL certificate will expire in %s days", days)
         elif event_type == "certificate_invalid_online":
             invalid_domains = data.get("invalid_domains", [])
-            self._logger.warning(f"Online certificate check failed for: {', '.join(invalid_domains)}")
+            self._logger.warning("Online certificate check failed for: %s", ', '.join(invalid_domains))
             for domain, result in data.get("results", {}).items():
                 if not result.get("valid"):
                     error = result.get("error", "Unknown error")
-                    self._logger.warning(f"  - {domain}: {error}")
+                    self._logger.warning("  - %s: %s", domain, error)
 
     def _start_ssl_manager(self):
         """Start the SSL certificate manager if enabled."""
@@ -863,7 +863,7 @@ class DynDNSUpdater:
                 if full_domain not in ssl_domains:
                     ssl_domains.append(full_domain)
 
-        self._logger.info(f"Starting SSL certificate manager for: {', '.join(ssl_domains)}")
+        self._logger.info("Starting SSL certificate manager for: %s", ', '.join(ssl_domains))
 
         try:
             self._cert_manager = CertificateManager(
@@ -898,7 +898,7 @@ class DynDNSUpdater:
             self._write_state_file(current_ip=self._last_ip, dns_status="ok")
 
         except Exception as e:
-            self._logger.error(f"Failed to start SSL certificate manager: {e}")
+            self._logger.error("Failed to start SSL certificate manager: %s", e)
 
     def _stop_ssl_manager(self):
         """Stop the SSL certificate manager."""
@@ -971,7 +971,7 @@ def load_options() -> dict:
                 logger.info("Loaded configuration from Home Assistant")
                 return options
         except (IOError, json.JSONDecodeError) as e:
-            logger.error(f"Failed to load options: {e}")
+            logger.error("Failed to load options: %s", e)
 
     # Fall back to environment variables (for testing)
     logger.warning("Using environment variables for configuration")

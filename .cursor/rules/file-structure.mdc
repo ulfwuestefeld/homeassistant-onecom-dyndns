@@ -1,0 +1,38 @@
+---
+description: Project file and directory layout conventions
+alwaysApply: false
+---
+
+# File Structure
+
+## Directory Layout
+
+- **Root** — Add-on entry point and core modules
+  - `run.py` — Main add-on entry point
+  - `acme_manager.py`, `certificate_manager.py`, `onecom_api.py` — Core modules
+  - `config.yaml` — Add-on configuration schema
+  - `Dockerfile`, `build.yaml` — Build configuration
+  - `requirements.txt` — Python dependencies (production + dev)
+  - `translations/` — Add-on UI translations (`en.yaml`, `de.yaml`)
+
+- **`custom_components/onecom_dyndns/`** — Home Assistant integration
+  - `__init__.py` — Integration setup, coordinator, service registration
+  - `config_flow.py` — Configuration flow (user + hassio discovery)
+  - `const.py` — Constants and `get_device_info()` helper
+  - `sensor.py`, `binary_sensor.py`, `button.py` — Entity platforms
+  - `onecom_api.py` — Integration-specific API wrapper
+  - `services.yaml` — Service definitions
+  - `strings.json` — Translation source; `manifest.json` — Integration metadata
+  - `translations/` — Component translations (`en.json`, `de.json`)
+  - `icon.png`, `logo.png` — Integration branding
+
+- **`tests/`** — Pytest test suite
+  - `conftest.py` — HA stubs and shared fixtures
+  - `test_<module>.py` — One test file per source module
+
+## Naming Conventions
+
+- Test files: `test_<module>.py`
+- Entity platforms: `<entity_type>.py` (sensor.py, binary_sensor.py, button.py)
+- Constants: `const.py`
+- Translations: `strings.json` (source), `translations/<lang>.json` (copies)

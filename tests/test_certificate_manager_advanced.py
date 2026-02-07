@@ -593,5 +593,74 @@ class TestChallengeCallback:
         assert manager.challenge_callback is test_callback
 
 
+class TestStopEventPropagation:
+    """Tests for stop_event propagation from CertificateManager to ACMEManager."""
+
+    @patch.object(CertificateManager, 'get_certificate_info')
+    @patch("certificate_manager.OneComAPI")
+    @patch("certificate_manager.ACMEManager")
+    def test_stop_event_passed_to_acme_manager(self, mock_acme, mock_api, mock_info):
+        """Test that CertificateManager passes its _stop_event to ACMEManager."""
+        mock_info.return_value = None
+
+        mock_api_instance = Mock()
+        mock_api.return_value = mock_api_instance
+
+        mock_acme_instance = Mock()
+        mock_acme_instance.obtain_and_save_certificate.return_value = True
+        mock_acme.return_value = mock_acme_instance
+
+        # Return cert info after renewal
+        mock_info.side_effect = [None, {"days_remaining": 89, "needs_renewal": False}]
+
+        manager = CertificateManager(
+            username="test@example.com",
+            password="password",
+            domain="example.com",
+            email="ssl@example.com",
+        )
+
+        manager.request_certificate()
+
+        # Verify ACMEManager was called with stop_event=manager._stop_event
+        call_kwargs = mock_acme.call_args[1]
+        assert "stop_event" in call_kwargs
+        assert call_kwargs["stop_event"] is manager._stop_event
+
+    @patch.object(CertificateManager, 'get_certificate_info')
+    @patch("certificate_manager.OneComAPI")
+    @patch("certificate_manager.ACMEManager")
+    def test_stop_during_certificate_request_signals_acme(self, mock_acme, mock_api, mock_info):
+        """Test that CertificateManager.stop() signals the shared event."""
+        import threading
+
+        mock_info.return_value = None
+        mock_api_instance = Mock()
+        mock_api.return_value = mock_api_instance
+
+        mock_acme_instance = Mock()
+        mock_acme_instance.obtain_and_save_certificate.return_value = True
+        mock_acme.return_value = mock_acme_instance
+
+        mock_info.side_effect = [None, {"days_remaining": 89, "needs_renewal": False}]
+
+        manager = CertificateManager(
+            username="test@example.com",
+            password="password",
+            domain="example.com",
+            email="ssl@example.com",
+        )
+
+        # Simulate stop being called
+        assert not manager._stop_event.is_set()
+        manager._running = True
+        manager.stop()
+        assert manager._stop_event.is_set()
+
+        # Any ACMEManager created with this event would see it as set
+        shared_event = manager._stop_event
+        assert shared_event.is_set()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

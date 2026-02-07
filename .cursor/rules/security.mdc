@@ -1,0 +1,32 @@
+---
+description: Security conventions for credential and data handling
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Security Conventions
+
+## Credential Handling
+
+- **Never log passwords**: Use lazy formatting; never include passwords in log messages
+- **Password masking**: Validated by `test_security.py` — passwords must not appear in logs
+- **Config flow**: Passwords stored in `ConfigEntry.data` (encrypted by HA)
+- **Add-on options**: Passwords in `/data/options.json` (file permissions managed by Supervisor)
+
+## API Security
+
+- **Session management**: Always call `api.logout()` after operations
+- **One login per cycle**: Share `OneComAPI` instance across subdomains in a single update
+- **Error messages**: Never expose sensitive details in user-facing errors
+
+## File Permissions
+
+- **State/command files**: Written to `/config/` (accessible by HA Core)
+- **SSL certificates**: Stored in `/ssl/` (mapped volume)
+- **ACME data**: Stored in `/data/acme/` (add-on private)
+
+## Network Security
+
+- All external API calls use HTTPS
+- Default `requests` SSL verification (certificates validated)
+- Retry logic with exponential backoff prevents accidental DoS

@@ -217,6 +217,74 @@ When the add-on creates an ACME challenge, it sends a **Home Assistant notificat
 
 If automatic TXT record creation fails, you can manually create the record at One.com with the provided name and value.
 
+## Add-on Mode vs. Standalone Mode
+
+The custom integration operates in two modes:
+
+### Add-on Mode (recommended)
+
+Active when the add-on is installed and running. The integration is auto-created via Supervisor Discovery or detected via the state file.
+
+- **Data source**: Reads `/config/.onecom_dyndns_state.json` every 30 seconds
+- **Button presses**: Write a command to `/config/.onecom_dyndns_commands.json`; the add-on executes within 5 seconds
+- **Device**: Entities attach to the existing Supervisor add-on device ("One.com DynDNS Updater")
+- **Configuration**: Inherited from the add-on — no manual credential entry
+
+### Standalone Mode (without add-on)
+
+Active when the integration is installed manually without the add-on.
+
+- **Data source**: Polls IP services directly (ipify, ifconfig, icanhazip)
+- **Button presses**: Execute actions directly (DNS update, IP check, certificate renewal)
+- **Device**: Creates its own device "One.com DynDNS Updater - {domain}"
+- **Configuration**: Entered via the setup wizard (credentials, domain, subdomains, etc.)
+
+### State File Format
+
+The add-on writes the state file (`/config/.onecom_dyndns_state.json`) after every check cycle:
+
+```json
+{
+  "current_ip": "203.0.113.42",
+  "last_ip": "203.0.113.41",
+  "domain": "example.com",
+  "subdomains": ["homeassistant.example.com"],
+  "ip_changed": false,
+  "dns_status": "ok",
+  "last_update": "2026-02-07T12:00:00+00:00",
+  "last_ip_update": "2026-02-06T18:30:00+00:00",
+  "last_certificate_renewal": "2026-01-15T03:00:00+00:00",
+  "ssl_enabled": true,
+  "certificate_info": {
+    "expiry": "2026-04-15T03:00:00+00:00",
+    "domains": ["example.com", "homeassistant.example.com"],
+    "days_remaining": 67
+  },
+  "acme_challenge": null
+}
+```
+
+### Command File Format
+
+Button presses and service calls write to `/config/.onecom_dyndns_commands.json`:
+
+```json
+{
+  "command": "update_dns",
+  "timestamp": "2026-02-07T12:00:00+00:00"
+}
+```
+
+Supported commands: `update_dns`, `check_ip`, `renew_certificate`.
+
+### Button Behaviour
+
+| Button | Add-on Mode | Standalone Mode |
+|--------|-------------|-----------------|
+| **Update DNS** | Writes `update_dns` command → add-on executes | Calls `OneComAPI.update_record()` directly |
+| **Check IP** | Writes `check_ip` command → add-on executes | Polls IP service directly |
+| **Renew Certificate** | Writes `renew_certificate` command → add-on executes | Triggers `CertificateManager` directly |
+
 ## Home Assistant Sensors
 
 The add-on creates the following sensors in Home Assistant:
@@ -259,13 +327,13 @@ automation:
 When the add-on starts it automatically:
 
 1. **Deploys the custom component** – Copies `custom_components/onecom_dyndns/` into the Home Assistant `/config/custom_components/` directory. This happens on every start and is version-aware (only updates when a new version is bundled).
-2. **Publishes Supervisor Discovery** – Notifies Home Assistant that an integration is available.
-3. **Shows a confirmation dialog** – Home Assistant presents a notification: *"The One.com DynDNS add-on was detected. Do you want to create entities?"*. Confirm to create the integration.
+2. **Publishes Supervisor Discovery** – Notifies Home Assistant that an integration is available (with retry logic for first boot).
+3. **Auto-creates the integration** – The config entry is created automatically from the add-on configuration, no manual confirmation required. If discovery fails, the integration detects the running add-on via the shared state file on next restart.
 4. **Attaches entities to the add-on device** – All sensors, binary sensors and buttons appear directly on the existing "One.com DynDNS Updater" device alongside the standard Supervisor entities (switch, CPU, memory, version).
 
-> **No manual file copying is required.** The add-on handles everything.
+> **No manual file copying or configuration is required.** The add-on handles everything, including passing credentials and settings to the integration.
 
-After a Home Assistant restart you may need to confirm the discovery notification once. Subsequent add-on updates deploy the new component version automatically.
+Subsequent add-on updates deploy the new component version automatically.
 
 ## Home Assistant Integration (Standalone, without Add-on)
 
@@ -276,7 +344,7 @@ You can also install the integration manually without the add-on.
 1. Copy the `custom_components/onecom_dyndns` folder to your Home Assistant `config/custom_components/` directory
 2. Restart Home Assistant
 3. Go to **Settings → Devices & Services → Add Integration**
-4. Search for "One.com DynDNS" and follow the setup wizard
+4. Search for "One.com DynDNS Updater" and follow the setup wizard
 
 ### Setup Wizard Steps
 
@@ -286,7 +354,7 @@ You can also install the integration manually without the add-on.
 4. **Options**: Set update interval, IP service, and enable SSL
 5. **SSL Configuration** (optional): Configure Let's Encrypt settings
 
-> When installed standalone (without the add-on) the integration creates its own device "One.com DynDNS - {domain}".
+> When installed standalone (without the add-on) the integration creates its own device "One.com DynDNS Updater - {domain}".
 
 ### Entities
 

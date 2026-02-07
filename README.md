@@ -22,6 +22,11 @@ A Home Assistant add-on that automatically updates DNS A records at One.com when
 - Force renewal option for adding new domains
 - Staging mode for testing
 
+### Entities (Custom Integration)
+- **Sensors**: Current IP, Last Update, Last IP Update, Certificate Expiry, Last Certificate Renewal, ACME Challenge
+- **Binary Sensors**: DNS Status, Certificate Valid
+- **Buttons**: Update DNS, Check IP, Renew Certificate
+
 ### General
 - Full Home Assistant UI configuration
 - German and English translations
@@ -104,6 +109,27 @@ ssl_domains:
 
 2. **Disable 2FA**: Two-Factor Authentication is not supported. Disable it in your One.com account settings.
 
+## Architecture
+
+The add-on and custom integration communicate through shared files:
+
+```
+┌──────────────────────────────┐       ┌──────────────────────────────────┐
+│         Add-on (run.py)      │       │  Custom Integration (HA Core)    │
+│                              │       │                                  │
+│  IP check → DNS update → SSL │  ──►  │  DataUpdateCoordinator (30 s)    │
+│                              │ state │  reads state, exposes entities   │
+│  writes state file           │ file  │                                  │
+│  reads command file          │  ◄──  │  Button press → writes command   │
+└──────────────────────────────┘ cmd   └──────────────────────────────────┘
+                                 file
+```
+
+- **State file** (`/config/.onecom_dyndns_state.json`): Add-on writes after every check cycle and SSL event; integration reads every 30 seconds.
+- **Command file** (`/config/.onecom_dyndns_commands.json`): Button presses and service calls write commands; add-on picks up within 5 seconds.
+- **Discovery**: Add-on publishes `POST /discovery` with retry logic (5 attempts, increasing delay) so the integration auto-creates at first boot.
+- **Standalone mode**: Without the add-on, the integration polls IP services directly and performs DNS updates itself.
+
 ## How It Works
 
 ### DynDNS Flow
@@ -180,7 +206,7 @@ python run.py
 The add-on **automatically deploys** the custom integration into Home Assistant on every start. No manual file copying is needed:
 
 1. Install and start the add-on
-2. Confirm the discovery notification in **Settings → Devices & Services**
+2. The integration is auto-created from the add-on configuration (no confirmation required)
 3. All entities appear on the "One.com DynDNS Updater" device
 
 ### Manual (without Add-on)
@@ -190,7 +216,7 @@ You can also install the integration standalone:
 1. Copy `custom_components/onecom_dyndns` to your HA `config/custom_components/` directory
 2. Restart Home Assistant
 3. Go to **Settings → Devices & Services → Add Integration**
-4. Search for "One.com DynDNS"
+4. Search for "One.com DynDNS Updater"
 
 The integration provides sensors (Current IP, Last Update, Last IP Update, Certificate Expiry, Last Certificate Renewal, ACME Challenge), binary sensors (DNS Status, Certificate Valid), and button entities (Update DNS, Check IP, Renew Certificate). See [DOCS.md](DOCS.md) for details.
 

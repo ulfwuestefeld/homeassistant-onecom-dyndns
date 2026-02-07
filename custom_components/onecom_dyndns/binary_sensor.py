@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Final
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -16,7 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, CONF_DOMAIN, CONF_ADDON_SLUG, get_device_info
 
-BINARY_SENSOR_TYPES: tuple[BinarySensorEntityDescription, ...] = (
+BINARY_SENSOR_TYPES: Final[tuple[BinarySensorEntityDescription, ...]] = (
     BinarySensorEntityDescription(
         key="dns_status",
         translation_key="dns_status",

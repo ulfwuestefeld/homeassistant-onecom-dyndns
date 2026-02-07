@@ -10,6 +10,7 @@ WARNING: This may break if One.com changes their web interface.
 
 import logging
 import re
+import threading
 import time
 from typing import Optional, List, Dict, Any
 import requests
@@ -117,7 +118,7 @@ class OneComAPI:
         )
         for name, value in hidden_pattern:
             hidden_fields[name] = value
-            _LOGGER.debug(f"Found hidden field: {name}")
+            _LOGGER.debug("Found hidden field: %s", name)
 
         # Also try alternative pattern (value before name)
         hidden_pattern2 = re.findall(
@@ -127,7 +128,7 @@ class OneComAPI:
         for value, name in hidden_pattern2:
             if name not in hidden_fields:
                 hidden_fields[name] = value
-                _LOGGER.debug(f"Found hidden field (alt): {name}")
+                _LOGGER.debug("Found hidden field (alt): %s", name)
 
         # Perform login
         login_data = {
@@ -138,7 +139,7 @@ class OneComAPI:
         # Add any hidden fields (CSRF tokens, etc.)
         login_data.update(hidden_fields)
 
-        _LOGGER.debug(f"Login data fields: {list(login_data.keys())}")
+        _LOGGER.debug("Login data fields: %s", list(login_data.keys()))
 
         # Set headers for form submission
         post_headers = {
@@ -162,7 +163,7 @@ class OneComAPI:
         except requests.RequestException as e:
             raise OneComAPIError(f"Login request failed: {e}")
 
-        _LOGGER.debug(f"Login response URL: {response.url}")
+        _LOGGER.debug("Login response URL: %s", response.url)
 
         # Check if login was successful by looking for admin panel indicators
         if "logout" in response.text.lower() or "dns" in response.url.lower() or "/admin" in response.url:
@@ -175,7 +176,7 @@ class OneComAPI:
 
         # Log detailed debug information if we're still on account.one.com
         if "account.one.com" in response.url:
-            _LOGGER.debug(f"Still on account.one.com after login attempt")
+            _LOGGER.debug("Still on account.one.com after login attempt")
 
             # Extract any error message from the page - try multiple patterns
             error_patterns = [
@@ -189,7 +190,7 @@ class OneComAPI:
             for pattern in error_patterns:
                 match = re.search(pattern, response.text, re.IGNORECASE | re.DOTALL)
                 if match and match.group(1).strip():
-                    _LOGGER.error(f"Login error from One.com: {match.group(1).strip()}")
+                    _LOGGER.error("Login error from One.com: %s", match.group(1).strip())
                     break
 
             # Log part of the response body to see what One.com returns
@@ -202,7 +203,7 @@ class OneComAPI:
                 # Just get a portion around any error
                 body_snippet = response.text[response.text.find('<body'):response.text.find('<body')+1000] if '<body' in response.text else response.text[:500]
 
-            _LOGGER.debug(f"Response snippet: {body_snippet[:300]}...")
+            _LOGGER.debug("Response snippet: %s...", body_snippet[:300])
 
         # Check for specific credential errors (but not "ungültiger code" which is OAuth error)
         if "invalid username or password" in response_lower or "invalid credentials" in response_lower:
@@ -220,7 +221,7 @@ class OneComAPI:
         # If we're still on the login page (account.one.com), login likely failed
         if "account.one.com" in response.url and "kc-form-login" in response.text:
             _LOGGER.error("Still on login page after authentication attempt")
-            _LOGGER.debug(f"Response URL: {response.url}")
+            _LOGGER.debug("Response URL: %s", response.url)
             raise OneComAPIError("Login failed - still on login page. Please verify your One.com credentials and ensure 2FA is disabled.")
 
         # Try to access the admin panel to verify login
@@ -232,7 +233,7 @@ class OneComAPI:
                 self._logged_in = True
                 return True
         except Exception as e:
-            _LOGGER.debug(f"Verification request failed: {e}")
+            _LOGGER.debug("Verification request failed: %s", e)
 
         _LOGGER.warning("Login status uncertain - proceeding anyway")
         self._logged_in = True
@@ -349,7 +350,7 @@ class OneComAPI:
                 headers=headers
             )
             response.raise_for_status()
-            _LOGGER.info(f"Successfully updated '{subdomain or '@'}.{self.domain}' to {ip_address}")
+            _LOGGER.info("Successfully updated '%s.%s' to %s", subdomain or '@', self.domain, ip_address)
             return True
         except requests.RequestException as e:
             raise OneComAPIError(f"Failed to update DNS record: {e}")
@@ -477,7 +478,7 @@ class OneComAPI:
         if not self._logged_in or not self.session:
             raise OneComAPIError("Not logged in")
 
-        _LOGGER.debug(f"Creating TXT record for '{subdomain}' with content '{content}'")
+        _LOGGER.debug("Creating TXT record for '%s' with content '%s'", subdomain, content)
 
         create_url = f"{self.ADMIN_URL}/api/domains/{self.domain}/dns/custom_records"
 
@@ -497,7 +498,7 @@ class OneComAPI:
             "Accept": "application/json"
         }
 
-        _LOGGER.debug(f"Creating TXT record with data: {create_data}")
+        _LOGGER.debug("Creating TXT record with data: %s", create_data)
 
         try:
             response = self.session.post(
@@ -507,12 +508,12 @@ class OneComAPI:
             )
 
             # Log response details for debugging
-            _LOGGER.debug(f"Create TXT record response: {response.status_code}")
+            _LOGGER.debug("Create TXT record response: %s", response.status_code)
             
             # Check for conflict error (record already exists)
             if response.status_code >= 400:
                 response_text = response.text
-                _LOGGER.debug(f"Response body: {response_text}")
+                _LOGGER.debug("Response body: %s", response_text)
                 
                     # One.com returns 500 with a conflict message when record already exists
                 if "DNS_RECORD_CONFLICTING" in response_text or "ConflictingDnsRecordException" in response_text:
@@ -522,13 +523,13 @@ class OneComAPI:
                     
                     if match and "same content" in response_text:
                         existing_id = match.group(1)
-                        _LOGGER.info(f"TXT record already exists with same content (ID: {existing_id}), treating as success")
+                        _LOGGER.info("TXT record already exists with same content (ID: %s), treating as success", existing_id)
                         return existing_id
                     
                     # If conflict but different content, we need to delete old and create new
                     if match:
                         existing_id = match.group(1)
-                        _LOGGER.info(f"TXT record exists with different content, replacing (ID: {existing_id})")
+                        _LOGGER.info("TXT record exists with different content, replacing (ID: %s)", existing_id)
                         try:
                             self.delete_txt_record(existing_id)
                             # Retry creation after deletion
@@ -537,9 +538,9 @@ class OneComAPI:
                                 json=create_data,
                                 headers=headers
                             )
-                            _LOGGER.debug(f"Retry create TXT record response: {response.status_code}")
+                            _LOGGER.debug("Retry create TXT record response: %s", response.status_code)
                         except OneComAPIError as e:
-                            _LOGGER.warning(f"Failed to delete conflicting record: {e}")
+                            _LOGGER.warning("Failed to delete conflicting record: %s", e)
 
             response.raise_for_status()
             result = response.json()
@@ -549,7 +550,7 @@ class OneComAPI:
             if not record_id:
                 raise OneComAPIError("Could not get record ID from response")
 
-            _LOGGER.info(f"Successfully created TXT record '{subdomain}.{self.domain}'")
+            _LOGGER.info("Successfully created TXT record '%s.%s'", subdomain, self.domain)
             return record_id
 
         except requests.RequestException as e:
@@ -570,7 +571,7 @@ class OneComAPI:
         if not self._logged_in or not self.session:
             raise OneComAPIError("Not logged in")
 
-        _LOGGER.debug(f"Deleting DNS record with ID '{record_id}'")
+        _LOGGER.debug("Deleting DNS record with ID '%s'", record_id)
 
         delete_url = f"{self.ADMIN_URL}/api/domains/{self.domain}/dns/custom_records/{record_id}"
 
@@ -581,7 +582,7 @@ class OneComAPI:
         try:
             response = self.session.delete(delete_url, headers=headers)
             response.raise_for_status()
-            _LOGGER.info(f"Successfully deleted DNS record '{record_id}'")
+            _LOGGER.info("Successfully deleted DNS record '%s'", record_id)
             return True
 
         except requests.RequestException as e:
@@ -647,15 +648,15 @@ class OneComAPI:
         if not self._logged_in or not self.session:
             raise OneComAPIError("Not logged in")
 
-        _LOGGER.debug(f"Cleaning up ACME records starting with '{subdomain}'")
+        _LOGGER.debug("Cleaning up ACME records starting with '%s'", subdomain)
 
         # Find all records that start with the subdomain (not exact match)
         records = self.find_txt_records(subdomain, exact_match=False)
         
         if records:
-            _LOGGER.debug(f"Found {len(records)} ACME record(s) to clean up:")
+            _LOGGER.debug("Found %s ACME record(s) to clean up:", len(records))
             for r in records:
-                _LOGGER.debug(f"  - ID: {r['id']}, prefix: {r.get('prefix', 'N/A')}")
+                _LOGGER.debug("  - ID: %s, prefix: %s", r['id'], r.get('prefix', 'N/A'))
         
         deleted_count = 0
 
@@ -664,9 +665,9 @@ class OneComAPI:
                 self.delete_txt_record(record["id"])
                 deleted_count += 1
             except OneComAPIError as e:
-                _LOGGER.warning(f"Failed to delete record {record['id']}: {e}")
+                _LOGGER.warning("Failed to delete record %s: %s", record['id'], e)
 
-        _LOGGER.info(f"Cleaned up {deleted_count} ACME challenge records")
+        _LOGGER.info("Cleaned up %s ACME challenge records", deleted_count)
         return deleted_count
 
     def wait_for_dns_propagation(
@@ -674,7 +675,8 @@ class OneComAPI:
         subdomain: str,
         expected_content: str,
         timeout: int = 120,
-        interval: int = 5
+        interval: int = 5,
+        stop_event: "threading.Event | None" = None,
     ) -> bool:
         """Wait for DNS propagation of a TXT record.
 
@@ -685,6 +687,7 @@ class OneComAPI:
             expected_content: The expected TXT record content
             timeout: Maximum time to wait in seconds
             interval: Time between checks in seconds
+            stop_event: Optional threading.Event for interruptible waiting
 
         Returns:
             True if the record is visible, False if timeout reached.
@@ -692,7 +695,7 @@ class OneComAPI:
         import socket
 
         full_domain = f"{subdomain}.{self.domain}"
-        _LOGGER.info(f"Waiting for DNS propagation of '{full_domain}'...")
+        _LOGGER.info("Waiting for DNS propagation of '%s'...", full_domain)
 
         start_time = time.time()
 
@@ -709,14 +712,18 @@ class OneComAPI:
                     for answer in answers:
                         txt_data = answer.get("data", "").strip('"')
                         if expected_content in txt_data:
-                            _LOGGER.info(f"DNS propagation complete for '{full_domain}'")
+                            _LOGGER.info("DNS propagation complete for '%s'", full_domain)
                             return True
 
             except Exception as e:
-                _LOGGER.debug(f"DNS check failed: {e}")
+                _LOGGER.debug("DNS check failed: %s", e)
 
-            _LOGGER.debug(f"Record not yet visible, waiting {interval}s...")
-            time.sleep(interval)
+            _LOGGER.debug("Record not yet visible, waiting %ss...", interval)
+            if stop_event is not None:
+                if stop_event.wait(timeout=interval):
+                    return False  # Shutdown requested
+            else:
+                time.sleep(interval)
 
-        _LOGGER.warning(f"DNS propagation timeout for '{full_domain}'")
+        _LOGGER.warning("DNS propagation timeout for '%s'", full_domain)
         return False
