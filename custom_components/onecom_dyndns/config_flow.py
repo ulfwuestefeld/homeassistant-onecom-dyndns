@@ -133,7 +133,7 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }),
             errors=errors,
             description_placeholders={
-                "docs_url": "https://github.com/your-repo/onecom-dyndns"
+                "docs_url": "https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns"
             },
         )
 

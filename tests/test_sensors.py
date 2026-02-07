@@ -1392,9 +1392,9 @@ class TestGetDeviceInfo:
 
         assert info["identifiers"] == {("onecom_dyndns", "entry_456")}
         assert info["name"] == "One.com DynDNS - mysite.org"
-        assert info["manufacturer"] == "One.com"
-        assert info["model"] == "DynDNS"
-        assert info["configuration_url"] == "https://www.one.com/admin"
+        assert info["manufacturer"] == "ulfwuestefeld"
+        assert info["model"] == "DynDNS Updater"
+        assert info["configuration_url"] == "https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns"
 
     def test_without_addon_slug_default(self):
         """When addon_slug is not passed, defaults to None (standalone)."""
@@ -2180,6 +2180,99 @@ class TestCoordinatorUpdateInterval:
         hass = self._make_hass()
         coordinator = init_mod.OneComDynDNSCoordinator(hass, entry)
         assert coordinator.update_interval == timedelta(minutes=10)
+
+
+class TestAsyncDetectAddon:
+    """Verify _async_detect_addon detects the add-on via the state file."""
+
+    def _make_hass(self, config_dir):
+        hass = Mock()
+        hass.config.path = Mock(side_effect=lambda f: str(config_dir / f))
+        hass.async_add_executor_job = Mock(
+            side_effect=lambda fn, *args: asyncio.get_event_loop().run_in_executor(None, fn, *args)
+        )
+        return hass
+
+    def test_detects_addon_when_state_file_exists(self, tmp_path):
+        """Returns the add-on slug when the state file exists."""
+        _ensure_ha_stubs()
+        import importlib
+        init_mod = importlib.import_module("custom_components.onecom_dyndns")
+        importlib.reload(init_mod)
+
+        (tmp_path / ".onecom_dyndns_state.json").write_text("{}")
+        hass = self._make_hass(tmp_path)
+
+        result = asyncio.run(init_mod._async_detect_addon(hass))
+        assert result == "homeassistant-onecom-dyndns"
+
+    def test_returns_none_when_no_state_file(self, tmp_path):
+        """Returns None when the state file does not exist."""
+        _ensure_ha_stubs()
+        import importlib
+        init_mod = importlib.import_module("custom_components.onecom_dyndns")
+        importlib.reload(init_mod)
+
+        hass = self._make_hass(tmp_path)
+
+        result = asyncio.run(init_mod._async_detect_addon(hass))
+        assert result is None
+
+    def test_returns_none_on_error(self, tmp_path):
+        """Returns None when hass.config.path raises."""
+        _ensure_ha_stubs()
+        import importlib
+        init_mod = importlib.import_module("custom_components.onecom_dyndns")
+        importlib.reload(init_mod)
+
+        hass = Mock()
+        hass.config.path = Mock(side_effect=RuntimeError("boom"))
+        hass.async_add_executor_job = Mock(
+            side_effect=lambda fn, *args: asyncio.get_event_loop().run_in_executor(None, fn, *args)
+        )
+
+        result = asyncio.run(init_mod._async_detect_addon(hass))
+        assert result is None
+
+
+class TestBuildDiscoveryConfig:
+    """Verify _build_discovery_config helper in run.py."""
+
+    def test_builds_full_config(self):
+        """Config payload includes all add-on options."""
+        from run import _build_discovery_config
+
+        opts = {
+            "username": "u@one.com",
+            "password": "pw",
+            "domain": "example.com",
+            "subdomains": ["www"],
+            "update_interval": 3,
+            "ip_service": "ifconfig",
+            "ssl_enabled": True,
+            "ssl_email": "ssl@ex.com",
+            "ssl_domains": ["example.com"],
+            "ssl_staging": True,
+            "ssl_renewal_days": 14,
+            "ssl_check_interval": 6,
+        }
+        cfg = _build_discovery_config(opts)
+        assert cfg["username"] == "u@one.com"
+        assert cfg["domain"] == "example.com"
+        assert cfg["ssl_enabled"] is True
+        assert cfg["ssl_renewal_days"] == 14
+
+    def test_defaults_for_empty_options(self):
+        """Missing keys fall back to sensible defaults."""
+        from run import _build_discovery_config
+
+        cfg = _build_discovery_config({})
+        assert cfg["username"] == ""
+        assert cfg["domain"] == ""
+        assert cfg["subdomains"] == [""]
+        assert cfg["update_interval"] == 5
+        assert cfg["ip_service"] == "ipify"
+        assert cfg["ssl_enabled"] is False
 
 
 if __name__ == "__main__":

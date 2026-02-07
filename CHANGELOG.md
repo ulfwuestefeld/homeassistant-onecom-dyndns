@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.4] - 2026-02-07
+## [1.3.5] - 2026-02-07
 
 ### Changed
 
@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-Discovery**: `async_step_hassio()` now auto-creates the config entry
   immediately when the add-on publishes discovery, eliminating the manual
   confirmation step. Entities appear on the add-on device without user interaction.
+- **Automatic Add-on Detection**: `_async_detect_addon()` in `__init__.py` checks
+  for the state file at startup. If a manually created config entry finds the
+  state file, it switches to add-on mode automatically, attaching entities to the
+  add-on device and reading state instead of polling independently.
+- **Discovery Retry Logic**: `publish_addon_discovery()` now retries up to 5 times
+  with increasing delays when HA Core is not yet ready (e.g. during first boot).
+  Failure messages are logged at WARNING level for better visibility.
 - `"after_dependencies": ["hassio"]` in `manifest.json` ensures the Supervisor
   creates the add-on device before the integration attaches entities to it
 - `ADDON_STATE_FILE` and `ADDON_COMMAND_FILE` constants in `const.py`
@@ -46,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `OneComDynDNSCoordinator._async_read_addon_state()` – reads shared state file
 - `OneComDynDNSCoordinator._write_command_sync()` – writes command for add-on
 - `OneComDynDNSCoordinator._async_poll_directly()` – standalone-mode fallback
-- **Extended Test Suite** (422 → 445 tests)
+- **Extended Test Suite** (422 → 452 tests)
   - Tests for `_write_state_file()` (5 cases: JSON validity, FQDN subdomains,
     certificate info, write error handling, ip_changed flag)
   - Tests for `_check_commands()` (6 cases: no file, update_dns, check_ip,
@@ -57,6 +64,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     standalone no-write)
   - Tests for state/command file constants (2 cases)
   - Tests for update interval (2 cases: 30s add-on vs config standalone)
+  - Tests for `_async_detect_addon()` (3 cases: detected via state file, no file,
+    error handling)
+  - Tests for `_build_discovery_config()` (2 cases: full config, empty defaults)
+  - Tests for discovery retry logic (2 cases: succeeds after retries, exhausted)
+
+### Fixed
+
+- **Metadata**: `manifest.json` codeowners, documentation URL, and issue tracker
+  URL now point to `@ulfwuestefeld` / GitHub repository
+- **Device Info**: Standalone device shows `manufacturer: ulfwuestefeld` and
+  `configuration_url` pointing to the GitHub repository instead of one.com admin
+- **Repository Name**: `repository.yaml` `name` field changed to `ulfwuestefeld`
+  so the add-on device shows the correct "von" (by) attribution in the HA UI
+- **Config Flow URL**: `docs_url` placeholder in `async_step_user()` updated to
+  the correct GitHub repository URL
 
 ## [1.3.2] - 2026-02-06
 
@@ -136,7 +158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Custom component (1.2.0 → 1.3.4)**
+- **Custom component (1.2.0 → 1.3.5)**
   - SENSOR_TYPES extended from 5 to 6 (+ acme_challenge)
   - ssl_only_sensors set now includes acme_challenge
   - Updated English, German translations and strings.json for new entities

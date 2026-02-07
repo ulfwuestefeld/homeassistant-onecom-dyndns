@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import (
     DOMAIN,
     PLATFORMS,
+    ADDON_SLUG,
     CONF_USERNAME,
     CONF_PASSWORD,
     CONF_DOMAIN,
@@ -43,9 +44,42 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+async def _async_detect_addon(hass: HomeAssistant) -> str | None:
+    """Detect the running add-on by checking for its state file.
+
+    Returns the add-on slug if the state file exists (i.e. the add-on has
+    written at least one state), otherwise ``None``.
+    """
+    try:
+        state_path = Path(hass.config.path(ADDON_STATE_FILE))
+        if await hass.async_add_executor_job(state_path.is_file):
+            _LOGGER.info(
+                "Detected running add-on via state file %s", state_path
+            )
+            return ADDON_SLUG
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up One.com DynDNS from a config entry."""
     hass.data.setdefault(DOMAIN, {})
+
+    # If the entry was created manually (no addon_slug), try to detect the
+    # running add-on so the entities attach to the add-on device and the
+    # coordinator reads data from the state file instead of polling.
+    if not entry.data.get(CONF_ADDON_SLUG):
+        addon_slug = await _async_detect_addon(hass)
+        if addon_slug:
+            new_data = dict(entry.data)
+            new_data[CONF_ADDON_SLUG] = addon_slug
+            hass.config_entries.async_update_entry(entry, data=new_data)
+            _LOGGER.info(
+                "Switched to add-on mode (slug=%s) for entry %s",
+                addon_slug,
+                entry.entry_id,
+            )
 
     # Create coordinator
     coordinator = OneComDynDNSCoordinator(hass, entry)

@@ -641,8 +641,9 @@ class TestPublishAddonDiscovery:
         mock_post.assert_called_once()
 
     @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
+    @patch("run.time.sleep")
     @patch("run.requests.post")
-    def test_api_non_ok_returns_false(self, mock_post):
+    def test_api_non_ok_returns_false(self, mock_post, mock_sleep):
         """Return False when the Supervisor API returns a non-OK response."""
         from run import publish_addon_discovery
 
@@ -652,19 +653,60 @@ class TestPublishAddonDiscovery:
         mock_response.text = "Internal Server Error"
         mock_post.return_value = mock_response
 
-        result = publish_addon_discovery({"domain": "example.com"})
+        result = publish_addon_discovery({"domain": "example.com"}, retries=1)
         assert result is False
 
     @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
+    @patch("run.time.sleep")
     @patch("run.requests.post")
-    def test_request_exception_returns_false(self, mock_post):
+    def test_request_exception_returns_false(self, mock_post, mock_sleep):
         """Return False when the HTTP request raises an exception."""
         from run import publish_addon_discovery
 
         mock_post.side_effect = Exception("Connection refused")
 
-        result = publish_addon_discovery({"domain": "example.com"})
+        result = publish_addon_discovery({"domain": "example.com"}, retries=1)
         assert result is False
+
+    @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
+    @patch("run.time.sleep")
+    @patch("run.requests.post")
+    def test_retries_on_failure_then_succeeds(self, mock_post, mock_sleep):
+        """Retry until the Supervisor responds successfully."""
+        from run import publish_addon_discovery
+
+        fail_resp = Mock()
+        fail_resp.ok = False
+        fail_resp.status_code = 502
+        fail_resp.text = "Bad Gateway"
+
+        ok_resp = Mock()
+        ok_resp.ok = True
+
+        mock_post.side_effect = [fail_resp, fail_resp, ok_resp]
+
+        result = publish_addon_discovery({"domain": "example.com"}, retries=3, delay=1)
+        assert result is True
+        assert mock_post.call_count == 3
+        assert mock_sleep.call_count == 2  # waited between retries
+
+    @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
+    @patch("run.time.sleep")
+    @patch("run.requests.post")
+    def test_retries_exhausted(self, mock_post, mock_sleep):
+        """Return False when all retries are exhausted."""
+        from run import publish_addon_discovery
+
+        fail_resp = Mock()
+        fail_resp.ok = False
+        fail_resp.status_code = 503
+        fail_resp.text = "Service Unavailable"
+        mock_post.return_value = fail_resp
+
+        result = publish_addon_discovery({"domain": "example.com"}, retries=3, delay=1)
+        assert result is False
+        assert mock_post.call_count == 3
+        assert mock_sleep.call_count == 2
 
     @patch("run.SUPERVISOR_TOKEN", "test-token-abc")
     @patch("run.requests.post")

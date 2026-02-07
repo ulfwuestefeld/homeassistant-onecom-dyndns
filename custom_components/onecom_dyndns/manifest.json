@@ -2,17 +2,17 @@
   "domain": "onecom_dyndns",
   "name": "One.com DynDNS",
   "after_dependencies": ["hassio"],
-  "codeowners": ["@your-github-username"],
+  "codeowners": ["@ulfwuestefeld"],
   "config_flow": true,
-  "documentation": "https://github.com/your-repo/onecom-dyndns",
+  "documentation": "https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/your-repo/onecom-dyndns/issues",
+  "issue_tracker": "https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns/issues",
   "requirements": [
     "requests>=2.28.0",
     "acme>=2.0.0",
     "josepy>=1.13.0",
     "cryptography>=41.0.0"
   ],
-  "version": "1.3.4"
+  "version": "1.3.5"
 }

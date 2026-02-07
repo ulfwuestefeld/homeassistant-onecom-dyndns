@@ -192,60 +192,87 @@ def deploy_custom_component():
         return False
 
 
-def publish_addon_discovery(options: dict):
+def _build_discovery_config(options: dict) -> dict:
+    """Build the discovery config payload from add-on options."""
+    return {
+        "username": options.get("username", ""),
+        "password": options.get("password", ""),
+        "domain": options.get("domain", ""),
+        "subdomains": options.get("subdomains", [""]),
+        "update_interval": options.get("update_interval", 5),
+        "ip_service": options.get("ip_service", "ipify"),
+        "ssl_enabled": options.get("ssl_enabled", False),
+        "ssl_email": options.get("ssl_email", ""),
+        "ssl_domains": options.get("ssl_domains", []),
+        "ssl_staging": options.get("ssl_staging", False),
+        "ssl_renewal_days": options.get("ssl_renewal_days", 30),
+        "ssl_check_interval": options.get("ssl_check_interval", 12),
+    }
+
+
+def publish_addon_discovery(options: dict, retries: int = 5, delay: int = 10):
     """Publish discovery info via Supervisor so the custom component auto-configures.
 
     The Supervisor forwards the discovery to HA core which triggers
     ``async_step_hassio()`` in the integration's config flow.
+
+    Because HA Core may not be ready immediately after the add-on starts
+    (especially on first install), the function retries several times with
+    an increasing delay.
     """
     if not SUPERVISOR_TOKEN:
-        logging.debug("No SUPERVISOR_TOKEN, skipping discovery")
+        logging.warning("No SUPERVISOR_TOKEN, skipping discovery publication")
         return False
 
-    try:
-        headers = {
-            "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
-            "Content-Type": "application/json",
-        }
+    headers = {
+        "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+        "Content-Type": "application/json",
+    }
 
-        discovery_data = {
-            "addon": "homeassistant-onecom-dyndns",
-            "service": "onecom_dyndns",
-            "config": {
-                "username": options.get("username", ""),
-                "password": options.get("password", ""),
-                "domain": options.get("domain", ""),
-                "subdomains": options.get("subdomains", [""]),
-                "update_interval": options.get("update_interval", 5),
-                "ip_service": options.get("ip_service", "ipify"),
-                "ssl_enabled": options.get("ssl_enabled", False),
-                "ssl_email": options.get("ssl_email", ""),
-                "ssl_domains": options.get("ssl_domains", []),
-                "ssl_staging": options.get("ssl_staging", False),
-                "ssl_renewal_days": options.get("ssl_renewal_days", 30),
-                "ssl_check_interval": options.get("ssl_check_interval", 12),
-            },
-        }
+    discovery_data = {
+        "addon": "homeassistant-onecom-dyndns",
+        "service": "onecom_dyndns",
+        "config": _build_discovery_config(options),
+    }
 
-        response = requests.post(
-            "http://supervisor/discovery",
-            headers=headers,
-            json=discovery_data,
-            timeout=10,
-        )
-        if response.ok:
-            logging.info("Published discovery for onecom_dyndns integration")
-            return True
-        else:
-            logging.debug(
-                "Discovery publish returned %s: %s",
-                response.status_code,
-                response.text,
+    for attempt in range(1, retries + 1):
+        try:
+            response = requests.post(
+                "http://supervisor/discovery",
+                headers=headers,
+                json=discovery_data,
+                timeout=10,
             )
-            return False
-    except Exception as e:
-        logging.debug("Failed to publish discovery: %s", e)
-        return False
+            if response.ok:
+                logging.info(
+                    "Published discovery for onecom_dyndns integration "
+                    "(attempt %d/%d)", attempt, retries,
+                )
+                return True
+            else:
+                logging.warning(
+                    "Discovery publish attempt %d/%d returned %s: %s",
+                    attempt, retries,
+                    response.status_code,
+                    response.text,
+                )
+        except Exception as exc:
+            logging.warning(
+                "Discovery publish attempt %d/%d failed: %s",
+                attempt, retries, exc,
+            )
+
+        if attempt < retries:
+            wait = delay * attempt
+            logging.info(
+                "Retrying discovery publication in %ds …", wait,
+            )
+            time.sleep(wait)
+
+    logging.error(
+        "Could not publish discovery after %d attempts", retries,
+    )
+    return False
 
 
 def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
@@ -563,7 +590,7 @@ class DynDNSUpdater:
             self._write_state_file(current_ip=current_ip, dns_status="error")
 
     # ------------------------------------------------------------------
-    # Legacy sensor update methods (deprecated since 1.3.4)
+    # Legacy sensor update methods (deprecated since 1.3.5)
     #
     # These pushed state directly to the HA REST API, creating orphaned
     # entities not linked to any device.  Replaced by _write_state_file()

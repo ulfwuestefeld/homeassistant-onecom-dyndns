@@ -86,7 +86,7 @@ def get_device_info(entry_id: str, domain: str, addon_slug: str | None = None):
     return DeviceInfo(
         identifiers={(DOMAIN, entry_id)},
         name=f"One.com DynDNS - {domain}",
-        manufacturer="One.com",
-        model="DynDNS",
-        configuration_url="https://www.one.com/admin",
+        manufacturer="ulfwuestefeld",
+        model="DynDNS Updater",
+        configuration_url="https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns",
     )

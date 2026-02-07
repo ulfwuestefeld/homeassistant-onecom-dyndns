@@ -1,6 +1,6 @@
 # Home Assistant Add-on Repository Configuration
 # Place this file in the root of your GitHub repository
 
-name: One.com DynDNS Add-ons
+name: ulfwuestefeld
 url: https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns
 maintainer: Ulf Wüstefeld <ulf@wuesti.eu>
