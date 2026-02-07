@@ -171,7 +171,7 @@ class TestCertificateManagerErrors:
         from certificate_manager import CertificateManager
         from onecom_api import OneComAPIError
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             original = cm.CERT_STATUS_FILE
             cm.CERT_STATUS_FILE = os.path.join(tmpdir, "status.json")
             
@@ -229,7 +229,7 @@ class TestFileIOErrors:
         """Test handling of last IP file read error."""
         from run import DynDNSUpdater
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             # Create a directory where file is expected (can't read as file)
             last_ip_path = os.path.join(tmpdir, "last_ip.txt")
             os.makedirs(last_ip_path)  # Create as directory
@@ -253,7 +253,7 @@ class TestFileIOErrors:
         """Test handling of invalid JSON in options file."""
         from run import load_options
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             options_file = os.path.join(tmpdir, "options.json")
             with open(options_file, "w") as f:
                 f.write("{ invalid json }")
@@ -320,7 +320,7 @@ class TestGracefulDegradation:
             "log_level": "error",
         }
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(options)
                 
@@ -369,7 +369,7 @@ class TestRecoveryScenarios:
             "log_level": "error",
         }
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(options)
                 

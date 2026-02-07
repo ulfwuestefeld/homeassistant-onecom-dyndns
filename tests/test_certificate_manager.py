@@ -148,7 +148,7 @@ class TestCertificateManagerStatus:
 
     def test_save_and_load_status(self):
         """Test saving and loading status."""
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             status_file = f"{tmpdir}/status.json"
             cert_path = f"{tmpdir}/cert.pem"
             key_path = f"{tmpdir}/key.pem"
@@ -174,7 +174,7 @@ class TestCertificateManagerStatus:
 
     def test_load_status_no_file(self):
         """Test loading status when file doesn't exist."""
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             status_file = f"{tmpdir}/nonexistent.json"
 
             manager = CertificateManager(
@@ -194,7 +194,7 @@ class TestCertificateManagerCertInfo:
 
     def test_get_certificate_info_no_cert(self):
         """Test getting info when no certificate exists."""
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             manager = CertificateManager(
                 username="user@example.com",
                 password="password",
@@ -268,7 +268,7 @@ class TestCertificateManagerGetStatus:
 
     def test_get_status_basic(self):
         """Test getting basic status."""
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             manager = CertificateManager(
                 username="user@example.com",
                 password="password",

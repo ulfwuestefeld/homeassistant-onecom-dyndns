@@ -419,7 +419,7 @@ class TestCertificateInfoParsing:
 
     def test_get_certificate_info_no_file(self, manager):
         """Test getting info when no certificate file exists."""
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             manager.cert_path = os.path.join(tmpdir, "nonexistent.pem")
             info = manager.get_certificate_info()
             assert info is None
@@ -429,7 +429,7 @@ class TestCertificateInfoParsing:
         """Test getting info when certificate parsing fails."""
         mock_load_cert.side_effect = Exception("Invalid certificate")
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             cert_path = os.path.join(tmpdir, "cert.pem")
             with open(cert_path, "w") as f:
                 f.write("-----BEGIN CERTIFICATE-----\ninvalid\n-----END CERTIFICATE-----")

@@ -79,7 +79,7 @@ class TestACMEManagerDirectories:
 
     def test_ensure_directories_creates_paths(self):
         """Test that directories are created."""
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             onecom_api = Mock()
 
             manager = ACMEManager(
@@ -120,7 +120,7 @@ class TestACMEManagerCertificateExpiry:
         """Test expiry check when no certificate exists."""
         onecom_api = Mock()
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             manager = ACMEManager(
                 email="test@example.com",
                 onecom_api=onecom_api,
@@ -134,7 +134,7 @@ class TestACMEManagerCertificateExpiry:
         """Test renewal check when no certificate exists."""
         onecom_api = Mock()
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             manager = ACMEManager(
                 email="test@example.com",
                 onecom_api=onecom_api,
@@ -151,7 +151,7 @@ class TestACMEManagerCertificateSaving:
         """Test saving certificate and key."""
         onecom_api = Mock()
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             cert_path = f"{tmpdir}/cert.pem"
             key_path = f"{tmpdir}/key.pem"
             account_key_path = f"{tmpdir}/account.key"

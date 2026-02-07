@@ -200,7 +200,7 @@ class TestIPChangeDetection:
         """Test that IP is persisted between checks."""
         import tempfile
         
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             last_ip_file = os.path.join(tmpdir, 'last_ip.txt')
             
             # Simulate saving IP

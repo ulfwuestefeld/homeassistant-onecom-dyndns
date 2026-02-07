@@ -964,7 +964,7 @@ class TestAddonLastIPUpdateSensor:
         """Test that check_and_update writes state file on IP change."""
         from run import DynDNSUpdater
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             state_file = os.path.join(tmpdir, "state.json")
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")), \
                  patch("run.ADDON_STATE_FILE", state_file):
@@ -1000,7 +1000,7 @@ class TestAddonLastIPUpdateSensor:
         """Test that no sensor update happens if IP is unchanged."""
         from run import DynDNSUpdater
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 mock_response = Mock()
                 mock_response.text = "1.2.3.4"
@@ -1073,7 +1073,7 @@ class TestAddonLastCertificateRenewalSensor:
         """Test that a renewal event writes the state file."""
         from run import DynDNSUpdater
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             state_file = os.path.join(tmpdir, "state.json")
             with patch("run.send_ha_notification"), \
                  patch("run.update_ha_sensor"), \

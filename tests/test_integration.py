@@ -92,7 +92,7 @@ class TestOneComAPIAndDynDNSIntegration:
         mock_session.patch.return_value = mock_update_response
         mock_session_class.return_value = mock_session
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(mock_options)
                 
@@ -188,7 +188,7 @@ class TestSensorUpdatesIntegration:
         mock_ha_response.raise_for_status = Mock()
         mock_post.return_value = mock_ha_response
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             state_file = os.path.join(tmpdir, "state.json")
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")), \
                  patch("run.ADDON_STATE_FILE", state_file):
@@ -244,7 +244,7 @@ class TestConfigurationFlowIntegration:
         """Test configuration flows from options file to updater."""
         from run import load_options, DynDNSUpdater
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             options_file = os.path.join(tmpdir, "options.json")
             test_options = {
                 "username": "config@example.com",
@@ -304,7 +304,7 @@ class TestErrorPropagationIntegration:
         mock_api.login.side_effect = OneComAPIError("Authentication failed")
         mock_api_class.return_value = mock_api
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(mock_options)
                 

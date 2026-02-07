@@ -301,7 +301,7 @@ class TestConcurrentOperations:
             "ssl_enabled": False,
         }
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(options)
 
@@ -384,7 +384,7 @@ class TestFileSystemEdgeCases:
         """Test behavior when last IP file directory doesn't exist."""
         from run import DynDNSUpdater
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             # Non-existent subdirectory
             nonexistent_path = os.path.join(tmpdir, "nonexistent", "subdir", "last_ip.txt")
 
@@ -410,7 +410,7 @@ class TestFileSystemEdgeCases:
         """Test handling of permission errors when reading certificate."""
         from certificate_manager import CertificateManager
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             cert_path = os.path.join(tmpdir, "cert.pem")
             
             # Create file

@@ -49,7 +49,7 @@ class TestCredentialHandling:
         """Test that password in options is handled securely."""
         from run import load_options
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             options_file = os.path.join(tmpdir, "options.json")
             with open(options_file, "w") as f:
                 json.dump({
@@ -209,7 +209,7 @@ class TestFilePermissions:
 
         from acme_manager import ACMEManager
 
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             cert_path = os.path.join(tmpdir, "ssl", "cert.pem")
             key_path = os.path.join(tmpdir, "ssl", "key.pem")
             account_key_path = os.path.join(tmpdir, "data", "account.key")
@@ -238,7 +238,7 @@ class TestFilePermissions:
         """Test that status files don't contain sensitive data."""
         import certificate_manager as cm
         
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             status_file = os.path.join(tmpdir, "status.json")
             cert_path = os.path.join(tmpdir, "cert.pem")
             key_path = os.path.join(tmpdir, "key.pem")
