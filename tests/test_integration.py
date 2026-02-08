@@ -41,10 +41,9 @@ class TestOneComAPIAndDynDNSIntegration:
             "ssl_enabled": False,
         }
 
-    @patch("run.requests.get")
     @patch("onecom_api.requests.Session")
     @patch("run.update_ha_sensor")
-    def test_full_dns_update_integration(self, mock_sensor, mock_session_class, mock_ip_get, mock_options):
+    def test_full_dns_update_integration(self, mock_sensor, mock_session_class, mock_options):
         """Test full flow from IP detection to DNS update."""
         from run import DynDNSUpdater
         from onecom_api import OneComAPI
@@ -53,7 +52,6 @@ class TestOneComAPIAndDynDNSIntegration:
         mock_ip_response = Mock()
         mock_ip_response.text = "1.2.3.4"
         mock_ip_response.raise_for_status = Mock()
-        mock_ip_get.return_value = mock_ip_response
 
         # Mock One.com session
         mock_session = Mock()
@@ -95,12 +93,13 @@ class TestOneComAPIAndDynDNSIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(mock_options)
+                updater._http_session.get = Mock(return_value=mock_ip_response)
                 
                 # This should detect IP and update DNS
                 updater.check_and_update()
 
                 # Verify IP was detected
-                assert mock_ip_get.called
+                assert updater._http_session.get.called
 
 
 class TestCertificateManagerAndOneComAPIIntegration:
@@ -172,8 +171,7 @@ class TestSensorUpdatesIntegration:
 
     @patch("run.SUPERVISOR_TOKEN", "test-token")
     @patch("run.requests.post")
-    @patch("run.requests.get")
-    def test_all_sensors_updated_on_ip_change(self, mock_get, mock_post, mock_options):
+    def test_all_sensors_updated_on_ip_change(self, mock_post, mock_options):
         """Test that state file is written when IP changes."""
         from run import DynDNSUpdater
 
@@ -181,7 +179,6 @@ class TestSensorUpdatesIntegration:
         mock_ip_response = Mock()
         mock_ip_response.text = "1.2.3.4"
         mock_ip_response.raise_for_status = Mock()
-        mock_get.return_value = mock_ip_response
 
         # Mock HA API
         mock_ha_response = Mock()
@@ -200,6 +197,7 @@ class TestSensorUpdatesIntegration:
                     mock_api_class.return_value = mock_api
 
                     updater = DynDNSUpdater(mock_options)
+                    updater._http_session.get = Mock(return_value=mock_ip_response)
                     updater.check_and_update()
 
                     # Verify state file was written with correct data
@@ -287,10 +285,9 @@ class TestErrorPropagationIntegration:
             "ssl_enabled": False,
         }
 
-    @patch("run.requests.get")
     @patch("run.OneComAPI")
     @patch("run.update_ha_sensor")
-    def test_api_error_does_not_crash_updater(self, mock_sensor, mock_api_class, mock_get, mock_options):
+    def test_api_error_does_not_crash_updater(self, mock_sensor, mock_api_class, mock_options):
         """Test that API errors don't crash the updater."""
         from run import DynDNSUpdater
         from onecom_api import OneComAPIError
@@ -298,7 +295,6 @@ class TestErrorPropagationIntegration:
         mock_ip_response = Mock()
         mock_ip_response.text = "1.2.3.4"
         mock_ip_response.raise_for_status = Mock()
-        mock_get.return_value = mock_ip_response
 
         mock_api = Mock()
         mock_api.login.side_effect = OneComAPIError("Authentication failed")
@@ -307,6 +303,7 @@ class TestErrorPropagationIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(mock_options)
+                updater._http_session.get = Mock(return_value=mock_ip_response)
                 
                 # Should not raise - error should be handled gracefully
                 updater.check_and_update()

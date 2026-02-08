@@ -8,8 +8,8 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import (
     BooleanSelector,
     NumberSelector,
@@ -52,6 +52,7 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for One.com DynDNS."""
 
     VERSION = 1
+    MINOR_VERSION = 1
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -60,8 +61,8 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._subdomains: list[str] = []
 
     async def async_step_hassio(
-        self, discovery_info: dict[str, Any]
-    ) -> FlowResult:
+        self, discovery_info: dict[str, Any],
+    ) -> ConfigFlowResult:
         """Handle Supervisor add-on discovery.
 
         Called automatically when the add-on publishes its discovery
@@ -84,7 +85,7 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "addon", "homeassistant-onecom-dyndns"
         )
 
-        # Auto-create the entry – no user confirmation required because
+        # Auto-create the entry -- no user confirmation required because
         # all configuration is already provided by the add-on.
         return self.async_create_entry(
             title=f"One.com DynDNS Updater - {domain}",
@@ -92,8 +93,8 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Handle the initial step - credentials."""
         errors: dict[str, str] = {}
 
@@ -118,7 +119,7 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors["base"] = "invalid_auth"
             if "Invalid credentials" in result.get("error", ""):
                 errors["base"] = "invalid_auth"
-            elif "connect" in result.get("error", "").lower():
+            elif "connect" in str(result.get("error", "")).lower():
                 errors["base"] = "cannot_connect"
 
         return self.async_show_form(
@@ -138,8 +139,8 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_domain(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Handle domain selection step."""
         errors: dict[str, str] = {}
 
@@ -181,8 +182,8 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_domain_manual(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Handle manual domain input step."""
         errors: dict[str, str] = {}
 
@@ -216,8 +217,8 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_subdomains(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Handle subdomain selection step."""
         errors: dict[str, str] = {}
 
@@ -255,8 +256,8 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_options(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Handle general options step."""
         errors: dict[str, str] = {}
 
@@ -275,7 +276,7 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         ip_service_options = [
             {"value": key, "label": key.capitalize()}
-            for key in IP_SERVICES.keys()
+            for key in IP_SERVICES
         ]
 
         return self.async_show_form(
@@ -308,8 +309,8 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_ssl(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Handle SSL configuration step."""
         errors: dict[str, str] = {}
 
@@ -390,38 +391,142 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             },
         )
 
+    # ------------------------------------------------------------------
+    # Reauth flow
+    # ------------------------------------------------------------------
+
+    async def async_step_reauth(
+        self, entry_data: dict[str, Any],
+    ) -> ConfigFlowResult:
+        """Handle reauth triggered by ConfigEntryAuthFailed."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
+        """Handle reauth credential input."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            reauth_entry = self._get_reauth_entry()
+            result = await async_validate_credentials(
+                user_input[CONF_USERNAME],
+                user_input[CONF_PASSWORD],
+                reauth_entry.data.get(CONF_DOMAIN),
+            )
+
+            if result["valid"]:
+                new_data = {**reauth_entry.data, **user_input}
+                self.hass.config_entries.async_update_entry(
+                    reauth_entry, data=new_data,
+                )
+                await self.hass.config_entries.async_reload(reauth_entry.entry_id)
+                return self.async_abort(reason="reauth_successful")
+
+            errors["base"] = "invalid_auth"
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema({
+                vol.Required(CONF_USERNAME): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.EMAIL)
+                ),
+                vol.Required(CONF_PASSWORD): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                ),
+            }),
+            errors=errors,
+        )
+
+    # ------------------------------------------------------------------
+    # Reconfigure flow
+    # ------------------------------------------------------------------
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
+        """Handle reconfiguration of domain/subdomains."""
+        errors: dict[str, str] = {}
+        reconfigure_entry = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            new_domain = user_input[CONF_DOMAIN]
+
+            # Fetch subdomains for the new domain
+            result = await async_validate_credentials(
+                reconfigure_entry.data[CONF_USERNAME],
+                reconfigure_entry.data[CONF_PASSWORD],
+                new_domain,
+            )
+
+            if not result["valid"]:
+                errors["base"] = "cannot_connect"
+            else:
+                new_subdomains = user_input.get(CONF_SUBDOMAINS, [""])
+                new_data = {
+                    **reconfigure_entry.data,
+                    CONF_DOMAIN: new_domain,
+                    CONF_SUBDOMAINS: new_subdomains,
+                }
+                self.hass.config_entries.async_update_entry(
+                    reconfigure_entry,
+                    data=new_data,
+                    title=f"One.com DynDNS Updater - {new_domain}",
+                )
+                await self.hass.config_entries.async_reload(
+                    reconfigure_entry.entry_id
+                )
+                return self.async_abort(reason="reconfigure_successful")
+
+        current_domain = reconfigure_entry.data.get(CONF_DOMAIN, "")
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema({
+                vol.Required(CONF_DOMAIN, default=current_domain): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.TEXT)
+                ),
+                vol.Required(
+                    CONF_SUBDOMAINS,
+                    default=reconfigure_entry.data.get(CONF_SUBDOMAINS, [""]),
+                ): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.TEXT, multiple=True)
+                ),
+            }),
+            errors=errors,
+        )
+
+    # ------------------------------------------------------------------
+    # Options flow
+    # ------------------------------------------------------------------
+
     @staticmethod
     @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
     ) -> OptionsFlowHandler:
         """Get the options flow for this handler."""
-        return OptionsFlowHandler(config_entry)
+        return OptionsFlowHandler()
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for One.com DynDNS."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
-
     async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Manage the options."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Update the config entry
             return self.async_create_entry(title="", data=user_input)
 
-        # Get current values
-        current = self.config_entry.data
+        # Get current values -- merge options over data for defaults
+        current = {**self.config_entry.data, **self.config_entry.options}
 
         ip_service_options = [
             {"value": key, "label": key.capitalize()}
-            for key in IP_SERVICES.keys()
+            for key in IP_SERVICES
         ]
 
         return self.async_show_form(

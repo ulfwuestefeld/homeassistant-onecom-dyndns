@@ -72,6 +72,26 @@
           "ssl_renewal_days": "Zertifikat so viele Tage vor Ablauf erneuern",
           "ssl_check_interval": "Wie oft prüfen, ob eine Zertifikatserneuerung erforderlich ist (in Stunden)"
         }
+      },
+      "reauth_confirm": {
+        "title": "One.com erneut authentifizieren",
+        "description": "Ihre One.com Zugangsdaten sind nicht mehr gültig. Bitte geben Sie Ihre aktualisierten Zugangsdaten ein.",
+        "data": {
+          "username": "E-Mail-Adresse",
+          "password": "Passwort"
+        }
+      },
+      "reconfigure": {
+        "title": "One.com DynDNS neu konfigurieren",
+        "description": "Aktualisieren Sie die Domain- und Subdomain-Einstellungen für diesen Integrationseintrag.",
+        "data": {
+          "domain": "Domain",
+          "subdomains": "Subdomains"
+        },
+        "data_description": {
+          "domain": "Die Domain, für die DNS-Einträge verwaltet werden sollen",
+          "subdomains": "Wählen Sie die Subdomains, deren IP-Adresse aktualisiert werden soll"
+        }
       }
     },
     "error": {
@@ -81,7 +101,10 @@
       "ssl_email_required": "E-Mail ist für SSL-Zertifikate erforderlich"
     },
     "abort": {
-      "already_configured": "Diese Domain ist bereits konfiguriert"
+      "already_configured": "Diese Domain ist bereits konfiguriert",
+      "no_domain": "Keine Domain in den Add-on-Erkennungsdaten gefunden",
+      "reauth_successful": "Erneute Authentifizierung war erfolgreich",
+      "reconfigure_successful": "Neukonfiguration war erfolgreich"
     }
   },
   "options": {
@@ -96,6 +119,14 @@
           "ssl_email": "SSL E-Mail",
           "ssl_staging": "Staging-Server verwenden",
           "ssl_renewal_days": "Erneuerungstage"
+        },
+        "data_description": {
+          "update_interval": "Wie oft nach IP-Adressänderungen geprüft werden soll (in Minuten)",
+          "ip_service": "Dienst zur Erkennung Ihrer öffentlichen IP-Adresse",
+          "ssl_enabled": "Automatisch SSL-Zertifikate über Let's Encrypt beziehen und erneuern",
+          "ssl_email": "E-Mail-Adresse für Let's Encrypt Kontobenachrichtigungen",
+          "ssl_staging": "Let's Encrypt Staging-Server für Tests verwenden",
+          "ssl_renewal_days": "Zertifikat so viele Tage vor Ablauf erneuern"
         }
       }
     }
@@ -126,7 +157,7 @@
         "name": "Letzte IP-Aktualisierung"
       },
       "certificate_expiry": {
-        "name": "Zertifikat Ablauf"
+        "name": "Zertifikatsablauf"
       },
       "last_certificate_renewal": {
         "name": "Letzte Zertifikatserneuerung"

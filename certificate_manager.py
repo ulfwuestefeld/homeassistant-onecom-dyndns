@@ -88,17 +88,30 @@ class CertificateManager:
         self._last_check: Optional[datetime] = None
         self._last_renewal: Optional[datetime] = None
         self._callbacks: List[Callable[[str, Dict[str, Any]], None]] = []
+        self._directories_created = False
+
+        # Certificate info cache: avoids re-reading and parsing the PEM
+        # file on every state-write cycle.  Invalidated when a new
+        # certificate is saved.
+        self._cached_cert_info: Optional[Dict[str, Any]] = None
 
         _LOGGER.info("Certificate Manager initialized for %s", domain)
         _LOGGER.info("SSL domains: %s", ', '.join(self.ssl_domains))
         _LOGGER.info("Staging mode: %s", staging)
 
     def _ensure_directories(self):
-        """Ensure all necessary directories exist."""
+        """Ensure all necessary directories exist.
+
+        Only performs the filesystem check once; subsequent calls return
+        immediately.
+        """
+        if self._directories_created:
+            return
         for path in [self.cert_path, self.key_path, self.status_file]:
             directory = os.path.dirname(path)
             if directory:
                 os.makedirs(directory, exist_ok=True)
+        self._directories_created = True
 
     def add_callback(self, callback: Callable[[str, Dict[str, Any]], None]):
         """Add a callback for certificate events.
@@ -124,11 +137,20 @@ class CertificateManager:
     def get_certificate_info(self) -> Optional[Dict[str, Any]]:
         """Get information about the current certificate.
 
+        Returns a cached result if the certificate has not changed since the
+        last call.  The cache is invalidated when ``request_certificate``
+        writes a new PEM file or when the certificate file no longer exists
+        on disk (e.g. deleted by an external process).
+
         Returns:
             Dictionary with certificate info or None if no certificate.
         """
         if not os.path.exists(self.cert_path):
+            self._cached_cert_info = None
             return None
+
+        if self._cached_cert_info is not None:
+            return self._cached_cert_info
 
         try:
             with open(self.cert_path, "rb") as f:
@@ -163,7 +185,7 @@ class CertificateManager:
 
             days_remaining = (expiry - now).days
 
-            return {
+            info = {
                 "subject": subject,
                 "issuer": {attr.oid._name: attr.value for attr in cert.issuer},
                 "domains": domains,
@@ -173,6 +195,8 @@ class CertificateManager:
                 "serial_number": str(cert.serial_number),
                 "needs_renewal": days_remaining <= self.renewal_days,
             }
+            self._cached_cert_info = info
+            return info
 
         except Exception as e:
             _LOGGER.error("Failed to read certificate info: %s", e)
@@ -254,6 +278,10 @@ class CertificateManager:
             # Obtain certificate
             if acme.obtain_and_save_certificate(self.ssl_domains):
                 self._last_renewal = datetime.now()
+
+                # Invalidate cached cert info so the next read picks up the
+                # freshly saved certificate.
+                self._cached_cert_info = None
 
                 # Save status
                 cert_info = self.get_certificate_info()
@@ -367,6 +395,9 @@ class CertificateManager:
             _LOGGER.warning("Certificate manager already running")
             return
 
+        # Clear the stop event so a previously stopped manager can be
+        # restarted without the renewal loop exiting immediately.
+        self._stop_event.clear()
         self._running = True
         self._thread = threading.Thread(target=self._renewal_loop, daemon=True)
         self._thread.start()

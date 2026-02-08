@@ -30,6 +30,11 @@ class OneComAPI:
     ADMIN_URL = f"{BASE_URL}/admin"
     LOGIN_URL = f"{BASE_URL}/admin/login.do"
 
+    # Default timeout in seconds for all HTTP requests to One.com.
+    # Prevents the add-on from hanging indefinitely if One.com becomes
+    # unresponsive (returns headers but stalls on the body).
+    REQUEST_TIMEOUT = 30
+
     def __init__(self, username: str, password: str, domain: str):
         """Initialize the One.com API client.
 
@@ -86,7 +91,7 @@ class OneComAPI:
 
         try:
             # Get the login page to find the form action URL
-            response = self.session.get(self.ADMIN_URL, allow_redirects=True)
+            response = self.session.get(self.ADMIN_URL, allow_redirects=True, timeout=self.REQUEST_TIMEOUT)
             response.raise_for_status()
         except requests.RequestException as e:
             raise OneComAPIError(f"Failed to connect to One.com: {e}")
@@ -157,7 +162,8 @@ class OneComAPI:
                 login_url,
                 data=login_data,
                 headers=post_headers,
-                allow_redirects=True
+                allow_redirects=True,
+                timeout=self.REQUEST_TIMEOUT,
             )
             response.raise_for_status()
         except requests.RequestException as e:
@@ -227,7 +233,7 @@ class OneComAPI:
         # Try to access the admin panel to verify login
         _LOGGER.debug("Login status uncertain, verifying by accessing admin panel...")
         try:
-            verify_response = self.session.get(f"{self.ADMIN_URL}/", allow_redirects=True)
+            verify_response = self.session.get(f"{self.ADMIN_URL}/", allow_redirects=True, timeout=self.REQUEST_TIMEOUT)
             if "/admin" in verify_response.url and "account.one.com" not in verify_response.url:
                 _LOGGER.info("Successfully logged into One.com (verified)")
                 self._logged_in = True
@@ -251,7 +257,7 @@ class OneComAPI:
         dns_url = f"{self.ADMIN_URL}/api/domains/{self.domain}/dns/custom_records"
 
         try:
-            response = self.session.get(dns_url)
+            response = self.session.get(dns_url, timeout=self.REQUEST_TIMEOUT)
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
@@ -347,7 +353,8 @@ class OneComAPI:
             response = self.session.patch(
                 update_url,
                 json=update_data,
-                headers=headers
+                headers=headers,
+                timeout=self.REQUEST_TIMEOUT,
             )
             response.raise_for_status()
             _LOGGER.info("Successfully updated '%s.%s' to %s", subdomain or '@', self.domain, ip_address)
@@ -440,7 +447,8 @@ class OneComAPI:
 
         try:
             response = self.session.patch(
-                update_url, json=update_data, headers=headers
+                update_url, json=update_data, headers=headers,
+                timeout=self.REQUEST_TIMEOUT,
             )
             response.raise_for_status()
             _LOGGER.info(
@@ -504,7 +512,8 @@ class OneComAPI:
             response = self.session.post(
                 create_url,
                 json=create_data,
-                headers=headers
+                headers=headers,
+                timeout=self.REQUEST_TIMEOUT,
             )
 
             # Log response details for debugging
@@ -536,7 +545,8 @@ class OneComAPI:
                             response = self.session.post(
                                 create_url,
                                 json=create_data,
-                                headers=headers
+                                headers=headers,
+                                timeout=self.REQUEST_TIMEOUT,
                             )
                             _LOGGER.debug("Retry create TXT record response: %s", response.status_code)
                         except OneComAPIError as e:
@@ -580,7 +590,7 @@ class OneComAPI:
         }
 
         try:
-            response = self.session.delete(delete_url, headers=headers)
+            response = self.session.delete(delete_url, headers=headers, timeout=self.REQUEST_TIMEOUT)
             response.raise_for_status()
             _LOGGER.info("Successfully deleted DNS record '%s'", record_id)
             return True
@@ -701,9 +711,12 @@ class OneComAPI:
 
         while time.time() - start_time < timeout:
             try:
-                # Use DNS over HTTPS for reliable checking
+                # Use DNS over HTTPS for reliable checking.
+                # Reuse the authenticated session for connection pooling
+                # (avoids a new TLS handshake on every propagation check).
                 dns_check_url = f"https://dns.google/resolve?name={full_domain}&type=TXT"
-                response = requests.get(dns_check_url, timeout=10)
+                http_session = self.session or requests
+                response = http_session.get(dns_check_url, timeout=10)
 
                 if response.status_code == 200:
                     data = response.json()

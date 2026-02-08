@@ -28,13 +28,10 @@ sys.modules['josepy'] = MagicMock()
 class TestNetworkErrors:
     """Tests for network error handling."""
 
-    @patch("run.requests.get")
-    def test_connection_error_handled(self, mock_get):
+    def test_connection_error_handled(self):
         """Test that connection errors are handled gracefully."""
         from run import DynDNSUpdater
 
-        mock_get.side_effect = requests.exceptions.ConnectionError("Network unreachable")
-
         options = {
             "username": "test@example.com",
             "password": "test",
@@ -46,17 +43,17 @@ class TestNetworkErrors:
         }
 
         updater = DynDNSUpdater(options)
+        updater._http_session.get = Mock(
+            side_effect=requests.exceptions.ConnectionError("Network unreachable")
+        )
         ip = updater.get_public_ip()
 
         assert ip is None
 
-    @patch("run.requests.get")
-    def test_timeout_error_handled(self, mock_get):
+    def test_timeout_error_handled(self):
         """Test that timeout errors are handled gracefully."""
         from run import DynDNSUpdater
 
-        mock_get.side_effect = requests.exceptions.Timeout("Request timed out")
-
         options = {
             "username": "test@example.com",
             "password": "test",
@@ -68,16 +65,16 @@ class TestNetworkErrors:
         }
 
         updater = DynDNSUpdater(options)
+        updater._http_session.get = Mock(
+            side_effect=requests.exceptions.Timeout("Request timed out")
+        )
         ip = updater.get_public_ip()
 
         assert ip is None
 
-    @patch("run.requests.get")
-    def test_ssl_error_handled(self, mock_get):
+    def test_ssl_error_handled(self):
         """Test that SSL errors are handled gracefully."""
         from run import DynDNSUpdater
-
-        mock_get.side_effect = requests.exceptions.SSLError("SSL certificate verify failed")
 
         options = {
             "username": "test@example.com",
@@ -90,6 +87,9 @@ class TestNetworkErrors:
         }
 
         updater = DynDNSUpdater(options)
+        updater._http_session.get = Mock(
+            side_effect=requests.exceptions.SSLError("SSL certificate verify failed")
+        )
         ip = updater.get_public_ip()
 
         assert ip is None
@@ -302,13 +302,10 @@ class TestHAIntegrationErrors:
 class TestGracefulDegradation:
     """Tests for graceful degradation scenarios."""
 
-    @patch("run.requests.get")
     @patch("run.update_ha_sensor")
-    def test_continues_after_ip_service_failure(self, mock_sensor, mock_get):
+    def test_continues_after_ip_service_failure(self, mock_sensor):
         """Test that updater continues after IP service failure."""
         from run import DynDNSUpdater
-
-        mock_get.side_effect = requests.exceptions.ConnectionError("Service down")
 
         options = {
             "username": "test@example.com",
@@ -323,6 +320,9 @@ class TestGracefulDegradation:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(options)
+                updater._http_session.get = Mock(
+                    side_effect=requests.exceptions.ConnectionError("Service down")
+                )
                 
                 # Should not raise - just log and continue
                 updater.check_and_update()
@@ -333,18 +333,11 @@ class TestGracefulDegradation:
 class TestRecoveryScenarios:
     """Tests for recovery from errors."""
 
-    @patch("run.requests.get")
     @patch("run.OneComAPI")
     @patch("run.update_ha_sensor")
-    def test_recovery_after_dns_failure(self, mock_sensor, mock_api_class, mock_get):
+    def test_recovery_after_dns_failure(self, mock_sensor, mock_api_class):
         """Test recovery after DNS update failure."""
         from run import DynDNSUpdater
-
-        # IP service works
-        mock_response = Mock()
-        mock_response.text = "1.2.3.4"
-        mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         # First API call fails, second succeeds
         mock_api = Mock()

@@ -43,10 +43,9 @@ class TestE2EDynDNSFlow:
             "ssl_enabled": False,
         }
 
-    @patch("run.requests.get")
     @patch("run.OneComAPI")
     @patch("run.update_ha_sensor")
-    def test_full_dyndns_update_flow(self, mock_sensor, mock_api_class, mock_get, mock_options):
+    def test_full_dyndns_update_flow(self, mock_sensor, mock_api_class, mock_options):
         """Test complete DynDNS update flow when IP changes."""
         from run import DynDNSUpdater
 
@@ -54,7 +53,6 @@ class TestE2EDynDNSFlow:
         mock_response = Mock()
         mock_response.text = "1.2.3.4"
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         mock_api = Mock()
         mock_api.update_all_subdomains.return_value = {
@@ -69,12 +67,13 @@ class TestE2EDynDNSFlow:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")), \
                  patch("run.ADDON_STATE_FILE", os.path.join(tmpdir, "state.json")):
                 updater = DynDNSUpdater(mock_options)
+                updater._http_session.get = Mock(return_value=mock_response)
                 
                 # Run check and update
                 updater.check_and_update()
 
                 # Verify IP was detected
-                mock_get.assert_called()
+                updater._http_session.get.assert_called()
                 
                 # Verify DNS was updated
                 mock_api.login.assert_called_once()
@@ -92,17 +91,15 @@ class TestE2EDynDNSFlow:
                 assert state["current_ip"] == "1.2.3.4"
                 assert state["dns_status"] == "ok"
 
-    @patch("run.requests.get")
     @patch("run.OneComAPI")
     @patch("run.update_ha_sensor")
-    def test_no_update_when_ip_unchanged(self, mock_sensor, mock_api_class, mock_get, mock_options):
+    def test_no_update_when_ip_unchanged(self, mock_sensor, mock_api_class, mock_options):
         """Test that DNS is not updated when IP hasn't changed."""
         from run import DynDNSUpdater
 
         mock_response = Mock()
         mock_response.text = "1.2.3.4"
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a file with existing IP
@@ -112,22 +109,21 @@ class TestE2EDynDNSFlow:
 
             with patch("run.LAST_IP_FILE", last_ip_file):
                 updater = DynDNSUpdater(mock_options)
+                updater._http_session.get = Mock(return_value=mock_response)
                 updater.check_and_update()
 
                 # DNS API should NOT be called
                 mock_api_class.assert_not_called()
 
-    @patch("run.requests.get")
     @patch("run.OneComAPI")
     @patch("run.update_ha_sensor")
-    def test_ip_change_detection(self, mock_sensor, mock_api_class, mock_get, mock_options):
+    def test_ip_change_detection(self, mock_sensor, mock_api_class, mock_options):
         """Test IP change detection and update."""
         from run import DynDNSUpdater
 
         mock_response = Mock()
         mock_response.text = "5.6.7.8"  # New IP
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         mock_api = Mock()
         mock_api.update_all_subdomains.return_value = {
@@ -145,6 +141,7 @@ class TestE2EDynDNSFlow:
 
             with patch("run.LAST_IP_FILE", last_ip_file):
                 updater = DynDNSUpdater(mock_options)
+                updater._http_session.get = Mock(return_value=mock_response)
                 updater.check_and_update()
 
                 # DNS should be updated with new IP
@@ -182,16 +179,10 @@ class TestE2ESSLCertificateFlow:
         }
 
     @patch("run.CertificateManager")
-    @patch("run.requests.get")
     @patch("run.update_ha_sensor")
-    def test_ssl_manager_initialization(self, mock_sensor, mock_get, mock_cert_manager, ssl_options):
+    def test_ssl_manager_initialization(self, mock_sensor, mock_cert_manager, ssl_options):
         """Test SSL certificate manager is initialized correctly."""
         from run import DynDNSUpdater
-
-        mock_response = Mock()
-        mock_response.text = "1.2.3.4"
-        mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         mock_cert = Mock()
         mock_cert.get_certificate_info.return_value = {
@@ -218,17 +209,11 @@ class TestE2ESSLCertificateFlow:
                 mock_cert.start.assert_called_once()
 
     @patch("run.CertificateManager")
-    @patch("run.requests.get")
     @patch("run.update_ha_sensor")
     @patch("run.send_ha_notification")
-    def test_ssl_force_renewal(self, mock_notify, mock_sensor, mock_get, mock_cert_manager, ssl_options):
+    def test_ssl_force_renewal(self, mock_notify, mock_sensor, mock_cert_manager, ssl_options):
         """Test forced SSL certificate renewal."""
         from run import DynDNSUpdater
-
-        mock_response = Mock()
-        mock_response.text = "1.2.3.4"
-        mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         mock_cert = Mock()
         mock_cert.request_certificate.return_value = True
@@ -266,22 +251,21 @@ class TestE2EErrorRecovery:
             "ssl_enabled": False,
         }
 
-    @patch("run.requests.get")
     @patch("run.update_ha_sensor")
-    def test_recovery_from_ip_service_failure(self, mock_sensor, mock_get, mock_options):
+    def test_recovery_from_ip_service_failure(self, mock_sensor, mock_options):
         """Test recovery when IP service fails then succeeds."""
         from run import DynDNSUpdater
         import requests
 
-        # First call fails, second succeeds
-        mock_get.side_effect = [
-            requests.RequestException("Service unavailable"),
-            Mock(text="1.2.3.4", raise_for_status=Mock()),
-        ]
-
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(mock_options)
+
+                # First call fails, second succeeds
+                updater._http_session.get = Mock(side_effect=[
+                    requests.RequestException("Service unavailable"),
+                    Mock(text="1.2.3.4", raise_for_status=Mock()),
+                ])
                 
                 # First check - should fail gracefully
                 updater.check_and_update()
@@ -290,10 +274,9 @@ class TestE2EErrorRecovery:
                 ip = updater.get_public_ip()
                 assert ip == "1.2.3.4"
 
-    @patch("run.requests.get")
     @patch("run.OneComAPI")
     @patch("run.update_ha_sensor")
-    def test_recovery_from_dns_update_failure(self, mock_sensor, mock_api_class, mock_get, mock_options):
+    def test_recovery_from_dns_update_failure(self, mock_sensor, mock_api_class, mock_options):
         """Test behavior when DNS update fails."""
         from run import DynDNSUpdater
         from onecom_api import OneComAPIError
@@ -301,7 +284,6 @@ class TestE2EErrorRecovery:
         mock_response = Mock()
         mock_response.text = "1.2.3.4"
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         # API login fails
         mock_api = Mock()
@@ -313,24 +295,19 @@ class TestE2EErrorRecovery:
             
             with patch("run.LAST_IP_FILE", last_ip_file):
                 updater = DynDNSUpdater(mock_options)
+                updater._http_session.get = Mock(return_value=mock_response)
                 updater.check_and_update()
 
                 # IP should NOT be saved because DNS update failed
                 assert not os.path.exists(last_ip_file) or open(last_ip_file).read() != "1.2.3.4"
 
-    @patch("run.requests.get")
     @patch("run.OneComAPI")
     @patch("run.update_ha_sensor")
-    def test_partial_dns_update_failure(self, mock_sensor, mock_api_class, mock_get, mock_options):
+    def test_partial_dns_update_failure(self, mock_sensor, mock_api_class, mock_options):
         """Test behavior when some DNS updates fail."""
         from run import DynDNSUpdater
 
         mock_options["subdomains"] = ["www", "api", "fail"]
-
-        mock_response = Mock()
-        mock_response.text = "1.2.3.4"
-        mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         mock_api = Mock()
         mock_api.update_all_subdomains.return_value = {
@@ -366,20 +343,19 @@ class TestE2EGracefulShutdown:
             "ssl_enabled": False,
         }
 
-    @patch("run.requests.get")
     @patch("run.update_ha_sensor")
-    def test_graceful_stop(self, mock_sensor, mock_get, mock_options):
+    def test_graceful_stop(self, mock_sensor, mock_options):
         """Test graceful shutdown of updater."""
         from run import DynDNSUpdater
 
         mock_response = Mock()
         mock_response.text = "1.2.3.4"
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(mock_options)
+                updater._http_session.get = Mock(return_value=mock_response)
                 
                 # Start in a thread
                 def run_updater():
@@ -404,19 +380,13 @@ class TestE2EGracefulShutdown:
                 assert updater._running is False
 
     @patch("run.CertificateManager")
-    @patch("run.requests.get")
     @patch("run.update_ha_sensor")
-    def test_ssl_manager_stopped_on_shutdown(self, mock_sensor, mock_get, mock_cert_manager, mock_options):
+    def test_ssl_manager_stopped_on_shutdown(self, mock_sensor, mock_cert_manager, mock_options):
         """Test SSL manager is stopped on shutdown."""
         from run import DynDNSUpdater
 
         mock_options["ssl_enabled"] = True
         mock_options["ssl_email"] = "ssl@example.com"
-
-        mock_response = Mock()
-        mock_response.text = "1.2.3.4"
-        mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         mock_cert = Mock()
         mock_cert.get_certificate_info.return_value = None
@@ -437,10 +407,9 @@ class TestE2EGracefulShutdown:
 class TestE2EMultipleSubdomains:
     """End-to-end tests for multiple subdomain handling."""
 
-    @patch("run.requests.get")
     @patch("run.OneComAPI")
     @patch("run.update_ha_sensor")
-    def test_update_multiple_subdomains(self, mock_sensor, mock_api_class, mock_get):
+    def test_update_multiple_subdomains(self, mock_sensor, mock_api_class):
         """Test updating multiple subdomains in one flow."""
         from run import DynDNSUpdater
 
@@ -454,11 +423,6 @@ class TestE2EMultipleSubdomains:
             "log_level": "error",
             "ssl_enabled": False,
         }
-
-        mock_response = Mock()
-        mock_response.text = "1.2.3.4"
-        mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         mock_api = Mock()
         mock_api.update_all_subdomains.return_value = {

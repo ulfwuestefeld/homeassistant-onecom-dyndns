@@ -31,6 +31,10 @@ A Home Assistant add-on that automatically updates DNS A records at One.com when
 - Full Home Assistant UI configuration
 - German and English translations
 - Also available as **Custom Integration** with Config Flow
+- **Reauthentication flow** when credentials expire
+- **Reconfigure flow** to change domain/subdomains without removing the entry
+- **Diagnostics** support (download from HA UI, sensitive data redacted)
+- Minimum Home Assistant version: **2024.12.0**
 
 ## Installation
 
@@ -185,7 +189,14 @@ The add-on and custom integration communicate through shared files:
 ### Run Tests
 
 ```bash
-pip install pytest requests
+pip install -r requirements.txt
+pytest tests/ -v
+```
+
+To also run the Home Assistant integration tests (config flow, setup/unload):
+
+```bash
+pip install pytest-homeassistant-custom-component pytest-asyncio
 pytest tests/ -v
 ```
 
@@ -218,7 +229,7 @@ You can also install the integration standalone:
 3. Go to **Settings → Devices & Services → Add Integration**
 4. Search for "One.com DynDNS Updater"
 
-The integration provides sensors (Current IP, Last Update, Last IP Update, Certificate Expiry, Last Certificate Renewal, ACME Challenge), binary sensors (DNS Status, Certificate Valid), and button entities (Update DNS, Check IP, Renew Certificate). See [DOCS.md](DOCS.md) for details.
+The integration provides sensors (Current IP, Last Update, Last IP Update, Certificate Expiry, Last Certificate Renewal, ACME Challenge), binary sensors (DNS Status, Certificate Valid), and button entities (Update DNS, Check IP, Renew Certificate). It also supports reauthentication, reconfiguration, and diagnostics download. See [DOCS.md](DOCS.md) for details.
 
 ## Troubleshooting
 

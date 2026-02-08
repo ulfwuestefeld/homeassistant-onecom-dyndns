@@ -16,12 +16,6 @@ This Home Assistant add-on automatically updates DNS A records at One.com when y
 - Force renewal option for adding new domains
 - ACME challenge notifications in Home Assistant
 
-## Requirements
-
-- A One.com account with at least one domain
-- DNS A records must already exist (this add-on cannot create new records)
-- Two-Factor Authentication must be disabled on your One.com account
-
 ## Configuration
 
 ### Required Settings
@@ -284,6 +278,36 @@ Supported commands: `update_dns`, `check_ip`, `renew_certificate`.
 | **Update DNS** | Writes `update_dns` command → add-on executes | Calls `OneComAPI.update_record()` directly |
 | **Check IP** | Writes `check_ip` command → add-on executes | Polls IP service directly |
 | **Renew Certificate** | Writes `renew_certificate` command → add-on executes | Triggers `CertificateManager` directly |
+
+## Requirements
+
+- **Home Assistant 2024.12.0** or newer (required by the custom integration)
+- A One.com account with at least one domain
+- DNS A records must already exist (this add-on cannot create new records)
+- Two-Factor Authentication must be disabled on your One.com account
+
+## Reauthentication
+
+If your One.com credentials expire or become invalid, the integration will detect this and show a **Reauth required** notification in Settings > Devices & Services. Click the notification to re-enter your credentials without losing any entity history.
+
+## Reconfiguration
+
+You can change the domain and subdomain settings of an existing config entry without deleting and recreating it:
+
+1. Go to **Settings > Devices & Services > One.com DynDNS Updater**
+2. Click the three-dot menu > **Reconfigure**
+3. Choose a new domain and subdomains
+4. Click **Submit** — the integration reloads automatically
+
+## Diagnostics
+
+The integration supports Home Assistant's diagnostics feature:
+
+1. Go to **Settings > Devices & Services > One.com DynDNS Updater**
+2. Click the three-dot menu > **Download diagnostics**
+3. A JSON file is downloaded with all configuration and state data
+
+Sensitive fields (password, username, ssl_email, ssl_key, tokens) are **automatically redacted** before download.
 
 ## Home Assistant Sensors
 

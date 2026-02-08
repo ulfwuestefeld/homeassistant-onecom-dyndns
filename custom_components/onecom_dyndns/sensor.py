@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any, Final
 
@@ -12,24 +13,19 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator
 
 from .const import (
     DOMAIN,
     CONF_DOMAIN,
     CONF_ADDON_SLUG,
-    ATTR_CURRENT_IP,
-    ATTR_LAST_UPDATE,
-    ATTR_LAST_IP_UPDATE,
-    ATTR_LAST_CERTIFICATE_RENEWAL,
-    ATTR_CERTIFICATE_EXPIRY,
-    ATTR_CERTIFICATE_DOMAINS,
-    ATTR_DAYS_UNTIL_EXPIRY,
-    ATTR_ACME_CHALLENGE,
+    CONF_SSL_ENABLED,
     get_device_info,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 SENSOR_TYPES: Final[tuple[SensorEntityDescription, ...]] = (
     SensorEntityDescription(
@@ -72,6 +68,17 @@ SENSOR_TYPES: Final[tuple[SensorEntityDescription, ...]] = (
 )
 
 
+def _safe_parse_datetime(value: str | None) -> datetime | None:
+    """Safely parse an ISO datetime string, returning None on failure."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        _LOGGER.warning("Could not parse datetime value: %s", value)
+        return None
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -87,7 +94,7 @@ async def async_setup_entry(
     for description in SENSOR_TYPES:
         # Skip certificate-related sensors if SSL not enabled
         if description.key in ssl_only_sensors:
-            if not entry.data.get("ssl_enabled", False):
+            if not entry.data.get(CONF_SSL_ENABLED, False):
                 continue
 
         entities.append(OneComDynDNSSensor(coordinator, entry, description, domain))
@@ -102,7 +109,7 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator,
+        coordinator: DataUpdateCoordinator,
         entry: ConfigEntry,
         description: SensorEntityDescription,
         domain: str,
@@ -111,7 +118,6 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self.entity_description = description
         self._domain = domain
-        self._entry = entry
 
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_device_info = get_device_info(
@@ -121,7 +127,7 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> str | datetime | None:
         """Return the state of the sensor."""
         if self.coordinator.data is None:
             return None
@@ -132,28 +138,21 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
             return self.coordinator.data.get("current_ip")
 
         if key == "last_update":
-            last_update = self.coordinator.data.get("last_update")
-            if last_update:
-                return datetime.fromisoformat(last_update)
-            return None
+            return _safe_parse_datetime(self.coordinator.data.get("last_update"))
 
         if key == "last_ip_update":
-            last_ip_update = self.coordinator.data.get("last_ip_update")
-            if last_ip_update:
-                return datetime.fromisoformat(last_ip_update)
-            return None
+            return _safe_parse_datetime(self.coordinator.data.get("last_ip_update"))
 
         if key == "certificate_expiry":
             cert_info = self.coordinator.data.get("certificate_info")
-            if cert_info and cert_info.get("not_valid_after"):
-                return datetime.fromisoformat(cert_info["not_valid_after"])
+            if cert_info:
+                return _safe_parse_datetime(cert_info.get("not_valid_after"))
             return None
 
         if key == "last_certificate_renewal":
-            last_renewal = self.coordinator.data.get("last_certificate_renewal")
-            if last_renewal:
-                return datetime.fromisoformat(last_renewal)
-            return None
+            return _safe_parse_datetime(
+                self.coordinator.data.get("last_certificate_renewal")
+            )
 
         if key == "acme_challenge":
             acme = self.coordinator.data.get("acme_challenge")
@@ -170,7 +169,7 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
             return {}
 
         key = self.entity_description.key
-        attrs = {}
+        attrs: dict[str, Any] = {}
 
         if key == "current_ip":
             attrs["domain"] = self._domain
@@ -178,11 +177,11 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
             attrs["last_ip"] = self.coordinator.data.get("last_ip")
             attrs["ip_changed"] = self.coordinator.data.get("ip_changed", False)
 
-        if key == "last_ip_update":
+        elif key == "last_ip_update":
             attrs["domain"] = self._domain
             attrs["current_ip"] = self.coordinator.data.get("current_ip")
 
-        if key == "certificate_expiry":
+        elif key == "certificate_expiry":
             cert_info = self.coordinator.data.get("certificate_info")
             if cert_info:
                 attrs["domains"] = cert_info.get("domains", [])
@@ -190,13 +189,13 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
                 attrs["issuer"] = cert_info.get("issuer", {}).get("organizationName", "Unknown")
                 attrs["needs_renewal"] = cert_info.get("needs_renewal", False)
 
-        if key == "last_certificate_renewal":
+        elif key == "last_certificate_renewal":
             cert_info = self.coordinator.data.get("certificate_info")
             if cert_info:
                 attrs["domains"] = cert_info.get("domains", [])
                 attrs["certificate_expiry"] = cert_info.get("not_valid_after")
 
-        if key == "acme_challenge":
+        elif key == "acme_challenge":
             acme = self.coordinator.data.get("acme_challenge")
             if acme:
                 attrs["domain"] = acme.get("domain")
@@ -205,8 +204,3 @@ class OneComDynDNSSensor(CoordinatorEntity, SensorEntity):
                 attrs["timestamp"] = acme.get("timestamp")
 
         return attrs
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()

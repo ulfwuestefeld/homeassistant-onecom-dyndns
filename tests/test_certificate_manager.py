@@ -303,3 +303,177 @@ class TestCertificateManagerError:
         """Test exception inherits from Exception."""
         error = CertificateManagerError("Test")
         assert isinstance(error, Exception)
+
+
+class TestCertificateInfoCaching:
+    """Tests for certificate info caching in CertificateManager."""
+
+    def test_cached_cert_info_returned_on_second_call(self, tmp_path):
+        """Second call to get_certificate_info returns cached data."""
+        cert_path = tmp_path / "cert.pem"
+        key_path = tmp_path / "key.pem"
+        status_file = tmp_path / "status.json"
+
+        # Create a dummy cert file so the existence check passes
+        cert_path.write_bytes(b"placeholder")
+
+        manager = CertificateManager(
+            username="user@example.com",
+            password="password",
+            domain="example.com",
+            email="ssl@example.com",
+            cert_path=str(cert_path),
+            key_path=str(key_path),
+            status_file=str(status_file),
+        )
+
+        # Manually set cache (simulating a previous successful parse)
+        fake_info = {"days_remaining": 60, "needs_renewal": False}
+        manager._cached_cert_info = fake_info
+
+        # Call returns cached value without re-parsing the file
+        assert manager.get_certificate_info() is fake_info
+
+    def test_cache_invalidated_when_cert_file_deleted(self, tmp_path):
+        """Cache is cleared and None returned when the cert file is deleted."""
+        cert_path = tmp_path / "cert.pem"
+        key_path = tmp_path / "key.pem"
+        status_file = tmp_path / "status.json"
+
+        # Create a dummy cert file
+        cert_path.write_bytes(b"placeholder")
+
+        manager = CertificateManager(
+            username="user@example.com",
+            password="password",
+            domain="example.com",
+            email="ssl@example.com",
+            cert_path=str(cert_path),
+            key_path=str(key_path),
+            status_file=str(status_file),
+        )
+
+        # Simulate cached cert info from a previous call
+        manager._cached_cert_info = {"days_remaining": 60, "needs_renewal": False}
+
+        # Delete the certificate file (external cleanup)
+        cert_path.unlink()
+
+        # Should detect the missing file, clear cache, and return None
+        result = manager.get_certificate_info()
+        assert result is None
+        assert manager._cached_cert_info is None
+
+    def test_cache_invalidated_after_request_certificate(self, tmp_path):
+        """Cache should be None after successful certificate request."""
+        cert_path = tmp_path / "cert.pem"
+        key_path = tmp_path / "key.pem"
+        status_file = tmp_path / "status.json"
+
+        manager = CertificateManager(
+            username="user@example.com",
+            password="password",
+            domain="example.com",
+            email="ssl@example.com",
+            cert_path=str(cert_path),
+            key_path=str(key_path),
+            status_file=str(status_file),
+        )
+
+        # Set fake cache
+        manager._cached_cert_info = {"days_remaining": 60}
+
+        # Mock the certificate request flow
+        with patch("certificate_manager.OneComAPI") as mock_api, \
+             patch("certificate_manager.ACMEManager") as mock_acme:
+            mock_api_instance = Mock()
+            mock_api.return_value = mock_api_instance
+
+            mock_acme_instance = Mock()
+            mock_acme_instance.obtain_and_save_certificate.return_value = True
+            mock_acme.return_value = mock_acme_instance
+
+            manager.request_certificate(force=True)
+
+        # Cache should have been invalidated
+        assert manager._cached_cert_info is None
+
+
+class TestStartClearsStopEvent:
+    """Tests for CertificateManager.start() clearing _stop_event."""
+
+    def test_start_clears_stop_event(self, tmp_path):
+        """start() should clear _stop_event so renewal loop doesn't exit."""
+        manager = CertificateManager(
+            username="user@example.com",
+            password="password",
+            domain="example.com",
+            email="ssl@example.com",
+            cert_path=str(tmp_path / "cert.pem"),
+            key_path=str(tmp_path / "key.pem"),
+            status_file=str(tmp_path / "status.json"),
+        )
+
+        # Simulate stop() was called previously
+        manager._stop_event.set()
+        assert manager._stop_event.is_set()
+
+        # Now start() should clear the event
+        with patch.object(manager, '_renewal_loop'):
+            manager.start()
+
+        assert not manager._stop_event.is_set()
+        manager.stop()
+
+    def test_restart_after_stop_works(self, tmp_path):
+        """Manager can be started after being stopped."""
+        manager = CertificateManager(
+            username="user@example.com",
+            password="password",
+            domain="example.com",
+            email="ssl@example.com",
+            cert_path=str(tmp_path / "cert.pem"),
+            key_path=str(tmp_path / "key.pem"),
+            status_file=str(tmp_path / "status.json"),
+        )
+
+        with patch.object(manager, '_renewal_loop'):
+            manager.start()
+            assert manager._running is True
+            manager.stop()
+            assert manager._running is False
+            assert manager._stop_event.is_set()
+
+            # Second start
+            manager.start()
+            assert manager._running is True
+            assert not manager._stop_event.is_set()
+            manager.stop()
+
+
+class TestEnsureDirectoriesOnce:
+    """Tests that _ensure_directories only runs once."""
+
+    def test_directories_flag(self, tmp_path):
+        """_ensure_directories sets the _directories_created flag."""
+        manager = CertificateManager(
+            username="user@example.com",
+            password="password",
+            domain="example.com",
+            email="ssl@example.com",
+            cert_path=str(tmp_path / "ssl" / "cert.pem"),
+            key_path=str(tmp_path / "ssl" / "key.pem"),
+            status_file=str(tmp_path / "data" / "status.json"),
+        )
+
+        # Flag should already be set because _ensure_directories is NOT
+        # called in CertificateManager.__init__; it's called lazily.
+        # Let's call it explicitly.
+        manager._directories_created = False
+        manager._ensure_directories()
+        assert manager._directories_created is True
+
+        # Subsequent calls are no-ops (directories exist)
+        with patch("os.makedirs") as mock_mkdirs:
+            manager._ensure_directories()
+            mock_mkdirs.assert_not_called()

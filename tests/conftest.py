@@ -2,14 +2,21 @@
 Pytest configuration and fixtures for One.com DynDNS tests.
 """
 
-import pytest
-import sys
+from __future__ import annotations
+
 import os
+import sys
 import tempfile
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
+
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# ---------------------------------------------------------------------------
+# Standard fixtures (used by non-HA tests: test_run.py, test_onecom_api.py, etc.)
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -22,7 +29,7 @@ def mock_options():
         "subdomains": ["www", "api", ""],
         "update_interval": 5,
         "ip_service": "ipify",
-        "log_level": "error"
+        "log_level": "error",
     }
 
 
@@ -60,8 +67,8 @@ def mock_dns_records():
                         "prefix": "www",
                         "type": "A",
                         "content": "1.1.1.1",
-                        "ttl": 3600
-                    }
+                        "ttl": 3600,
+                    },
                 },
                 {
                     "type": "dns_service_records",
@@ -70,8 +77,8 @@ def mock_dns_records():
                         "prefix": "api",
                         "type": "A",
                         "content": "1.1.1.1",
-                        "ttl": 3600
-                    }
+                        "ttl": 3600,
+                    },
                 },
                 {
                     "type": "dns_service_records",
@@ -80,9 +87,9 @@ def mock_dns_records():
                         "prefix": "@",
                         "type": "A",
                         "content": "1.1.1.1",
-                        "ttl": 3600
-                    }
-                }
+                        "ttl": 3600,
+                    },
+                },
             ]
         }
     }
@@ -101,8 +108,8 @@ def mock_txt_records():
                         "prefix": "_acme-challenge",
                         "type": "TXT",
                         "content": "token123",
-                        "ttl": 600
-                    }
+                        "ttl": 600,
+                    },
                 },
                 {
                     "type": "dns_custom_records",
@@ -111,9 +118,9 @@ def mock_txt_records():
                         "prefix": "_acme-challenge.www",
                         "type": "TXT",
                         "content": "token456",
-                        "ttl": 600
-                    }
-                }
+                        "ttl": 600,
+                    },
+                },
             ]
         }
     }
@@ -131,11 +138,11 @@ def temp_cert_paths():
     """Provide temporary certificate paths for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield {
-            'cert_path': os.path.join(tmpdir, 'cert.pem'),
-            'key_path': os.path.join(tmpdir, 'key.pem'),
-            'account_key_path': os.path.join(tmpdir, 'account.key'),
-            'status_file': os.path.join(tmpdir, 'status.json'),
-            'tmpdir': tmpdir,
+            "cert_path": os.path.join(tmpdir, "cert.pem"),
+            "key_path": os.path.join(tmpdir, "key.pem"),
+            "account_key_path": os.path.join(tmpdir, "account.key"),
+            "status_file": os.path.join(tmpdir, "status.json"),
+            "tmpdir": tmpdir,
         }
 
 
@@ -176,6 +183,31 @@ def mock_failed_response():
     response.status_code = 500
     response.raise_for_status.side_effect = Exception("500 Server Error")
     return response
+
+
+# ---------------------------------------------------------------------------
+# HA integration fixtures (used by test_config_flow.py, test_init.py, etc.)
+# ---------------------------------------------------------------------------
+
+MOCK_CONFIG_DATA = {
+    "username": "test@example.com",
+    "password": "testpassword",
+    "domain": "example.com",
+    "subdomains": ["www", ""],
+    "update_interval": 5,
+    "ip_service": "ipify",
+    "ssl_enabled": False,
+}
+
+MOCK_CONFIG_DATA_SSL = {
+    **MOCK_CONFIG_DATA,
+    "ssl_enabled": True,
+    "ssl_email": "ssl@example.com",
+    "ssl_domains": ["example.com", "www.example.com"],
+    "ssl_staging": False,
+    "ssl_renewal_days": 30,
+    "ssl_check_interval": 12,
+}
 
 
 # Configure pytest to show more details

@@ -5,6 +5,146 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-02-08
+
+### Added
+
+- **Reauth flow**: When One.com credentials expire or become invalid, the
+  integration now raises `ConfigEntryAuthFailed` and shows a re-authentication
+  dialog instead of silently failing.
+- **Reconfigure flow**: Users can change domain and subdomain settings without
+  deleting and recreating the config entry.
+- **Diagnostics support**: New `diagnostics.py` enables the "Download
+  diagnostics" button in the HA UI. Sensitive data (passwords, keys, tokens)
+  is automatically redacted.
+- **`data_description` for Options flow**: Help text is now shown below each
+  field in the Options flow for both English and German.
+- **`no_domain` abort reason**: Supervisor discovery now shows a proper message
+  instead of a raw key when the add-on provides no domain.
+- **`reauth_successful` / `reconfigure_successful` abort reasons** with
+  `[%key:...]` references to HA common strings.
+- **New test files**: `test_config_flow.py` (13 tests covering user/domain/
+  options/hassio/reauth flows) and `test_init.py` (8 tests covering setup,
+  unload, services, options reload).
+
+### Fixed
+
+- **P0 -- Options flow bug**: The coordinator now reads configurable values
+  (`update_interval`, `ip_service`, `ssl_enabled`, etc.) from `entry.options`
+  with fallback to `entry.data`. Previously, changes made through the Options
+  flow were silently ignored.
+- **P0 -- Missing API methods**: `update_all_subdomains()`,
+  `_update_dns_record_with_cache()`, `find_txt_records()`,
+  `cleanup_acme_records()`, and `wait_for_dns_propagation()` were present in
+  the root `onecom_api.py` but missing from the custom component copy.
+  Standalone DNS batch updates crashed with `AttributeError`.
+- **P0 -- No HTTP timeouts**: The custom component API client had no timeouts
+  on any HTTP request. Added `REQUEST_TIMEOUT = 30` on all `session.get/post/
+  patch/delete` calls.
+- **P1 -- `asyncio.get_event_loop()`**: Replaced with
+  `asyncio.get_running_loop()` in `async_validate_credentials()` for Python
+  3.14 compatibility.
+- **P1 -- `datetime.fromisoformat()` crash**: Added `try/except ValueError`
+  around all datetime parsing in `sensor.py` via `_safe_parse_datetime()`.
+- **P1 -- False-positive certificate problem**: `binary_sensor.py` now returns
+  `None` (unknown) instead of `True` (problem) when no certificate info is
+  available at startup.
+- **P1 -- Wrong TXT record type**: `create_txt_record()` now uses
+  `dns_custom_records` (matching the root version) instead of
+  `dns_service_records`.
+- **P1 -- Supervisor device metadata overwrite**: `get_device_info()` in
+  add-on mode now only sets `identifiers` and no longer overwrites the
+  Supervisor's own `name`/`manufacturer`/`model`.
+- **Weak test assertion**: `test_run.py` `test_returns_empty_when_no_token`
+  now asserts `token == ""` instead of the always-true
+  `token == "" or isinstance(token, str)`.
+
+### Changed
+
+- **`const.py` modernised**: `CONF_USERNAME`, `CONF_PASSWORD`, `CONF_DOMAIN`
+  are now re-exported from `homeassistant.const`. `PLATFORMS` uses
+  `Platform.SENSOR` etc. instead of string literals. Dead constant
+  `UPDATE_INTERVAL_SECONDS` removed.
+- **`config_flow.py` modernised**: `FlowResult` replaced by
+  `ConfigFlowResult`. Added `MINOR_VERSION = 1`. Removed redundant
+  `OptionsFlowHandler.__init__`. Options flow now shows current values from
+  merged `data | options`.
+- **`manifest.json` cleaned up**: Core dependencies `requests` and
+  `cryptography` removed (always available in HA). Versions pinned
+  (`acme==2.9.0`, `josepy==1.14.0`). Added `homeassistant` minimum version
+  `2024.12.0`.
+- **`__init__.py` improved**: Added `config_entry=entry` kwarg to coordinator.
+  Temp file path uses `pathlib` instead of string concatenation. Unused loop
+  variables replaced with `_`.
+- **Entity cleanup**: Removed unused `self._entry` attribute, redundant
+  `_handle_coordinator_update` overrides, and unused imports across
+  `sensor.py`, `binary_sensor.py`, `button.py`. Hardcoded `"ssl_enabled"`
+  replaced with `CONF_SSL_ENABLED` constant. Type hints added to coordinator
+  parameters.
+- **`strings.json`**: Standard error/abort strings now use `[%key:...]`
+  references. Added `reauth_confirm`, `reconfigure`, and `no_domain` entries.
+- **`de.json` typo fixed**: "Zertifikat Ablauf" → "Zertifikatsablauf".
+- **`en.json` synchronised** with `strings.json` changes.
+- **`button.py` error handling**: `async_press()` now checks for method
+  existence and logs/re-raises exceptions.
+- **`onecom_api.py` HTML decoding**: Manual `&amp;`/`&lt;`/`&gt;` replacement
+  replaced with `html.unescape()`.
+- **Test stubs updated**: HA stubs in `test_sensors.py` extended with
+  `ConfigFlowResult`, `ConfigEntryAuthFailed`, standard HA constants, and
+  `entry.options = {}` on all mock entries.
+
+## [1.3.8] - 2026-02-07
+
+### Changed
+
+- **Performance: Persistent HTTP session** for IP detection and HA API calls.
+  `DynDNSUpdater` now creates a `requests.Session` (`_http_session`) at init and
+  reuses it across all `get_public_ip()` calls, eliminating redundant TCP + TLS
+  handshakes on every check cycle. Session is properly closed on `stop()`.
+- **Performance: DNS propagation uses session** – `wait_for_dns_propagation()`
+  in `onecom_api.py` now uses `self.session` (the already-authenticated session)
+  for DNS-over-HTTPS checks instead of creating bare `requests.get()` calls.
+- **Performance: Certificate info caching** – `CertificateManager.get_certificate_info()`
+  caches the parsed certificate data in memory (`_cached_cert_info`) and only
+  re-reads from disk when a new certificate is issued, avoiding repeated x509
+  decoding on every state file write.
+- **Performance: ACME account key caching** – `ACMEManager._get_client()` now
+  caches the RSA account key in `_account_key` after first load, avoiding
+  redundant disk reads on subsequent certificate requests.
+- **Performance: State file mtime caching** – `OneComDynDNSCoordinator._read_state_file_sync()`
+  only rereads and JSON-parses the state file when its `st_mtime` has changed,
+  reducing unnecessary I/O and CPU on every coordinator update cycle.
+- **Performance: ACME challenge in-memory caching** – `DynDNSUpdater` caches
+  the current ACME challenge in `_current_acme_challenge` and reads from memory
+  in `_write_state_file()` instead of re-reading the challenge file from disk.
+- **Performance: Standalone mode batch DNS update** – `_async_update_dns()` in
+  the custom component now uses `api.update_all_subdomains()` (single API call)
+  instead of per-subdomain `update_dns_record()` calls.
+- **Performance: Single `_ensure_directories()` call** – `CertificateManager`
+  and `ACMEManager` now use a `_directories_created` flag so filesystem
+  `mkdir -p` operations run only once instead of on every status save.
+
+### Fixed
+
+- **Stability: Request timeouts** – Added `REQUEST_TIMEOUT = 30` constant to
+  `OneComAPI` and applied `timeout=30` to every `session.get`, `.post`, `.patch`,
+  and `.delete` call. Previously, requests could hang indefinitely if the
+  One.com server was unresponsive.
+- **Stability: Session leak in `update_dns()`** – Wrapped `api.login()` and
+  `api.update_all_subdomains()` in a `try/finally` block to guarantee
+  `api.logout()` is called even when exceptions occur (both in `run.py` and
+  `custom_components/__init__.py`).
+- **Stability: Interruptible retry backoff** – `retry_with_backoff` decorator
+  in `acme_manager.py` now uses `_stop_event.wait()` instead of `time.sleep()`
+  for delays, so retries abort immediately on graceful shutdown.
+- **Stability: `CertificateManager` restartable** – `start()` now clears the
+  `_stop_event`, allowing the manager to be stopped and restarted without
+  creating a new instance.
+- **Tests: Mock targets updated** – All tests that mocked `run.requests.get` or
+  `onecom_api.requests.get` now mock the correct session-based `.get()` methods
+  (`updater._http_session.get`, `api.session.get`), ensuring tests exercise the
+  real code paths. Fixed 475 tests across 17 test files.
+
 ## [1.3.7] - 2026-02-07
 
 ### Changed

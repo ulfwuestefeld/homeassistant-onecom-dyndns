@@ -407,6 +407,14 @@ class DynDNSUpdater:
         self._api: Optional[OneComAPI] = None
         self._cert_manager: Optional[CertificateManager] = None
 
+        # Persistent HTTP session for IP checks and HA API calls.
+        # Avoids creating a new TCP+TLS connection on every polling cycle.
+        self._http_session = requests.Session()
+
+        # In-memory ACME challenge cache (set by save_acme_challenge_info,
+        # avoids reading the challenge file from disk on every state write).
+        self._current_acme_challenge: Optional[dict] = None
+
         # Setup logging
         self._setup_logging()
 
@@ -484,7 +492,7 @@ class DynDNSUpdater:
 
         try:
             self._logger.debug("Fetching IP from %s", url)
-            response = requests.get(url, timeout=10)
+            response = self._http_session.get(url, timeout=10)
             response.raise_for_status()
             ip = response.text.strip()
 
@@ -528,16 +536,12 @@ class DynDNSUpdater:
         """
         self._logger.info("Updating DNS records to %s", ip)
 
+        api = OneComAPI(self.username, self.password, self.domain)
         try:
-            # Create API client and login
-            api = OneComAPI(self.username, self.password, self.domain)
             api.login()
 
             # Update all subdomains
             results = api.update_all_subdomains(self.subdomains, ip)
-
-            # Logout
-            api.logout()
 
             # Check results
             success_count = sum(1 for r in results.values() if r["success"])
@@ -557,6 +561,8 @@ class DynDNSUpdater:
         except OneComAPIError as e:
             self._logger.error("DNS update failed: %s", e)
             return False
+        finally:
+            api.logout()
 
     def check_and_update(self):
         """Check for IP changes and update DNS if needed."""
@@ -702,14 +708,9 @@ class DynDNSUpdater:
             except Exception:
                 pass
 
-        # Read current ACME challenge (if any)
-        acme_challenge = None
-        try:
-            if os.path.isfile(ACME_CHALLENGE_FILE):
-                with open(ACME_CHALLENGE_FILE, "r") as f:
-                    acme_challenge = json.load(f)
-        except (IOError, json.JSONDecodeError):
-            pass
+        # Use in-memory ACME challenge cache (populated by
+        # _save_acme_challenge which is used as the challenge_callback).
+        acme_challenge = self._current_acme_challenge
 
         subdomains_list = [
             f"{s}.{self.domain}" if s else self.domain
@@ -797,6 +798,48 @@ class DynDNSUpdater:
         else:
             self._logger.warning("Unknown command: %s", command)
 
+    def _save_acme_challenge(self, domain: str, txt_name: str, txt_value: str):
+        """Save ACME challenge info in-memory and to disk.
+
+        Used as the ``challenge_callback`` for :class:`CertificateManager` so
+        that the challenge data is available in ``_write_state_file`` without
+        having to re-read the file from disk every cycle.
+        """
+        challenge_info = {
+            "domain": domain,
+            "txt_name": txt_name,
+            "txt_value": txt_value,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "instruction": (
+                f"Create a TXT record with name '{txt_name}' "
+                f"and value '{txt_value}'"
+            ),
+        }
+
+        # Keep in memory for _write_state_file
+        self._current_acme_challenge = challenge_info
+
+        # Persist to disk (for backward compatibility / external readers)
+        try:
+            with open(ACME_CHALLENGE_FILE, "w") as f:
+                json.dump(challenge_info, f, indent=2)
+            self._logger.info("ACME challenge info saved to %s", ACME_CHALLENGE_FILE)
+        except Exception as e:
+            self._logger.warning("Failed to save ACME challenge info: %s", e)
+
+        # Send Home Assistant notification
+        notification_message = (
+            f"**Domain:** {domain}\n\n"
+            f"**TXT Record Name:**\n`{txt_name}`\n\n"
+            f"**TXT Record Value:**\n`{txt_value}`\n\n"
+            f"Create this TXT record at your DNS provider if automatic creation fails."
+        )
+        send_ha_notification(
+            title="🔐 ACME DNS Challenge",
+            message=notification_message,
+            notification_id="onecom_dyndns_acme_challenge",
+        )
+
     def _ssl_event_callback(self, event_type: str, data: dict):
         """Handle SSL certificate events.
 
@@ -875,7 +918,7 @@ class DynDNSUpdater:
                 staging=self.ssl_staging,
                 renewal_days=self.ssl_renewal_days,
                 check_interval_hours=self.ssl_check_interval,
-                challenge_callback=save_acme_challenge_info,
+                challenge_callback=self._save_acme_challenge,
             )
 
             # Register callback for SSL events
@@ -953,6 +996,7 @@ class DynDNSUpdater:
         self._running = False
         self._stop_event.set()  # Wake up the main loop immediately
         self._stop_ssl_manager()
+        self._http_session.close()
 
 
 def load_options() -> dict:

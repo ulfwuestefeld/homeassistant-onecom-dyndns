@@ -43,14 +43,11 @@ class TestIPServices:
 class TestIPDetection:
     """Tests for IP detection functionality."""
 
-    @patch('run.OneComAPI')
-    @patch('requests.get')
-    def test_get_current_ip_success(self, mock_get, mock_api):
+    def test_get_current_ip_success(self):
         """Test successful IP detection."""
         mock_response = Mock()
         mock_response.text = "91.51.131.49"
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
         
         options = {
             'username': 'test@example.com',
@@ -63,17 +60,15 @@ class TestIPDetection:
         
         with patch.object(DynDNSUpdater, '_load_last_ip'):
             updater = DynDNSUpdater(options)
+            updater._http_session.get = Mock(return_value=mock_response)
             ip = updater.get_public_ip()
             assert ip == "91.51.131.49"
 
-    @patch('run.OneComAPI')
-    @patch('requests.get')
-    def test_get_current_ip_with_whitespace(self, mock_get, mock_api):
+    def test_get_current_ip_with_whitespace(self):
         """Test IP detection with leading/trailing whitespace."""
         mock_response = Mock()
         mock_response.text = "  91.51.131.49\n"
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
         
         options = {
             'username': 'test@example.com',
@@ -86,16 +81,13 @@ class TestIPDetection:
         
         with patch.object(DynDNSUpdater, '_load_last_ip'):
             updater = DynDNSUpdater(options)
+            updater._http_session.get = Mock(return_value=mock_response)
             ip = updater.get_public_ip()
             # Should be stripped
             assert ip.strip() == "91.51.131.49"
 
-    @patch('run.OneComAPI')
-    @patch('requests.get')
-    def test_get_current_ip_timeout(self, mock_get, mock_api):
+    def test_get_current_ip_timeout(self):
         """Test IP detection timeout handling."""
-        mock_get.side_effect = requests.exceptions.Timeout("Request timed out")
-        
         options = {
             'username': 'test@example.com',
             'password': 'testpass',
@@ -107,15 +99,14 @@ class TestIPDetection:
         
         with patch.object(DynDNSUpdater, '_load_last_ip'):
             updater = DynDNSUpdater(options)
+            updater._http_session.get = Mock(
+                side_effect=requests.exceptions.Timeout("Request timed out")
+            )
             ip = updater.get_public_ip()
             assert ip is None
 
-    @patch('run.OneComAPI')
-    @patch('requests.get')
-    def test_get_current_ip_connection_error(self, mock_get, mock_api):
+    def test_get_current_ip_connection_error(self):
         """Test IP detection connection error handling."""
-        mock_get.side_effect = requests.exceptions.ConnectionError("Connection failed")
-        
         options = {
             'username': 'test@example.com',
             'password': 'testpass',
@@ -127,6 +118,9 @@ class TestIPDetection:
         
         with patch.object(DynDNSUpdater, '_load_last_ip'):
             updater = DynDNSUpdater(options)
+            updater._http_session.get = Mock(
+                side_effect=requests.exceptions.ConnectionError("Connection failed")
+            )
             ip = updater.get_public_ip()
             assert ip is None
 

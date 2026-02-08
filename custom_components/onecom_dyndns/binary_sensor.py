@@ -10,11 +10,11 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator
 
-from .const import DOMAIN, CONF_DOMAIN, CONF_ADDON_SLUG, get_device_info
+from .const import DOMAIN, CONF_DOMAIN, CONF_ADDON_SLUG, CONF_SSL_ENABLED, get_device_info
 
 BINARY_SENSOR_TYPES: Final[tuple[BinarySensorEntityDescription, ...]] = (
     BinarySensorEntityDescription(
@@ -45,7 +45,7 @@ async def async_setup_entry(
     for description in BINARY_SENSOR_TYPES:
         # Skip certificate sensor if SSL not enabled
         if description.key == "certificate_valid":
-            if not entry.data.get("ssl_enabled", False):
+            if not entry.data.get(CONF_SSL_ENABLED, False):
                 continue
 
         entities.append(OneComDynDNSBinarySensor(coordinator, entry, description, domain))
@@ -60,7 +60,7 @@ class OneComDynDNSBinarySensor(CoordinatorEntity, BinarySensorEntity):
 
     def __init__(
         self,
-        coordinator,
+        coordinator: DataUpdateCoordinator,
         entry: ConfigEntry,
         description: BinarySensorEntityDescription,
         domain: str,
@@ -69,7 +69,6 @@ class OneComDynDNSBinarySensor(CoordinatorEntity, BinarySensorEntity):
         super().__init__(coordinator)
         self.entity_description = description
         self._domain = domain
-        self._entry = entry
 
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_device_info = get_device_info(
@@ -91,10 +90,12 @@ class OneComDynDNSBinarySensor(CoordinatorEntity, BinarySensorEntity):
             return self.coordinator.data.get("current_ip") is not None
 
         if key == "certificate_valid":
-            # For PROBLEM class, True means there IS a problem
+            # For PROBLEM class, True means there IS a problem.
+            # Return None (unknown) when no certificate info is available
+            # yet (e.g. first boot) instead of a false-positive problem.
             cert_info = self.coordinator.data.get("certificate_info")
             if cert_info is None:
-                return True  # No certificate = problem
+                return None
             # Return True (problem) if needs renewal or days_remaining <= 0
             if cert_info.get("needs_renewal", False):
                 return True
@@ -110,14 +111,14 @@ class OneComDynDNSBinarySensor(CoordinatorEntity, BinarySensorEntity):
             return {}
 
         key = self.entity_description.key
-        attrs = {}
+        attrs: dict[str, Any] = {}
 
         if key == "dns_status":
             attrs["domain"] = self._domain
             attrs["current_ip"] = self.coordinator.data.get("current_ip")
             attrs["subdomains"] = self.coordinator.data.get("subdomains", [])
 
-        if key == "certificate_valid":
+        elif key == "certificate_valid":
             cert_info = self.coordinator.data.get("certificate_info")
             if cert_info:
                 attrs["expiry_date"] = cert_info.get("not_valid_after")
@@ -125,8 +126,3 @@ class OneComDynDNSBinarySensor(CoordinatorEntity, BinarySensorEntity):
                 attrs["domains"] = cert_info.get("domains", [])
 
         return attrs
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()

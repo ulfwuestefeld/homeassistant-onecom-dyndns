@@ -58,41 +58,56 @@ RETRYABLE_EXCEPTIONS = (
 
 def retry_with_backoff(func):
     """Decorator that implements retry with exponential backoff.
-    
+
     Retries the function on network-related errors with increasing delays.
     Uses jitter to prevent thundering herd.
+
+    If the first positional argument (``self``) exposes a ``_stop_event``
+    attribute, the delay is performed via ``Event.wait()`` so that a
+    graceful-shutdown signal interrupts the sleep immediately instead of
+    blocking for up to ``MAX_DELAY`` seconds.
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
         last_exception = None
-        
+
+        # If called on an instance with _stop_event, use it for
+        # interruptible sleeping during retries.
+        stop_event = getattr(args[0], "_stop_event", None) if args else None
+
         for attempt in range(MAX_RETRIES):
             try:
                 return func(*args, **kwargs)
             except RETRYABLE_EXCEPTIONS as e:
                 last_exception = e
-                
+
                 if attempt < MAX_RETRIES - 1:
                     # Calculate delay with exponential backoff and jitter
                     delay = min(BASE_DELAY * (2 ** attempt), MAX_DELAY)
                     jitter = random.uniform(0, delay * 0.3)
                     total_delay = delay + jitter
-                    
+
                     _LOGGER.warning(
                         "Network error (attempt %s/%s): %s",
                         attempt + 1, MAX_RETRIES, type(e).__name__,
                     )
                     _LOGGER.info("Retrying in %.1f seconds...", total_delay)
-                    time.sleep(total_delay)
+
+                    if stop_event is not None:
+                        if stop_event.wait(timeout=total_delay):
+                            _LOGGER.info("Shutdown requested during retry backoff")
+                            raise
+                    else:
+                        time.sleep(total_delay)
                 else:
                     _LOGGER.error(
                         "All %s attempts failed: %s: %s",
                         MAX_RETRIES, type(e).__name__, e,
                     )
-        
+
         # Re-raise the last exception after all retries failed
         raise last_exception
-    
+
     return wrapper
 
 
@@ -141,6 +156,9 @@ class ACMEManager:
         self._account_key: Optional[jose.JWKRSA] = None
         self._client: Optional[client.ClientV2] = None
         self._stop_event = stop_event or threading.Event()
+
+        # Create directories once up front instead of on every operation.
+        self._ensure_directories()
 
         _LOGGER.info("ACME Manager initialized (staging=%s)", staging)
 
@@ -232,7 +250,9 @@ class ACMEManager:
         Returns:
             Configured ACME client.
         """
-        self._account_key = self._load_or_create_account_key()
+        # Cache the account key so it isn't re-read from disk on every call.
+        if self._account_key is None:
+            self._account_key = self._load_or_create_account_key()
 
         # Create network client with optional account
         net = client.ClientNetwork(self._account_key, account=regr, user_agent="OneComDynDNS/1.0")

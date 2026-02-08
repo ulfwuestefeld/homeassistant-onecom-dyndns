@@ -22,12 +22,18 @@ Before running the tests, you need to install the following:
 3. **Test Dependencies**
    Install via pip:
    ```bash
-   pip install pytest pytest-cov responses
+   pip install pytest pytest-cov responses pytest-asyncio
    ```
 
    Or install all dependencies from requirements.txt:
    ```bash
    pip install -r requirements.txt
+   ```
+
+4. **Home Assistant Integration Tests** (optional)
+   To run config flow and setup/unload tests:
+   ```bash
+   pip install pytest-homeassistant-custom-component
    ```
 
 ### Optional Tools
@@ -69,6 +75,8 @@ Coverage report will be generated in `htmlcov/index.html`
 | `pytest tests/test_edge_cases.py -v` | Edge case tests |
 | `pytest tests/test_error_handling.py -v` | Error handling tests |
 | `pytest tests/test_sensors.py -v` | Sensor entity tests |
+| `pytest tests/test_config_flow.py -v` | Config flow tests (requires HA) |
+| `pytest tests/test_init.py -v` | Setup/unload/services tests (requires HA) |
 
 #### Run Tests in Parallel (Faster)
 ```bash
@@ -108,7 +116,9 @@ tests/
 ├── test_security.py                 # Security-related tests
 ├── test_edge_cases.py               # Boundary and edge case tests
 ├── test_error_handling.py           # Error handling tests
-└── test_sensors.py                  # Sensor entity tests (component + add-on)
+├── test_sensors.py                  # Sensor entity tests (component + add-on)
+├── test_config_flow.py             # HA config flow tests (requires HA framework)
+└── test_init.py                    # HA setup/unload/services tests (requires HA framework)
 ```
 
 ### Test Categories Explained
@@ -121,6 +131,8 @@ tests/
 | **Security Tests** | Verify secure handling of credentials and data |
 | **Edge Case Tests** | Test boundary conditions and unusual inputs |
 | **Error Handling Tests** | Verify proper error handling and recovery |
+| **HA Config Flow Tests** | Test Home Assistant configuration wizard steps |
+| **HA Init Tests** | Test integration setup, teardown, and service registration |
 
 ### Continuous Integration (CI)
 
@@ -175,12 +187,18 @@ Bevor Sie die Tests ausführen können, müssen Sie folgendes installieren:
 3. **Test-Abhängigkeiten**
    Installation über pip:
    ```bash
-   pip install pytest pytest-cov responses
+   pip install pytest pytest-cov responses pytest-asyncio
    ```
 
    Oder alle Abhängigkeiten aus requirements.txt installieren:
    ```bash
    pip install -r requirements.txt
+   ```
+
+4. **Home Assistant Integrationstests** (optional)
+   Zum Ausführen der Config-Flow- und Setup-Tests:
+   ```bash
+   pip install pytest-homeassistant-custom-component
    ```
 
 ### Optionale Werkzeuge
@@ -222,6 +240,8 @@ Der Coverage-Bericht wird in `htmlcov/index.html` erstellt.
 | `pytest tests/test_edge_cases.py -v` | Grenzfall-Tests |
 | `pytest tests/test_error_handling.py -v` | Fehlerbehandlungs-Tests |
 | `pytest tests/test_sensors.py -v` | Sensor-Entity-Tests |
+| `pytest tests/test_config_flow.py -v` | Config-Flow-Tests (benötigt HA) |
+| `pytest tests/test_init.py -v` | Setup/Unload/Service-Tests (benötigt HA) |
 
 #### Tests parallel ausführen (schneller)
 ```bash
@@ -261,7 +281,9 @@ tests/
 ├── test_security.py                 # Sicherheitsbezogene Tests
 ├── test_edge_cases.py               # Grenzfall- und Edge-Case-Tests
 ├── test_error_handling.py           # Fehlerbehandlungs-Tests
-└── test_sensors.py                  # Sensor-Entity-Tests (Komponente + Add-on)
+├── test_sensors.py                  # Sensor-Entity-Tests (Komponente + Add-on)
+├── test_config_flow.py             # HA Config-Flow-Tests (benötigt HA-Framework)
+└── test_init.py                    # HA Setup/Unload/Service-Tests (benötigt HA-Framework)
 ```
 
 ### Test-Kategorien erklärt
@@ -274,6 +296,8 @@ tests/
 | **Sicherheitstests** | Überprüfen sichere Handhabung von Zugangsdaten |
 | **Grenzfall-Tests** | Testen Randbedingungen und ungewöhnliche Eingaben |
 | **Fehlerbehandlungs-Tests** | Überprüfen korrekte Fehlerbehandlung und Wiederherstellung |
+| **HA Config-Flow-Tests** | Testen die Home Assistant Konfigurationsschritte |
+| **HA Init-Tests** | Testen Setup, Teardown und Service-Registrierung |
 
 ### Continuous Integration (CI)
 
@@ -352,11 +376,11 @@ pytest tests/ -v
 
 | Metric | Value |
 |--------|-------|
-| Test Files / Test-Dateien | 17 (+conftest.py) |
-| Estimated Tests / Geschätzte Tests | ~458 |
-| Test Categories / Test-Kategorien | 8 |
+| Test Files / Test-Dateien | 19 (+conftest.py) |
+| Estimated Tests / Geschätzte Tests | ~497 |
+| Test Categories / Test-Kategorien | 10 |
 | Coverage Target / Coverage-Ziel | >80% |
 
 ---
 
-*Last updated / Zuletzt aktualisiert: 2026-02-07*
+*Last updated / Zuletzt aktualisiert: 2026-02-08*

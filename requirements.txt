@@ -8,5 +8,11 @@ cryptography>=41.0.0
 
 # Testing Dependencies (dev only)
 pytest>=7.0.0
+pytest-asyncio>=0.21.0
 pytest-cov>=4.0.0
 responses>=0.22.0
+
+# Optional: HA integration tests (test_config_flow.py, test_init.py)
+# Installs the full Home Assistant Core + pytest-socket; on Windows
+# pytest-socket blocks ProactorEventLoop, so install only when needed:
+#   pip install pytest-homeassistant-custom-component

@@ -1,7 +1,7 @@
 # Software Bill of Materials (SBOM)
 
 **Project:** One.com DynDNS Updater  
-**Version:** 1.3.7  
+**Version:** 1.4.0  
 **Date:** 2026-02-07  
 **License:** MIT  
 
@@ -13,7 +13,7 @@ This document provides a complete inventory of all software components used in t
 
 | Component | Version | License | Description |
 |-----------|---------|---------|-------------|
-| One.com DynDNS Updater | 1.3.7 | MIT | Main application |
+| One.com DynDNS Updater | 1.4.0 | MIT | Main application |
 
 ### Source Files
 
@@ -26,14 +26,23 @@ This document provides a complete inventory of all software components used in t
 
 ## Runtime Dependencies
 
-### Python Packages (Production)
+### Python Packages (Production -- Add-on)
 
 | Package | Min. Version | License | Purpose |
 |---------|--------------|---------|---------|
 | requests | >=2.28.0 | Apache-2.0 | HTTP client for API calls |
-| acme | >=2.0.0 | Apache-2.0 | Let's Encrypt ACME protocol |
-| josepy | >=1.13.0 | Apache-2.0 | JOSE/JWK cryptographic operations |
+| acme | ==2.9.0 | Apache-2.0 | Let's Encrypt ACME protocol |
+| josepy | ==1.14.0 | Apache-2.0 | JOSE/JWK cryptographic operations |
 | cryptography | >=41.0.0 | Apache-2.0 / BSD-3-Clause | Cryptographic primitives |
+
+### Python Packages (Production -- Custom Integration)
+
+| Package | Version | License | Purpose |
+|---------|---------|---------|---------|
+| acme | ==2.9.0 | Apache-2.0 | Let's Encrypt ACME protocol |
+| josepy | ==1.14.0 | Apache-2.0 | JOSE/JWK cryptographic operations |
+
+> `requests` and `cryptography` are provided by Home Assistant Core and not listed in the integration's `manifest.json`.
 
 ### Python Packages (Development/Testing)
 
@@ -41,7 +50,9 @@ This document provides a complete inventory of all software components used in t
 |---------|--------------|---------|---------|
 | pytest | >=7.0.0 | MIT | Testing framework |
 | pytest-cov | >=4.0.0 | MIT | Code coverage |
+| pytest-asyncio | >=0.21.0 | MIT | Async test support |
 | responses | >=0.22.0 | Apache-2.0 | HTTP mocking |
+| pytest-homeassistant-custom-component | latest | Apache-2.0 | HA integration test framework (optional) |
 
 ## Container Base Image
 
@@ -86,7 +97,7 @@ This document provides a complete inventory of all software components used in t
 
 | License | Components |
 |---------|------------|
-| MIT | Main application, libffi, musl, pytest, pytest-cov |
+| MIT | Main application, libffi, musl, pytest, pytest-cov, pytest-asyncio |
 | Apache-2.0 | requests, acme, josepy, openssl, Home Assistant base |
 | BSD-3-Clause | cryptography (dual-licensed) |
 | PSF-2.0 | Python |
@@ -102,7 +113,7 @@ This document provides a complete inventory of all software components used in t
 ## Dependency Graph
 
 ```
-One.com DynDNS Updater (1.3.7)
+One.com DynDNS Updater (1.4.0)
 ├── Python 3.11
 │   └── Alpine Linux 3.18
 │       ├── openssl
@@ -112,8 +123,8 @@ One.com DynDNS Updater (1.3.7)
 │   ├── urllib3
 │   ├── certifi
 │   └── charset-normalizer
-├── acme (>=2.0.0)
-│   ├── josepy (>=1.13.0)
+├── acme (==2.9.0)
+│   ├── josepy (==1.14.0)
 │   ├── cryptography (>=41.0.0)
 │   │   └── cffi
 │   └── requests

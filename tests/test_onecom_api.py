@@ -319,8 +319,7 @@ class TestOneComAPI:
         assert deleted_count == 2
         assert mock_delete.call_count == 2
 
-    @patch("onecom_api.requests.get")
-    def test_wait_for_dns_propagation_success(self, mock_get):
+    def test_wait_for_dns_propagation_success(self):
         """Test DNS propagation check success."""
         mock_response = Mock()
         mock_response.status_code = 200
@@ -329,9 +328,9 @@ class TestOneComAPI:
                 {"data": '"test-token"'}
             ]
         }
-        mock_get.return_value = mock_response
 
         self.api.session = Mock()
+        self.api.session.get.return_value = mock_response
         self.api._logged_in = True
 
         result = self.api.wait_for_dns_propagation(
@@ -343,16 +342,15 @@ class TestOneComAPI:
 
         assert result is True
 
-    @patch("onecom_api.requests.get")
     @patch("onecom_api.time.sleep")
-    def test_wait_for_dns_propagation_timeout(self, mock_sleep, mock_get):
+    def test_wait_for_dns_propagation_timeout(self, mock_sleep):
         """Test DNS propagation check timeout."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"Answer": []}
-        mock_get.return_value = mock_response
 
         self.api.session = Mock()
+        self.api.session.get.return_value = mock_response
         self.api._logged_in = True
 
         result = self.api.wait_for_dns_propagation(
@@ -391,30 +389,29 @@ class TestDynDNSUpdater:
         assert updater.update_interval == 5
         assert updater._running is True
 
-    @patch("run.requests.get")
-    def test_get_public_ip_success(self, mock_get):
+    def test_get_public_ip_success(self):
         """Test successful IP detection."""
         from run import DynDNSUpdater
 
         mock_response = Mock()
         mock_response.text = "1.2.3.4"
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         updater = DynDNSUpdater(self.options)
+        updater._http_session.get = Mock(return_value=mock_response)
         ip = updater.get_public_ip()
 
         assert ip == "1.2.3.4"
 
-    @patch("run.requests.get")
-    def test_get_public_ip_failure(self, mock_get):
+    def test_get_public_ip_failure(self):
         """Test IP detection failure."""
         from run import DynDNSUpdater
         import requests
 
-        mock_get.side_effect = requests.RequestException("Network error")
-
         updater = DynDNSUpdater(self.options)
+        updater._http_session.get = Mock(
+            side_effect=requests.RequestException("Network error")
+        )
         ip = updater.get_public_ip()
 
         assert ip is None

@@ -251,6 +251,22 @@ def _ensure_ha_stubs():
             DIAGNOSTIC = "diagnostic"
             CONFIG = "config"
         const.EntityCategory = _EntityCategory
+    # Standard HA config constants re-exported by our const.py
+    if not hasattr(const, "CONF_USERNAME"):
+        const.CONF_USERNAME = "username"
+    if not hasattr(const, "CONF_PASSWORD"):
+        const.CONF_PASSWORD = "password"
+    if not hasattr(const, "CONF_DOMAIN"):
+        const.CONF_DOMAIN = "domain"
+
+    # homeassistant.exceptions
+    exc_mod_name = "homeassistant.exceptions"
+    if exc_mod_name not in sys.modules:
+        m = types.ModuleType(exc_mod_name)
+        m.ConfigEntryAuthFailed = type("ConfigEntryAuthFailed", (Exception,), {})
+        sys.modules[exc_mod_name] = m
+    elif not hasattr(sys.modules[exc_mod_name], "ConfigEntryAuthFailed"):
+        sys.modules[exc_mod_name].ConfigEntryAuthFailed = type("ConfigEntryAuthFailed", (Exception,), {})
 
     return created
 
@@ -732,11 +748,11 @@ class TestDNSStatusBinarySensor:
 class TestCertificateValidBinarySensor:
     """Tests for the certificate_valid binary sensor."""
 
-    def test_problem_when_no_cert_info(self):
+    def test_unknown_when_no_cert_info(self):
         data = _make_coordinator_data(certificate_info=None)
         sensor = _make_binary_sensor("certificate_valid", data)
-        # True = problem (BinarySensorDeviceClass.PROBLEM)
-        assert sensor.is_on is True
+        # None = unknown (no data yet, e.g. first boot)
+        assert sensor.is_on is None
 
     def test_problem_when_needs_renewal(self):
         cert_info = {"needs_renewal": True, "days_remaining": 10}
@@ -972,29 +988,29 @@ class TestAddonLastIPUpdateSensor:
                 mock_response.text = "5.6.7.8"
                 mock_response.raise_for_status = Mock()
 
-                with patch("run.requests.get", return_value=mock_response):
-                    with patch("run.OneComAPI") as mock_api_class:
-                        mock_api = Mock()
-                        mock_api.update_all_subdomains.return_value = {
-                            "www": {"success": True},
-                            "@": {"success": True},
-                        }
-                        mock_api_class.return_value = mock_api
+                with patch("run.OneComAPI") as mock_api_class:
+                    mock_api = Mock()
+                    mock_api.update_all_subdomains.return_value = {
+                        "www": {"success": True},
+                        "@": {"success": True},
+                    }
+                    mock_api_class.return_value = mock_api
 
-                        with patch("run.update_ha_sensor"):
-                            updater = DynDNSUpdater(self.options)
-                            updater._last_ip = "1.2.3.3"
-                            updater.check_and_update()
+                    with patch("run.update_ha_sensor"):
+                        updater = DynDNSUpdater(self.options)
+                        updater._http_session.get = Mock(return_value=mock_response)
+                        updater._last_ip = "1.2.3.3"
+                        updater.check_and_update()
 
-                            # Verify last_ip_update was set
-                            assert updater._last_ip_update is not None
+                        # Verify last_ip_update was set
+                        assert updater._last_ip_update is not None
 
-                            # Verify state file contains correct data
-                            assert os.path.isfile(state_file)
-                            with open(state_file) as f:
-                                state = json.load(f)
-                            assert state["current_ip"] == "5.6.7.8"
-                            assert state["last_ip_update"] is not None
+                        # Verify state file contains correct data
+                        assert os.path.isfile(state_file)
+                        with open(state_file) as f:
+                            state = json.load(f)
+                        assert state["current_ip"] == "5.6.7.8"
+                        assert state["last_ip_update"] is not None
 
     def test_no_ip_change_does_not_update_sensor(self):
         """Test that no sensor update happens if IP is unchanged."""
@@ -1006,18 +1022,18 @@ class TestAddonLastIPUpdateSensor:
                 mock_response.text = "1.2.3.4"
                 mock_response.raise_for_status = Mock()
 
-                with patch("run.requests.get", return_value=mock_response):
-                    with patch("run.update_ha_sensor") as mock_sensor:
-                        updater = DynDNSUpdater(self.options)
-                        updater._last_ip = "1.2.3.4"
-                        updater.check_and_update()
+                with patch("run.update_ha_sensor") as mock_sensor:
+                    updater = DynDNSUpdater(self.options)
+                    updater._http_session.get = Mock(return_value=mock_response)
+                    updater._last_ip = "1.2.3.4"
+                    updater.check_and_update()
 
-                        # Should NOT have a last_ip_update sensor call
-                        sensor_calls = [
-                            c for c in mock_sensor.call_args_list
-                            if c[0][0] == "sensor.onecom_dyndns_last_ip_update"
-                        ]
-                        assert len(sensor_calls) == 0
+                    # Should NOT have a last_ip_update sensor call
+                    sensor_calls = [
+                        c for c in mock_sensor.call_args_list
+                        if c[0][0] == "sensor.onecom_dyndns_last_ip_update"
+                    ]
+                    assert len(sensor_calls) == 0
 
 
 class TestAddonLastCertificateRenewalSensor:
@@ -1359,7 +1375,11 @@ class TestGetDeviceInfo:
     """Tests for the get_device_info() helper in const.py."""
 
     def test_with_addon_slug_returns_hassio_identifiers(self):
-        """When addon_slug is set, DeviceInfo uses hassio identifiers."""
+        """When addon_slug is set, DeviceInfo uses only hassio identifiers.
+
+        In add-on mode we do NOT set name/manufacturer/model to avoid
+        overwriting the Supervisor's own device metadata.
+        """
         _ensure_ha_stubs()
         import importlib
         const_mod = importlib.import_module("custom_components.onecom_dyndns.const")
@@ -1373,10 +1393,9 @@ class TestGetDeviceInfo:
 
         # Our stub DeviceInfo returns a dict of keyword args
         assert info["identifiers"] == {("hassio", "homeassistant-onecom-dyndns")}
-        # Should contain fallback name/manufacturer for when Supervisor device
-        # is not yet created (prevents "Unnamed Device" in UI)
-        assert info["name"] == "One.com DynDNS Updater"
-        assert info["manufacturer"] == "ulfwuestefeld"
+        # Should NOT contain name/manufacturer to avoid overwriting Supervisor metadata
+        assert "name" not in info
+        assert "manufacturer" not in info
 
     def test_without_addon_slug_returns_standalone_device(self):
         """When addon_slug is None, DeviceInfo has full standalone metadata."""
@@ -1583,6 +1602,8 @@ def _ensure_config_flow_stubs():
 
     # config_entries stubs
     ce = sys.modules["homeassistant.config_entries"]
+    if not hasattr(ce, "ConfigFlowResult"):
+        ce.ConfigFlowResult = dict  # ConfigFlowResult is just a TypedDict
     if not hasattr(ce, "ConfigFlow"):
         class _ConfigFlow:
             """Minimal ConfigFlow stub."""
@@ -1607,10 +1628,18 @@ def _ensure_config_flow_stubs():
             def async_show_form(self, step_id="", **kw):
                 return {"type": "form", "step_id": step_id, **kw}
 
+            def _get_reauth_entry(self):
+                return getattr(self, "_reauth_entry", None)
+
+            def _get_reconfigure_entry(self):
+                return getattr(self, "_reconfigure_entry", None)
+
         ce.ConfigFlow = _ConfigFlow
 
     if not hasattr(ce, "OptionsFlow"):
         class _OptionsFlow:
+            config_entry = None
+
             def async_create_entry(self, title="", data=None):
                 return {"type": "create_entry", "title": title, "data": data}
 
@@ -1962,6 +1991,7 @@ def _make_addon_coordinator(hass_mock, state_file_path, command_file_path, extra
 
     entry = Mock()
     entry.data = entry_data
+    entry.options = {}
     entry.entry_id = "test-entry-123"
 
     # hass.config.path() should join with the temp directory
@@ -2002,6 +2032,7 @@ class TestCoordinatorAddonMode:
             "username": "u", "password": "p", "domain": "d.com",
             "update_interval": 5, "ip_service": "ipify",
         }
+        entry.options = {}
         hass = self._make_hass()
         coordinator = init_mod.OneComDynDNSCoordinator(hass, entry)
         assert coordinator._addon_mode is False
@@ -2135,6 +2166,7 @@ class TestCoordinatorCommandFile:
             "username": "u", "password": "p", "domain": "d.com",
             "subdomains": [""], "update_interval": 5, "ip_service": "ipify",
         }
+        entry.options = {}
         hass = self._make_hass()
         coordinator = init_mod.OneComDynDNSCoordinator(hass, entry)
 
@@ -2178,6 +2210,7 @@ class TestCoordinatorUpdateInterval:
             "username": "u", "password": "p", "domain": "d.com",
             "update_interval": 10, "ip_service": "ipify",
         }
+        entry.options = {}
         hass = self._make_hass()
         coordinator = init_mod.OneComDynDNSCoordinator(hass, entry)
         assert coordinator.update_interval == timedelta(minutes=10)
@@ -2234,6 +2267,81 @@ class TestAsyncDetectAddon:
 
         result = asyncio.run(init_mod._async_detect_addon(hass))
         assert result is None
+
+
+class TestStateFileMtimeCaching:
+    """Verify coordinator uses mtime-based caching for state file reads."""
+
+    def _make_hass(self):
+        hass = Mock()
+        hass.async_add_executor_job = Mock(
+            side_effect=lambda fn, *args: asyncio.get_event_loop().run_in_executor(None, fn, *args)
+        )
+        return hass
+
+    def test_same_mtime_returns_cached_data(self, tmp_path):
+        """When the state file hasn't changed, cached data is returned."""
+        state_file = tmp_path / ".onecom_dyndns_state.json"
+        state = {
+            "current_ip": "1.2.3.4",
+            "last_ip": "1.2.3.3",
+            "domain": "example.com",
+            "subdomains": ["www.example.com"],
+            "ip_changed": False,
+            "dns_status": "ok",
+            "last_update": "2026-02-06T12:00:00+00:00",
+            "last_ip_update": None,
+            "last_certificate_renewal": None,
+            "ssl_enabled": False,
+            "certificate_info": None,
+            "acme_challenge": None,
+        }
+        state_file.write_text(json.dumps(state))
+
+        hass = self._make_hass()
+        coordinator = _make_addon_coordinator(hass, str(state_file), str(tmp_path / "cmd.json"))
+
+        # First read
+        result1 = coordinator._read_state_file_sync()
+        assert result1["current_ip"] == "1.2.3.4"
+
+        # Second read (same mtime) should return cached data
+        result2 = coordinator._read_state_file_sync()
+        assert result2 is result1  # Same object reference = cached
+
+    def test_changed_mtime_rereads_file(self, tmp_path):
+        """When the state file changes, the new content is read."""
+        state_file = tmp_path / ".onecom_dyndns_state.json"
+        state = {
+            "current_ip": "1.2.3.4",
+            "last_ip": "1.2.3.3",
+            "domain": "example.com",
+            "subdomains": [],
+            "ip_changed": False,
+            "dns_status": "ok",
+            "last_update": None,
+            "last_ip_update": None,
+            "last_certificate_renewal": None,
+            "ssl_enabled": False,
+            "certificate_info": None,
+            "acme_challenge": None,
+        }
+        state_file.write_text(json.dumps(state))
+
+        hass = self._make_hass()
+        coordinator = _make_addon_coordinator(hass, str(state_file), str(tmp_path / "cmd.json"))
+
+        result1 = coordinator._read_state_file_sync()
+        assert result1["current_ip"] == "1.2.3.4"
+
+        # Modify file (os.replace changes mtime)
+        import time
+        time.sleep(0.05)  # Ensure mtime changes
+        state["current_ip"] = "5.6.7.8"
+        state_file.write_text(json.dumps(state))
+
+        result2 = coordinator._read_state_file_sync()
+        assert result2["current_ip"] == "5.6.7.8"
 
 
 class TestBuildDiscoveryConfig:

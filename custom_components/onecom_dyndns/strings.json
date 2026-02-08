@@ -9,8 +9,8 @@
         "title": "One.com Login",
         "description": "Enter your One.com account credentials. [Documentation]({docs_url})",
         "data": {
-          "username": "Email Address",
-          "password": "Password"
+          "username": "[%key:common::config_flow::data::email%]",
+          "password": "[%key:common::config_flow::data::password%]"
         },
         "data_description": {
           "username": "Your One.com account email address",
@@ -72,16 +72,39 @@
           "ssl_renewal_days": "Renew certificate this many days before expiration",
           "ssl_check_interval": "How often to check if certificate renewal is needed (in hours)"
         }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate One.com",
+        "description": "Your One.com credentials are no longer valid. Please enter your updated credentials.",
+        "data": {
+          "username": "[%key:common::config_flow::data::email%]",
+          "password": "[%key:common::config_flow::data::password%]"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure One.com DynDNS",
+        "description": "Update the domain and subdomain settings for this integration entry.",
+        "data": {
+          "domain": "Domain",
+          "subdomains": "Subdomains"
+        },
+        "data_description": {
+          "domain": "The domain to manage DNS records for",
+          "subdomains": "Select the subdomains whose IP address should be updated"
+        }
       }
     },
     "error": {
-      "invalid_auth": "Invalid username or password",
-      "cannot_connect": "Could not connect to One.com",
-      "unknown": "An unknown error occurred",
+      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]",
       "ssl_email_required": "Email is required for SSL certificates"
     },
     "abort": {
-      "already_configured": "This domain is already configured"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "no_domain": "No domain found in add-on discovery data",
+      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
+      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
     }
   },
   "options": {
@@ -96,6 +119,14 @@
           "ssl_email": "SSL Email",
           "ssl_staging": "Use Staging Server",
           "ssl_renewal_days": "Renewal Days"
+        },
+        "data_description": {
+          "update_interval": "How often to check for IP address changes (in minutes)",
+          "ip_service": "Service used to detect your public IP address",
+          "ssl_enabled": "Automatically obtain and renew SSL certificates via Let's Encrypt",
+          "ssl_email": "Email address for Let's Encrypt account notifications",
+          "ssl_staging": "Use Let's Encrypt staging server for testing",
+          "ssl_renewal_days": "Renew certificate this many days before expiration"
         }
       }
     }

@@ -311,3 +311,62 @@ class TestACMEManagerError:
         """Test exception inherits from Exception."""
         error = ACMEManagerError("Test")
         assert isinstance(error, Exception)
+
+
+class TestRetryWithBackoffInterruptible:
+    """Tests for interruptible retry_with_backoff decorator."""
+
+    def test_retry_uses_stop_event_for_sleep(self):
+        """When _stop_event is set during backoff, retry raises immediately."""
+        import threading
+        from acme_manager import retry_with_backoff
+
+        class FakeService:
+            def __init__(self):
+                self._stop_event = threading.Event()
+
+            @retry_with_backoff
+            def do_something(self):
+                raise ConnectionError("fail")
+
+        svc = FakeService()
+        svc._stop_event.set()  # Signal shutdown
+
+        with pytest.raises(ConnectionError):
+            svc.do_something()
+
+    def test_retry_succeeds_after_failure(self):
+        """Retry should succeed when the second attempt works."""
+        import threading
+        from acme_manager import retry_with_backoff
+
+        call_count = 0
+
+        class FakeService:
+            def __init__(self):
+                self._stop_event = threading.Event()
+
+            @retry_with_backoff
+            def do_something(self):
+                nonlocal call_count
+                call_count += 1
+                if call_count < 2:
+                    raise ConnectionError("transient")
+                return "ok"
+
+        svc = FakeService()
+        result = svc.do_something()
+        assert result == "ok"
+        assert call_count == 2
+
+    def test_retry_without_stop_event_uses_sleep(self):
+        """When there's no _stop_event attribute, time.sleep is used."""
+        from acme_manager import retry_with_backoff
+
+        @retry_with_backoff
+        def standalone_func():
+            raise ConnectionError("fail")
+
+        with patch("acme_manager.time.sleep"):
+            with pytest.raises(ConnectionError):
+                standalone_func()

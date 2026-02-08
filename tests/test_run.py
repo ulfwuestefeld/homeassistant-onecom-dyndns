@@ -47,7 +47,7 @@ class TestGetSupervisorToken:
         with patch.dict(os.environ, {}, clear=True):
             with patch("os.path.exists", return_value=False):
                 token = get_supervisor_token()
-                assert token == "" or isinstance(token, str)
+                assert token == ""
 
 
 class TestSendHaNotification:
@@ -347,22 +347,24 @@ class TestDynDNSUpdaterAdvanced:
         """Test DNS update with API error."""
         from onecom_api import OneComAPIError
         
-        mock_api_class.side_effect = OneComAPIError("Login failed")
+        mock_api = Mock()
+        mock_api.login.side_effect = OneComAPIError("Login failed")
+        mock_api_class.return_value = mock_api
 
         updater = DynDNSUpdater(self.options)
         result = updater.update_dns("1.2.3.4")
 
         assert result is False
+        mock_api.logout.assert_called_once()
 
-    @patch("run.requests.get")
-    def test_get_public_ip_invalid_response(self, mock_get):
+    def test_get_public_ip_invalid_response(self):
         """Test IP detection with invalid response."""
         mock_response = Mock()
         mock_response.text = "not-an-ip"
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         updater = DynDNSUpdater(self.options)
+        updater._http_session.get = Mock(return_value=mock_response)
         ip = updater.get_public_ip()
 
         assert ip is None
@@ -1014,6 +1016,132 @@ class TestCheckCommands:
 
                     updater._check_commands()
                     mock_cert.request_certificate.assert_called_once_with(force=True)
+
+
+# ---------------------------------------------------------------------------
+# Tests for session leak fix and persistent HTTP session
+# ---------------------------------------------------------------------------
+
+class TestSessionLeakFix:
+    """Tests verifying that api.logout() is called even on exceptions."""
+
+    def setup_method(self):
+        self.options = {
+            "username": "test@example.com",
+            "password": "testpassword",
+            "domain": "example.com",
+            "subdomains": ["www"],
+            "update_interval": 5,
+            "ip_service": "ipify",
+            "log_level": "error",
+            "ssl_enabled": False,
+        }
+
+    @patch("run.OneComAPI")
+    def test_update_dns_logout_on_exception(self, mock_api_class):
+        """api.logout() must be called even when update_all_subdomains raises."""
+        from onecom_api import OneComAPIError
+
+        mock_api = Mock()
+        mock_api.update_all_subdomains.side_effect = OneComAPIError("boom")
+        mock_api_class.return_value = mock_api
+
+        updater = DynDNSUpdater(self.options)
+        result = updater.update_dns("1.2.3.4")
+
+        assert result is False
+        mock_api.logout.assert_called_once()
+
+    @patch("run.OneComAPI")
+    def test_update_dns_logout_on_success(self, mock_api_class):
+        """api.logout() is called after a successful update."""
+        mock_api = Mock()
+        mock_api.update_all_subdomains.return_value = {
+            "www": {"success": True},
+        }
+        mock_api_class.return_value = mock_api
+
+        updater = DynDNSUpdater(self.options)
+        result = updater.update_dns("1.2.3.4")
+
+        assert result is True
+        mock_api.logout.assert_called_once()
+
+    def test_http_session_created_on_init(self):
+        """DynDNSUpdater should create a persistent requests.Session."""
+        updater = DynDNSUpdater(self.options)
+        assert updater._http_session is not None
+
+    def test_http_session_closed_on_stop(self):
+        """stop() should close the persistent session."""
+        updater = DynDNSUpdater(self.options)
+        updater._http_session = Mock()
+        updater.stop()
+        updater._http_session.close.assert_called_once()
+
+    def test_get_public_ip_uses_session(self):
+        """get_public_ip should use the persistent session, not requests.get."""
+        mock_response = Mock()
+        mock_response.text = "1.2.3.4"
+        mock_response.raise_for_status = Mock()
+
+        updater = DynDNSUpdater(self.options)
+        updater._http_session.get = Mock(return_value=mock_response)
+        ip = updater.get_public_ip()
+
+        assert ip == "1.2.3.4"
+        updater._http_session.get.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Tests for _save_acme_challenge method
+# ---------------------------------------------------------------------------
+
+class TestSaveAcmeChallenge:
+    """Tests for DynDNSUpdater._save_acme_challenge."""
+
+    def setup_method(self):
+        self.options = {
+            "username": "test@example.com",
+            "password": "testpassword",
+            "domain": "example.com",
+            "subdomains": ["www"],
+            "update_interval": 5,
+            "ip_service": "ipify",
+            "log_level": "error",
+            "ssl_enabled": True,
+            "ssl_email": "ssl@example.com",
+        }
+
+    @patch("run.send_ha_notification")
+    def test_caches_challenge_in_memory(self, mock_notify):
+        """The challenge should be stored in _current_acme_challenge."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("run.ACME_CHALLENGE_FILE", os.path.join(tmpdir, "acme.json")):
+                updater = DynDNSUpdater(self.options)
+                updater._save_acme_challenge(
+                    "example.com", "_acme-challenge.example.com", "token123"
+                )
+
+                assert updater._current_acme_challenge is not None
+                assert updater._current_acme_challenge["txt_value"] == "token123"
+                assert updater._current_acme_challenge["domain"] == "example.com"
+
+    @patch("run.send_ha_notification")
+    def test_writes_challenge_to_disk(self, mock_notify):
+        """The challenge should also be persisted to disk."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            challenge_file = os.path.join(tmpdir, "acme.json")
+            with patch("run.ACME_CHALLENGE_FILE", challenge_file):
+                updater = DynDNSUpdater(self.options)
+                updater._save_acme_challenge(
+                    "example.com", "_acme-challenge.example.com", "token123"
+                )
+
+                assert os.path.exists(challenge_file)
+                with open(challenge_file) as f:
+                    data = json.load(f)
+                assert data["txt_value"] == "token123"
 
 
 if __name__ == "__main__":

@@ -294,15 +294,14 @@ class TestDNSPropagation:
         self.api._logged_in = True
         self.api.session = Mock()
 
-    @patch("onecom_api.requests.get")
-    def test_dns_propagation_immediate_success(self, mock_get):
+    def test_dns_propagation_immediate_success(self):
         """Test DNS propagation when record is immediately available."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "Answer": [{"data": '"expected-token"'}]
         }
-        mock_get.return_value = mock_response
+        self.api.session.get.return_value = mock_response
 
         result = self.api.wait_for_dns_propagation(
             "_acme-challenge",
@@ -313,9 +312,8 @@ class TestDNSPropagation:
 
         assert result is True
 
-    @patch("onecom_api.requests.get")
     @patch("onecom_api.time.sleep")
-    def test_dns_propagation_delayed_success(self, mock_sleep, mock_get):
+    def test_dns_propagation_delayed_success(self, mock_sleep):
         """Test DNS propagation when record appears after delay."""
         mock_response_empty = Mock()
         mock_response_empty.status_code = 200
@@ -327,7 +325,7 @@ class TestDNSPropagation:
             "Answer": [{"data": '"expected-token"'}]
         }
 
-        mock_get.side_effect = [
+        self.api.session.get.side_effect = [
             mock_response_empty,
             mock_response_empty,
             mock_response_success,
@@ -342,14 +340,13 @@ class TestDNSPropagation:
 
         assert result is True
 
-    @patch("onecom_api.requests.get")
     @patch("onecom_api.time.sleep")
-    def test_dns_propagation_timeout(self, mock_sleep, mock_get):
+    def test_dns_propagation_timeout(self, mock_sleep):
         """Test DNS propagation timeout."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"Answer": []}
-        mock_get.return_value = mock_response
+        self.api.session.get.return_value = mock_response
 
         result = self.api.wait_for_dns_propagation(
             "_acme-challenge",

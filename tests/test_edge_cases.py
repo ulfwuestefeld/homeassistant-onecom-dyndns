@@ -272,9 +272,8 @@ class TestConcurrentOperations:
         assert ("cb2", "test") in results
 
     @patch("run.OneComAPI")
-    @patch("run.requests.get")
     @patch("run.update_ha_sensor")
-    def test_concurrent_check_and_update(self, mock_sensor, mock_get, mock_api_class):
+    def test_concurrent_check_and_update(self, mock_sensor, mock_api_class):
         """Test that concurrent check_and_update calls don't corrupt state."""
         import threading
         from run import DynDNSUpdater
@@ -282,7 +281,6 @@ class TestConcurrentOperations:
         mock_response = Mock()
         mock_response.text = "1.2.3.4"
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         mock_api = Mock()
         mock_api.update_all_subdomains.return_value = {
@@ -304,6 +302,7 @@ class TestConcurrentOperations:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
                 updater = DynDNSUpdater(options)
+                updater._http_session.get = Mock(return_value=mock_response)
 
                 errors = []
 
@@ -326,15 +325,13 @@ class TestConcurrentOperations:
 class TestNetworkEdgeCases:
     """Tests for network edge cases."""
 
-    @patch("run.requests.get")
-    def test_ip_response_with_whitespace(self, mock_get):
+    def test_ip_response_with_whitespace(self):
         """Test IP response with leading/trailing whitespace."""
         from run import DynDNSUpdater
 
         mock_response = Mock()
         mock_response.text = "  1.2.3.4  \n"  # Whitespace
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         options = {
             "username": "test@example.com",
@@ -347,19 +344,18 @@ class TestNetworkEdgeCases:
         }
 
         updater = DynDNSUpdater(options)
+        updater._http_session.get = Mock(return_value=mock_response)
         ip = updater.get_public_ip()
 
         assert ip == "1.2.3.4"  # Should be stripped
 
-    @patch("run.requests.get")
-    def test_ip_response_empty(self, mock_get):
+    def test_ip_response_empty(self):
         """Test empty IP response."""
         from run import DynDNSUpdater
 
         mock_response = Mock()
         mock_response.text = ""
         mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
 
         options = {
             "username": "test@example.com",
@@ -372,6 +368,7 @@ class TestNetworkEdgeCases:
         }
 
         updater = DynDNSUpdater(options)
+        updater._http_session.get = Mock(return_value=mock_response)
         ip = updater.get_public_ip()
 
         assert ip is None

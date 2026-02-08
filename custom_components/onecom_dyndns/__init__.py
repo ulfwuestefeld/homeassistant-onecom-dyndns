@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -155,19 +155,19 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_update_dns(call: ServiceCall) -> None:
         """Handle the update DNS service call."""
-        for entry_id, data in hass.data[DOMAIN].items():
+        for _entry_id, data in hass.data[DOMAIN].items():
             coordinator: OneComDynDNSCoordinator = data["coordinator"]
             await coordinator.async_force_update_dns()
 
     async def handle_renew_certificate(call: ServiceCall) -> None:
         """Handle the renew certificate service call."""
-        for entry_id, data in hass.data[DOMAIN].items():
+        for _entry_id, data in hass.data[DOMAIN].items():
             coordinator: OneComDynDNSCoordinator = data["coordinator"]
             await coordinator.async_force_renew_certificate()
 
     async def handle_check_ip(call: ServiceCall) -> None:
         """Handle the check IP service call."""
-        for entry_id, data in hass.data[DOMAIN].items():
+        for _entry_id, data in hass.data[DOMAIN].items():
             coordinator: OneComDynDNSCoordinator = data["coordinator"]
             await coordinator.async_refresh()
 
@@ -214,19 +214,34 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
             self._command_file = None
             self.session = async_get_clientsession(hass)
 
-        # Configuration (used in standalone mode and for entity metadata)
+        # Configuration -- options take precedence over initial data so that
+        # changes made through the Options Flow are actually applied.
         self.domain = entry.data.get(CONF_DOMAIN, "")
         self.subdomains = entry.data.get(CONF_SUBDOMAINS, [""])
-        self.ip_service = entry.data.get(CONF_IP_SERVICE, "ipify")
-        self.update_interval_minutes = entry.data.get(
-            CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+        self.ip_service = entry.options.get(
+            CONF_IP_SERVICE, entry.data.get(CONF_IP_SERVICE, "ipify"),
+        )
+        self.update_interval_minutes = entry.options.get(
+            CONF_UPDATE_INTERVAL,
+            entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
         )
 
-        # SSL Configuration
-        self.ssl_enabled = entry.data.get(CONF_SSL_ENABLED, False)
-        self.ssl_email = entry.data.get(CONF_SSL_EMAIL, "")
+        # SSL Configuration -- options override data
+        self.ssl_enabled = entry.options.get(
+            CONF_SSL_ENABLED, entry.data.get(CONF_SSL_ENABLED, False),
+        )
+        self.ssl_email = entry.options.get(
+            CONF_SSL_EMAIL, entry.data.get(CONF_SSL_EMAIL, ""),
+        )
         self.ssl_domains = entry.data.get(CONF_SSL_DOMAINS, [])
-        self.ssl_staging = entry.data.get(CONF_SSL_STAGING, False)
+        self.ssl_staging = entry.options.get(
+            CONF_SSL_STAGING, entry.data.get(CONF_SSL_STAGING, False),
+        )
+
+        # State file caching: avoid re-parsing JSON when the file hasn't
+        # changed since the last read (checked via mtime).
+        self._last_state_mtime: float = 0.0
+        self._last_state_data: dict[str, Any] | None = None
 
         # Standalone-mode state (not used in add-on mode)
         self._last_ip: str | None = None
@@ -246,6 +261,7 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
             _LOGGER,
             name=DOMAIN,
             update_interval=interval,
+            config_entry=entry,
         )
 
     # ------------------------------------------------------------------
@@ -286,11 +302,24 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
         }
 
     def _read_state_file_sync(self) -> dict[str, Any] | None:
-        """Synchronous helper to read the JSON state file."""
+        """Synchronous helper to read the JSON state file.
+
+        Uses mtime-based caching: if the file hasn't been modified since the
+        last read, the previously parsed data is returned without re-opening
+        and re-parsing the file.  This avoids ~9 out of 10 unnecessary JSON
+        parses (the state file is written every 5 min, but polled every 30 s).
+        """
         if self._state_file is None or not self._state_file.is_file():
             return None
+
+        mtime = self._state_file.stat().st_mtime
+        if mtime == self._last_state_mtime and self._last_state_data is not None:
+            return self._last_state_data
+
         with open(self._state_file, "r") as fh:
-            return json.load(fh)
+            self._last_state_data = json.load(fh)
+        self._last_state_mtime = mtime
+        return self._last_state_data
 
     async def _async_poll_directly(self) -> dict[str, Any]:
         """Standalone mode: poll IP services and update DNS directly."""
@@ -347,41 +376,52 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
             raise
 
     async def _async_update_dns(self, ip: str) -> bool:
-        """Update DNS records at One.com (standalone mode only)."""
+        """Update DNS records at One.com (standalone mode only).
+
+        Uses ``update_all_subdomains`` to fetch DNS records once and update
+        all subdomains in a single pass, avoiding N redundant API calls.
+        The API session is always closed via ``finally`` to prevent TCP/TLS
+        connection leaks.
+        """
+        from .onecom_api import OneComAPI, OneComAPIError  # noqa: E402
+
+        username = self.entry.data[CONF_USERNAME]
+        password = self.entry.data[CONF_PASSWORD]
+        api = OneComAPI(username, password, self.domain)
+
         try:
-            from .onecom_api import OneComAPI, OneComAPIError
-
-            username = self.entry.data[CONF_USERNAME]
-            password = self.entry.data[CONF_PASSWORD]
-            api = OneComAPI(username, password, self.domain)
-
             await self.hass.async_add_executor_job(api.login)
 
-            for subdomain in self.subdomains:
-                try:
-                    await self.hass.async_add_executor_job(
-                        api.update_dns_record, subdomain, ip
-                    )
+            results = await self.hass.async_add_executor_job(
+                api.update_all_subdomains, self.subdomains, ip
+            )
+
+            for name, result in results.items():
+                if result["success"]:
                     _LOGGER.info(
-                        "Updated DNS for %s.%s to %s",
-                        subdomain or "@",
-                        self.domain,
-                        ip,
+                        "Updated DNS for %s.%s to %s", name, self.domain, ip,
                     )
-                except OneComAPIError as err:
+                else:
                     _LOGGER.error(
                         "Failed to update %s.%s: %s",
-                        subdomain or "@",
-                        self.domain,
-                        err,
+                        name, self.domain, result["error"],
                     )
 
-            await self.hass.async_add_executor_job(api.logout)
-            return True
+            success_count = sum(1 for r in results.values() if r["success"])
+            return success_count == len(results)
 
+        except OneComAPIError as err:
+            if "Invalid credentials" in str(err):
+                raise ConfigEntryAuthFailed(str(err)) from err
+            _LOGGER.error("DNS update failed: %s", err)
+            return False
+        except ConfigEntryAuthFailed:
+            raise
         except Exception as err:
             _LOGGER.error("DNS update failed: %s", err)
             return False
+        finally:
+            await self.hass.async_add_executor_job(api.logout)
 
     # ------------------------------------------------------------------
     # Commands (button presses / service calls)
@@ -395,10 +435,10 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
             "command": command,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-        tmp = str(self._command_file) + ".tmp"
+        tmp = self._command_file.with_suffix(".json.tmp")
         with open(tmp, "w") as fh:
             json.dump(payload, fh)
-        Path(tmp).replace(self._command_file)
+        tmp.replace(self._command_file)
 
     async def async_force_update_dns(self) -> None:
         """Force a DNS update."""
