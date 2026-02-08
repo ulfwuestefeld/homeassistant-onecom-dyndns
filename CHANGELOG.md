@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.0] - 2026-02-08
+## [1.4.1] - 2026-02-08
 
 ### Added
 
@@ -58,6 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Weak test assertion**: `test_run.py` `test_returns_empty_when_no_token`
   now asserts `token == ""` instead of the always-true
   `token == "" or isinstance(token, str)`.
+- **CI -- `PermissionError` on ACMEManager init**: `_ensure_directories()` was
+  called eagerly in `ACMEManager.__init__`, trying to create `/data/acme/` even
+  in test environments. Directory creation is now lazy (deferred to first file
+  operation) with a `_directories_created` guard flag, preventing
+  `PermissionError` on CI runners and restricted environments.
 
 ### Changed
 
@@ -120,9 +125,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Performance: Standalone mode batch DNS update** – `_async_update_dns()` in
   the custom component now uses `api.update_all_subdomains()` (single API call)
   instead of per-subdomain `update_dns_record()` calls.
-- **Performance: Single `_ensure_directories()` call** – `CertificateManager`
+- **Performance: Lazy single `_ensure_directories()` call** – `CertificateManager`
   and `ACMEManager` now use a `_directories_created` flag so filesystem
-  `mkdir -p` operations run only once instead of on every status save.
+  `mkdir -p` operations run only once (on first use) instead of on every
+  status save. Directories are created lazily on the first file operation,
+  not at construction time.
 
 ### Fixed
 

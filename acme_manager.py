@@ -156,9 +156,7 @@ class ACMEManager:
         self._account_key: Optional[jose.JWKRSA] = None
         self._client: Optional[client.ClientV2] = None
         self._stop_event = stop_event or threading.Event()
-
-        # Create directories once up front instead of on every operation.
-        self._ensure_directories()
+        self._directories_created = False
 
         _LOGGER.info("ACME Manager initialized (staging=%s)", staging)
 
@@ -167,11 +165,14 @@ class ACMEManager:
         self._stop_event.set()
 
     def _ensure_directories(self):
-        """Ensure all necessary directories exist."""
+        """Ensure all necessary directories exist (runs only once)."""
+        if self._directories_created:
+            return
         for path in [self.account_key_path, self.cert_path, self.key_path]:
             directory = os.path.dirname(path)
             if directory:
                 os.makedirs(directory, exist_ok=True)
+        self._directories_created = True
 
     def _generate_private_key(self, key_size: int = 2048) -> rsa.RSAPrivateKey:
         """Generate a new RSA private key.
