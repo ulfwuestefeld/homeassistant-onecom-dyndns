@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Deprecated architectures**: Removed deprecated 32-bit architecture support
   (`armhf`, `armv7`, `i386`) from `build.yaml`. Only actively supported
   architectures (`aarch64` and `amd64`) are now built.
+- **F821 undefined name 'DeviceInfo'**: Added `TYPE_CHECKING` import guard
+  in `const.py` to fix flake8 F821 error. The `DeviceInfo` type is now
+  properly guarded for type checking without causing runtime import errors.
+
+### Changed
+
+- **GitHub Actions**: Enabled Node.js 24 support by setting
+  `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` in workflow. Prepares for
+  migration off deprecated Node.js 20 runners (removal date: Sept 16, 2026).
 
 ## [1.4.1] - 2026-02-08
 

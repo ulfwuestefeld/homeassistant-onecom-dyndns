@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from homeassistant.const import (
     CONF_DOMAIN,
@@ -10,6 +10,9 @@ from homeassistant.const import (
     CONF_USERNAME,
     Platform,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.helpers.entity import DeviceInfo
 
 DOMAIN: Final = "onecom_dyndns"
 
