@@ -18,9 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **GitHub Actions**: Enabled Node.js 24 support by setting
-  `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` in workflow. Prepares for
-  migration off deprecated Node.js 20 runners (removal date: Sept 16, 2026).
+- **GitHub Actions**: Removed `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` environment
+  variable. GitHub Actions will naturally handle the Node.js 20 → 24 migration
+  without explicit forcing. Latest patches of v4/v5 actions support Node.js 24.
 
 ## [1.4.1] - 2026-02-08
 
