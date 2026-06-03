@@ -69,8 +69,12 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         info via the Supervisor API.  The config entry is created
         immediately so the user sees entities on the add-on device
         without any manual setup.
-        """
-        config = discovery_info.get("config", discovery_info)
+        """      
+        if hasattr(discovery_info, "config"):
+            config = discovery_info.config
+        else:
+            config = discovery_info
+        
         domain = config.get("domain", "")
 
         if not domain:
