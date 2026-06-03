@@ -70,9 +70,15 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         immediately so the user sees entities on the add-on device
         without any manual setup.
         """      
-        if hasattr(discovery_info, "config"):
+        # Prüfen, ob es das neue HassioServiceInfo-Objekt (oder ein Mock davon) ist, 
+        # das das Attribut 'config' besitzt.
+        if hasattr(discovery_info, "config") and not isinstance(discovery_info, dict):
             config = discovery_info.config
+        # Falls es ein altes Dictionary ist (oder im Test so übergeben wird)
+        elif isinstance(discovery_info, dict):
+            config = discovery_info.get("config", discovery_info)
         else:
+            # Fallback für alle Fälle
             config = discovery_info
         
         domain = config.get("domain", "")
