@@ -1,8 +1,8 @@
 # Software Bill of Materials (SBOM)
 
 **Project:** One.com DynDNS Updater  
-**Version:** 1.4.1  
-**Date:** 2026-02-07  
+**Version:** 1.4.2  
+**Date:** 2026-06-03  
 **License:** MIT  
 
 ## Overview
@@ -13,7 +13,7 @@ This document provides a complete inventory of all software components used in t
 
 | Component | Version | License | Description |
 |-----------|---------|---------|-------------|
-| One.com DynDNS Updater | 1.4.1 | MIT | Main application |
+| One.com DynDNS Updater | 1.4.2 | MIT | Main application |
 
 ### Source Files
 
