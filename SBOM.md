@@ -113,7 +113,7 @@ This document provides a complete inventory of all software components used in t
 ## Dependency Graph
 
 ```
-One.com DynDNS Updater (1.4.1)
+One.com DynDNS Updater (1.4.2)
 ├── Python 3.11
 │   └── Alpine Linux 3.18
 │       ├── openssl
