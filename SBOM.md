@@ -1,7 +1,7 @@
 # Software Bill of Materials (SBOM)
 
 **Project:** One.com DynDNS Updater  
-**Version:** 1.5.1  
+**Version:** 1.5.2  
 **Date:** 2026-06-03  
 **License:** MIT  
 
@@ -13,7 +13,7 @@ This document provides a complete inventory of all software components used in t
 
 | Component | Version | License | Description |
 |-----------|---------|---------|-------------|
-| One.com DynDNS Updater | 1.5.1 | MIT | Main application |
+| One.com DynDNS Updater | 1.5.2 | MIT | Main application |
 
 ### Source Files
 
@@ -64,9 +64,6 @@ This document provides a complete inventory of all software components used in t
 
 - `amd64` (x86_64)
 - `aarch64` (ARM64)
-- `armv7` (ARMv7)
-- `armhf` (ARM hard float)
-- `i386` (x86 32-bit)
 
 ## Operating System Components (Alpine Linux 3.18)
 
@@ -113,7 +110,7 @@ This document provides a complete inventory of all software components used in t
 ## Dependency Graph
 
 ```
-One.com DynDNS Updater (1.5.1)
+One.com DynDNS Updater (1.5.2)
 ├── Python 3.11
 │   └── Alpine Linux 3.18
 │       ├── openssl

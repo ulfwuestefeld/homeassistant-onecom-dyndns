@@ -28,7 +28,7 @@ What actually happened.
 - **Home Assistant version**: 
 - **Add-on version**: 
 - **Installation method**: Add-on / Standalone integration
-- **Architecture**: amd64 / aarch64 / armv7 / other
+- **Architecture**: amd64 / aarch64 / other
 
 ## Logs
 
