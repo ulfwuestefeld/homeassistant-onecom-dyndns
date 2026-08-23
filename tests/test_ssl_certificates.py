@@ -6,9 +6,6 @@ import os
 import sys
 import tempfile
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
-
-import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,7 +16,6 @@ class TestCertificateExpiry:
 
     def test_certificate_days_until_expiry(self):
         """Test calculation of days until certificate expires."""
-        from datetime import datetime, timedelta
         
         # Certificate expires in 30 days
         expiry_date = datetime.now() + timedelta(days=30)
@@ -30,7 +26,6 @@ class TestCertificateExpiry:
 
     def test_certificate_expired(self):
         """Test detection of expired certificate."""
-        from datetime import datetime, timedelta
         
         # Certificate expired 5 days ago
         expiry_date = datetime.now() - timedelta(days=5)
@@ -40,7 +35,6 @@ class TestCertificateExpiry:
 
     def test_certificate_expiring_soon(self):
         """Test detection of certificate expiring within threshold."""
-        from datetime import datetime, timedelta
         
         renewal_threshold = 30  # days
         expiry_date = datetime.now() + timedelta(days=15)
@@ -51,7 +45,6 @@ class TestCertificateExpiry:
 
     def test_certificate_not_expiring_soon(self):
         """Test certificate not expiring within threshold."""
-        from datetime import datetime, timedelta
         
         renewal_threshold = 30  # days
         expiry_date = datetime.now() + timedelta(days=60)
@@ -185,8 +178,8 @@ class TestACMEChallenge:
         """Test that challenge response can be computed."""
         # DNS-01 challenge response is SHA256 hash of key authorization
         # This test documents the expected format
-        import hashlib
         import base64
+        import hashlib
         
         # Simplified example (actual implementation uses JWK thumbprint)
         token = "test_token"

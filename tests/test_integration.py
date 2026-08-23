@@ -8,7 +8,7 @@ import json
 import os
 import sys
 import tempfile
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -46,7 +46,6 @@ class TestOneComAPIAndDynDNSIntegration:
     def test_full_dns_update_integration(self, mock_sensor, mock_session_class, mock_options):
         """Test full flow from IP detection to DNS update."""
         from run import DynDNSUpdater
-        from onecom_api import OneComAPI
 
         # Mock IP detection
         mock_ip_response = Mock()
@@ -240,7 +239,7 @@ class TestConfigurationFlowIntegration:
 
     def test_options_file_to_updater(self):
         """Test configuration flows from options file to updater."""
-        from run import load_options, DynDNSUpdater
+        from run import DynDNSUpdater, load_options
 
         with tempfile.TemporaryDirectory() as tmpdir:
             options_file = os.path.join(tmpdir, "options.json")
@@ -289,8 +288,8 @@ class TestErrorPropagationIntegration:
     @patch("run.update_ha_sensor")
     def test_api_error_does_not_crash_updater(self, mock_sensor, mock_api_class, mock_options):
         """Test that API errors don't crash the updater."""
-        from run import DynDNSUpdater
         from onecom_api import OneComAPIError
+        from run import DynDNSUpdater
 
         mock_ip_response = Mock()
         mock_ip_response.text = "1.2.3.4"
@@ -317,9 +316,8 @@ class TestThreadSafetyIntegration:
 
     def test_certificate_manager_thread_safety(self):
         """Test that certificate manager handles threading correctly."""
+
         from certificate_manager import CertificateManager
-        import threading
-        import time
 
         manager = CertificateManager(
             username="test@example.com",

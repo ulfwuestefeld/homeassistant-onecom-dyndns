@@ -4,12 +4,11 @@ Edge case tests for One.com DynDNS Updater.
 These tests verify behavior in unusual or boundary conditions.
 """
 
-import json
 import os
 import sys
 import tempfile
 import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -276,6 +275,7 @@ class TestConcurrentOperations:
     def test_concurrent_check_and_update(self, mock_sensor, mock_api_class):
         """Test that concurrent check_and_update calls don't corrupt state."""
         import threading
+
         from run import DynDNSUpdater
 
         mock_response = Mock()
@@ -484,8 +484,8 @@ class TestTimingEdgeCases:
 
     def test_certificate_expiry_exactly_now(self):
         """Test certificate that expires right now."""
+
         from certificate_manager import CertificateManager
-        from datetime import datetime, timezone
 
         manager = CertificateManager(
             username="test@example.com",

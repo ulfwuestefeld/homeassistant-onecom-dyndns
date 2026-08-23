@@ -1,8 +1,8 @@
 # Software Bill of Materials (SBOM)
 
 **Project:** One.com DynDNS Updater  
-**Version:** 1.5.3  
-**Date:** 2026-06-03  
+**Version:** 1.5.4  
+**Date:** 2026-08-24  
 **License:** MIT  
 
 ## Overview
@@ -13,7 +13,7 @@ This document provides a complete inventory of all software components used in t
 
 | Component | Version | License | Description |
 |-----------|---------|---------|-------------|
-| One.com DynDNS Updater | 1.5.3 | MIT | Main application |
+| One.com DynDNS Updater | 1.5.4 | MIT | Main application |
 
 ### Source Files
 
@@ -30,10 +30,10 @@ This document provides a complete inventory of all software components used in t
 
 | Package | Min. Version | License | Purpose |
 |---------|--------------|---------|---------|
-| requests | >=2.28.0 | Apache-2.0 | HTTP client for API calls |
-| acme | ==2.9.0 | Apache-2.0 | Let's Encrypt ACME protocol |
-| josepy | ==1.14.0 | Apache-2.0 | JOSE/JWK cryptographic operations |
-| cryptography | >=41.0.0 | Apache-2.0 / BSD-3-Clause | Cryptographic primitives |
+| requests | 2.32.0 | Apache-2.0 | HTTP client for API calls |
+| acme | 5.6.0 | Apache-2.0 | Let's Encrypt ACME protocol |
+| josepy | 2.0.0 | Apache-2.0 | JOSE/JWK cryptographic operations |
+| cryptography | 50.0.0 | Apache-2.0 / BSD-3-Clause | Cryptographic primitives |
 
 ### Python Packages (Production -- Custom Integration)
 
@@ -42,7 +42,7 @@ This document provides a complete inventory of all software components used in t
 | acme | ==2.9.0 | Apache-2.0 | Let's Encrypt ACME protocol |
 | josepy | ==1.14.0 | Apache-2.0 | JOSE/JWK cryptographic operations |
 
-> `requests` and `cryptography` are provided by Home Assistant Core and not listed in the integration's `manifest.json`.
+> `requests` and `cryptography` are provided by Home Assistant Core but the add-on pins/declares compatible versions for the bundled environment.
 
 ### Python Packages (Development/Testing)
 

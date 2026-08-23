@@ -4,11 +4,10 @@ Error handling tests for One.com DynDNS Updater.
 These tests verify correct error handling and recovery.
 """
 
-import json
 import os
 import sys
 import tempfile
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import requests
@@ -408,8 +407,8 @@ class TestErrorLogging:
 
     def test_errors_are_logged(self):
         """Test that errors are properly logged."""
-        import logging
         import io
+        import logging
 
         from onecom_api import OneComAPI, OneComAPIError
 

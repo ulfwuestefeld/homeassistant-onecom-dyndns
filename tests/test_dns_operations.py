@@ -4,7 +4,7 @@ Tests for DNS operations including record creation, deletion, and validation.
 
 import os
 import sys
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 import requests
@@ -12,7 +12,7 @@ import requests
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from onecom_api import OneComAPI, OneComAPIError
+from onecom_api import OneComAPI
 
 
 class TestDNSRecordTypes:

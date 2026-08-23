@@ -3,16 +3,12 @@ Advanced unit tests for the Certificate Manager module.
 Tests for online verification, renewal logic, and edge cases.
 """
 
-import json
 import os
 import socket
 import ssl
 import sys
 import tempfile
-import threading
-import time
-from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -29,10 +25,6 @@ sys.modules['josepy'] = MagicMock()
 
 from certificate_manager import (
     CertificateManager,
-    CertificateManagerError,
-    CERT_STATUS_FILE,
-    DEFAULT_CERT_PATH,
-    DEFAULT_KEY_PATH,
 )
 
 
@@ -86,7 +78,7 @@ class TestOnlineCertificateVerification:
     @patch("certificate_manager.socket.create_connection")
     def test_verify_online_certificate_timeout(self, mock_create_conn, manager):
         """Test certificate verification with timeout."""
-        mock_create_conn.side_effect = socket.timeout("Connection timed out")
+        mock_create_conn.side_effect = TimeoutError("Connection timed out")
 
         result = manager.verify_online_certificate("example.com")
 
@@ -635,7 +627,6 @@ class TestStopEventPropagation:
     @patch("certificate_manager.ACMEManager")
     def test_stop_during_certificate_request_signals_acme(self, mock_acme, mock_api, mock_info, tmp_path):
         """Test that CertificateManager.stop() signals the shared event."""
-        import threading
 
         mock_info.return_value = None
         mock_api_instance = Mock()

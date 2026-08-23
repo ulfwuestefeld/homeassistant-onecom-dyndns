@@ -3,11 +3,11 @@ Advanced unit tests for the One.com API module.
 Tests for retry mechanism, TXT record conflict handling, and edge cases.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock, call
-import sys
 import os
-import time
+import sys
+from unittest.mock import Mock, patch
+
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

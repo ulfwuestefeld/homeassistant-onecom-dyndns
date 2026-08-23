@@ -5,9 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final
 
 from homeassistant.const import (
-    CONF_DOMAIN,
-    CONF_PASSWORD,
-    CONF_USERNAME,
     Platform,
 )
 
@@ -77,7 +74,7 @@ ADDON_COMMAND_FILE: Final = ".onecom_dyndns_commands.json"
 
 def get_device_info(
     entry_id: str, domain: str, addon_slug: str | None = None,
-) -> "DeviceInfo":
+) -> DeviceInfo:
     """Build DeviceInfo, attaching to the Supervisor add-on device when possible.
 
     When *addon_slug* is set (i.e. the integration was auto-discovered from
@@ -88,7 +85,7 @@ def get_device_info(
     Otherwise we create a standalone device.
     """
     # Import here to avoid circular / missing-HA issues during unit tests
-    from homeassistant.helpers.entity import DeviceInfo  # noqa: E402
+    from homeassistant.helpers.entity import DeviceInfo
 
     if addon_slug:
         return DeviceInfo(

@@ -10,7 +10,7 @@ import sys
 import tempfile
 import threading
 import time
-from unittest.mock import Mock, patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -254,8 +254,9 @@ class TestE2EErrorRecovery:
     @patch("run.update_ha_sensor")
     def test_recovery_from_ip_service_failure(self, mock_sensor, mock_options):
         """Test recovery when IP service fails then succeeds."""
-        from run import DynDNSUpdater
         import requests
+
+        from run import DynDNSUpdater
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
@@ -278,8 +279,8 @@ class TestE2EErrorRecovery:
     @patch("run.update_ha_sensor")
     def test_recovery_from_dns_update_failure(self, mock_sensor, mock_api_class, mock_options):
         """Test behavior when DNS update fails."""
-        from run import DynDNSUpdater
         from onecom_api import OneComAPIError
+        from run import DynDNSUpdater
 
         mock_response = Mock()
         mock_response.text = "1.2.3.4"

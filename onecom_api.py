@@ -12,7 +12,8 @@ import logging
 import re
 import threading
 import time
-from typing import Optional, List, Dict, Any
+from typing import Any
+
 import requests
 
 _LOGGER = logging.getLogger(__name__)
@@ -20,7 +21,6 @@ _LOGGER = logging.getLogger(__name__)
 
 class OneComAPIError(Exception):
     """Exception raised for One.com API errors."""
-    pass
 
 
 class OneComAPI:
@@ -46,7 +46,7 @@ class OneComAPI:
         self.username = username
         self.password = password
         self.domain = domain
-        self.session: Optional[requests.Session] = None
+        self.session: requests.Session | None = None
         self._logged_in = False
 
     def _create_session(self) -> requests.Session:
@@ -265,7 +265,7 @@ class OneComAPI:
         except ValueError as e:
             raise OneComAPIError(f"Invalid JSON response: {e}")
 
-    def _find_record_id(self, subdomain: str, records: dict) -> Optional[tuple]:
+    def _find_record_id(self, subdomain: str, records: dict) -> tuple | None:
         """Find the record ID for a given subdomain.
 
         Args:
@@ -598,7 +598,7 @@ class OneComAPI:
         except requests.RequestException as e:
             raise OneComAPIError(f"Failed to delete DNS record: {e}")
 
-    def find_txt_records(self, subdomain: str, exact_match: bool = False) -> List[Dict[str, Any]]:
+    def find_txt_records(self, subdomain: str, exact_match: bool = False) -> list[dict[str, Any]]:
         """Find all TXT records for a subdomain.
 
         Args:
@@ -702,7 +702,6 @@ class OneComAPI:
         Returns:
             True if the record is visible, False if timeout reached.
         """
-        import socket
 
         full_domain = f"{subdomain}.{self.domain}"
         _LOGGER.info("Waiting for DNS propagation of '%s'...", full_domain)

@@ -16,29 +16,29 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
-    DOMAIN,
-    PLATFORMS,
+    ADDON_COMMAND_FILE,
     ADDON_SLUG,
-    CONF_USERNAME,
-    CONF_PASSWORD,
+    ADDON_STATE_FILE,
+    CONF_ADDON_SLUG,
     CONF_DOMAIN,
+    CONF_IP_SERVICE,
+    CONF_PASSWORD,
+    CONF_SSL_CHECK_INTERVAL,
+    CONF_SSL_DOMAINS,
+    CONF_SSL_EMAIL,
+    CONF_SSL_ENABLED,
+    CONF_SSL_RENEWAL_DAYS,
+    CONF_SSL_STAGING,
     CONF_SUBDOMAINS,
     CONF_UPDATE_INTERVAL,
-    CONF_IP_SERVICE,
-    CONF_SSL_ENABLED,
-    CONF_SSL_EMAIL,
-    CONF_SSL_DOMAINS,
-    CONF_SSL_STAGING,
-    CONF_SSL_RENEWAL_DAYS,
-    CONF_SSL_CHECK_INTERVAL,
-    CONF_ADDON_SLUG,
+    CONF_USERNAME,
     DEFAULT_UPDATE_INTERVAL,
-    SERVICE_UPDATE_DNS,
-    SERVICE_RENEW_CERTIFICATE,
-    SERVICE_CHECK_IP,
+    DOMAIN,
     IP_SERVICES,
-    ADDON_STATE_FILE,
-    ADDON_COMMAND_FILE,
+    PLATFORMS,
+    SERVICE_CHECK_IP,
+    SERVICE_RENEW_CERTIFICATE,
+    SERVICE_UPDATE_DNS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -383,7 +383,7 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
         The API session is always closed via ``finally`` to prevent TCP/TLS
         connection leaks.
         """
-        from .onecom_api import OneComAPI, OneComAPIError  # noqa: E402
+        from .onecom_api import OneComAPI, OneComAPIError
 
         username = self.entry.data[CONF_USERNAME]
         password = self.entry.data[CONF_PASSWORD]

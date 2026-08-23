@@ -8,7 +8,7 @@ import json
 import os
 import sys
 import tempfile
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -21,9 +21,10 @@ class TestCredentialHandling:
 
     def test_password_not_logged(self):
         """Test that passwords are not logged in plain text."""
-        from onecom_api import OneComAPI
-        import logging
         import io
+        import logging
+
+        from onecom_api import OneComAPI
 
         # Capture log output
         log_capture = io.StringIO()
@@ -308,8 +309,8 @@ class TestTokenHandling:
 
     def test_supervisor_token_not_logged(self):
         """Test that supervisor token is not logged."""
-        import logging
         import io
+        import logging
 
         log_capture = io.StringIO()
         handler = logging.StreamHandler(log_capture)
@@ -347,7 +348,7 @@ class TestRateLimitingAwareness:
         sys.modules['acme.errors'] = MagicMock()
         sys.modules['josepy'] = MagicMock()
 
-        from acme_manager import retry_with_backoff, MAX_RETRIES, BASE_DELAY
+        from acme_manager import BASE_DELAY, MAX_RETRIES, retry_with_backoff
 
         # Verify retry configuration is reasonable
         assert MAX_RETRIES >= 3, "Should retry at least 3 times"
@@ -358,7 +359,6 @@ class TestRateLimitingAwareness:
         @retry_with_backoff
         def sample_func():
             """Sample docstring."""
-            pass
 
         assert sample_func.__name__ == "sample_func"
         assert sample_func.__doc__ == "Sample docstring."

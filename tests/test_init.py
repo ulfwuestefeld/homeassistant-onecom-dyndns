@@ -12,7 +12,7 @@ import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
 
-from homeassistant import config_entries  # noqa: E402
+from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 
 from custom_components.onecom_dyndns.const import (

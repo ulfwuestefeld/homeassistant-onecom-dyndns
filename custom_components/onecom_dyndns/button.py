@@ -11,9 +11,18 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 
-from .const import DOMAIN, CONF_DOMAIN, CONF_ADDON_SLUG, CONF_SSL_ENABLED, get_device_info
+from .const import (
+    CONF_ADDON_SLUG,
+    CONF_DOMAIN,
+    CONF_SSL_ENABLED,
+    DOMAIN,
+    get_device_info,
+)
 
 _LOGGER = logging.getLogger(__name__)
 

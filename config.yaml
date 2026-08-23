@@ -14,7 +14,7 @@ homeassistant_api: true
 hassio_api: true
 host_network: true
 map:
-  - config:rw
+  - homeassistant_config:rw
   - ssl:rw
 options:
   username: ""

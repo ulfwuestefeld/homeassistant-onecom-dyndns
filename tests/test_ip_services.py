@@ -4,9 +4,8 @@ Tests for IP detection services used by the DynDNS updater.
 
 import os
 import sys
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
-import pytest
 import requests
 
 # Add parent directory to path for imports

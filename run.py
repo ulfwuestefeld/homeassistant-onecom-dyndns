@@ -8,7 +8,6 @@ at One.com when changes are detected. It also supports automatic SSL
 certificate generation using Let's Encrypt with DNS-01 challenge.
 """
 
-import filecmp
 import json
 import logging
 import os
@@ -17,12 +16,11 @@ import signal
 import sys
 import threading
 import time
-from typing import Optional
 
 import requests
 
+from certificate_manager import CertificateManager
 from onecom_api import OneComAPI, OneComAPIError
-from certificate_manager import CertificateManager, CertificateManagerError
 
 # Configure logging
 LOG_LEVELS = {
@@ -149,7 +147,7 @@ def deploy_custom_component():
     try:
         with open(src_manifest, "r") as f:
             src_version = json.load(f).get("version", "0.0.0")
-    except (IOError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError) as exc:
         logging.warning("Cannot read bundled manifest.json: %s", exc)
         return False
 
@@ -160,7 +158,7 @@ def deploy_custom_component():
         try:
             with open(tgt_manifest, "r") as f:
                 tgt_version = json.load(f).get("version", "0.0.0")
-        except (IOError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError):
             tgt_version = None
 
     if tgt_version == src_version:
@@ -401,11 +399,11 @@ class DynDNSUpdater:
 
         self._running = True
         self._stop_event = threading.Event()
-        self._last_ip: Optional[str] = None
-        self._last_ip_update: Optional[str] = None
-        self._last_certificate_renewal: Optional[str] = None
-        self._api: Optional[OneComAPI] = None
-        self._cert_manager: Optional[CertificateManager] = None
+        self._last_ip: str | None = None
+        self._last_ip_update: str | None = None
+        self._last_certificate_renewal: str | None = None
+        self._api: OneComAPI | None = None
+        self._cert_manager: CertificateManager | None = None
 
         # Persistent HTTP session for IP checks and HA API calls.
         # Avoids creating a new TCP+TLS connection on every polling cycle.
@@ -413,7 +411,7 @@ class DynDNSUpdater:
 
         # In-memory ACME challenge cache (set by save_acme_challenge_info,
         # avoids reading the challenge file from disk on every state write).
-        self._current_acme_challenge: Optional[dict] = None
+        self._current_acme_challenge: dict | None = None
 
         # Setup logging
         self._setup_logging()
@@ -464,7 +462,7 @@ class DynDNSUpdater:
                 with open(LAST_IP_FILE, "r") as f:
                     self._last_ip = f.read().strip()
                     self._logger.debug("Loaded last IP: %s", self._last_ip)
-        except IOError as e:
+        except OSError as e:
             self._logger.warning("Could not load last IP: %s", e)
 
     def _save_last_ip(self, ip: str):
@@ -479,10 +477,10 @@ class DynDNSUpdater:
                 f.write(ip)
             self._last_ip = ip
             self._logger.debug("Saved IP: %s", ip)
-        except IOError as e:
+        except OSError as e:
             self._logger.error("Could not save IP: %s", e)
 
-    def get_public_ip(self) -> Optional[str]:
+    def get_public_ip(self) -> str | None:
         """Get the current public IP address.
 
         Returns:
@@ -757,7 +755,7 @@ class DynDNSUpdater:
                 cmd = json.load(f)
             # Remove the command file immediately so it isn't executed twice
             os.remove(ADDON_COMMAND_FILE)
-        except (IOError, json.JSONDecodeError) as exc:
+        except (OSError, json.JSONDecodeError) as exc:
             self._logger.debug("Could not read command file: %s", exc)
             try:
                 os.remove(ADDON_COMMAND_FILE)
@@ -1014,7 +1012,7 @@ def load_options() -> dict:
                 options = json.load(f)
                 logger.info("Loaded configuration from Home Assistant")
                 return options
-        except (IOError, json.JSONDecodeError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.error("Failed to load options: %s", e)
 
     # Fall back to environment variables (for testing)

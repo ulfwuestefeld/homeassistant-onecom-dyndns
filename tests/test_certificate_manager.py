@@ -2,18 +2,11 @@
 Unit tests for the Certificate Manager module.
 """
 
-import json
-import os
-import tempfile
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
-import threading
-import time
-
-import pytest
-
 # Mock the dependencies before importing
 import sys
+import tempfile
+from unittest.mock import MagicMock, Mock, patch
+
 sys.modules['acme'] = MagicMock()
 sys.modules['acme.client'] = MagicMock()
 sys.modules['acme.messages'] = MagicMock()
@@ -24,7 +17,6 @@ sys.modules['josepy'] = MagicMock()
 from certificate_manager import (
     CertificateManager,
     CertificateManagerError,
-    CERT_STATUS_FILE,
 )
 
 

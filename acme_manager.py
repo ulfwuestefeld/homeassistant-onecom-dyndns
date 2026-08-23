@@ -5,25 +5,25 @@ This module handles Let's Encrypt certificate management using the ACME protocol
 with DNS-01 challenge validation through One.com.
 """
 
-import json
 import logging
 import os
 import random
 import threading
 import time
 import traceback
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple, List, Callable
 from functools import wraps
 
+import josepy as jose
 import requests
+from acme import challenges, client, messages
+from acme import errors as acme_errors
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
-import josepy as jose
-from acme import client, messages, challenges, errors as acme_errors
 
 from onecom_api import OneComAPI, OneComAPIError
 
@@ -113,7 +113,6 @@ def retry_with_backoff(func):
 
 class ACMEManagerError(Exception):
     """Exception raised for ACME Manager errors."""
-    pass
 
 
 class ACMEManager:
@@ -127,8 +126,8 @@ class ACMEManager:
         account_key_path: str = DEFAULT_ACCOUNT_KEY_PATH,
         cert_path: str = DEFAULT_CERT_PATH,
         key_path: str = DEFAULT_KEY_PATH,
-        challenge_callback: Optional[Callable[[str, str, str], None]] = None,
-        stop_event: Optional[threading.Event] = None,
+        challenge_callback: Callable[[str, str, str], None] | None = None,
+        stop_event: threading.Event | None = None,
     ):
         """Initialize the ACME Manager.
 
@@ -153,8 +152,8 @@ class ACMEManager:
         self.challenge_callback = challenge_callback
 
         self.directory_url = LETSENCRYPT_STAGING if staging else LETSENCRYPT_PRODUCTION
-        self._account_key: Optional[jose.JWKRSA] = None
-        self._client: Optional[client.ClientV2] = None
+        self._account_key: jose.JWKRSA | None = None
+        self._client: client.ClientV2 | None = None
         self._stop_event = stop_event or threading.Event()
         self._directories_created = False
 
@@ -477,7 +476,7 @@ class ACMEManager:
                 except OneComAPIError as e:
                     _LOGGER.warning("Failed to cleanup challenge record: %s", e)
 
-    def obtain_certificate(self, domains: List[str]) -> Tuple[str, str]:
+    def obtain_certificate(self, domains: list[str]) -> tuple[str, str]:
         """Obtain a certificate for the specified domains.
 
         Args:
@@ -619,7 +618,7 @@ class ACMEManager:
         _LOGGER.info("NOTE: Restart NGINX or Home Assistant to use new certificate!")
         _LOGGER.info("="*50)
 
-    def get_certificate_expiry(self) -> Optional[datetime]:
+    def get_certificate_expiry(self) -> datetime | None:
         """Get the expiry date of the current certificate.
 
         Returns:
@@ -672,7 +671,7 @@ class ACMEManager:
 
         return False
 
-    def obtain_and_save_certificate(self, domains: List[str]) -> bool:
+    def obtain_and_save_certificate(self, domains: list[str]) -> bool:
         """Obtain and save a new certificate.
 
         Args:
@@ -689,7 +688,7 @@ class ACMEManager:
             _LOGGER.error("Failed to obtain certificate: %s", e)
             return False
 
-    def renew_if_needed(self, domains: List[str], days_before_expiry: int = 30) -> bool:
+    def renew_if_needed(self, domains: list[str], days_before_expiry: int = 30) -> bool:
         """Renew the certificate if it's expiring soon.
 
         Args:

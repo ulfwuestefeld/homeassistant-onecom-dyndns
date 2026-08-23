@@ -1,10 +1,10 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
-  "serialNumber": "urn:uuid:onecom-dyndns-sbom-2026-06-03-v1.4.2",
+  "serialNumber": "urn:uuid:onecom-dyndns-sbom-2026-08-24-v1.5.4",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-06-03T00:00:00Z",
+    "timestamp": "2026-08-24T00:00:00Z",
     "tools": [
       {
         "vendor": "Manual",
@@ -12,11 +12,11 @@
         "version": "1.0.0"
       }
     ],
-    "component": {
+      "component": {
       "type": "application",
       "bom-ref": "onecom-dyndns",
       "name": "One.com DynDNS Updater",
-      "version": "1.5.3",
+        "version": "1.5.4",
       "description": "Home Assistant add-on for dynamic DNS updates at One.com with automatic SSL certificates",
       "licenses": [
         {
@@ -40,9 +40,9 @@
   "components": [
     {
       "type": "library",
-      "bom-ref": "pkg:pypi/requests@2.28.0",
+      "bom-ref": "pkg:pypi/requests@2.32.0",
       "name": "requests",
-      "version": ">=2.28.0",
+      "version": "2.32.0",
       "description": "Python HTTP library for making HTTP requests",
       "purl": "pkg:pypi/requests",
       "licenses": [
@@ -61,9 +61,9 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:pypi/acme@2.9.0",
+      "bom-ref": "pkg:pypi/acme@5.6.0",
       "name": "acme",
-      "version": "2.9.0",
+      "version": "5.6.0",
       "description": "ACME protocol client library for Let's Encrypt",
       "purl": "pkg:pypi/acme",
       "licenses": [
@@ -82,9 +82,9 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:pypi/josepy@1.14.0",
+      "bom-ref": "pkg:pypi/josepy@2.0.0",
       "name": "josepy",
-      "version": "1.14.0",
+      "version": "2.0.0",
       "description": "JOSE (JSON Object Signing and Encryption) library",
       "purl": "pkg:pypi/josepy",
       "licenses": [
@@ -103,9 +103,9 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:pypi/cryptography@41.0.0",
+      "bom-ref": "pkg:pypi/cryptography@50.0.0",
       "name": "cryptography",
-      "version": ">=41.0.0",
+      "version": "50.0.0",
       "description": "Cryptographic recipes and primitives for Python",
       "purl": "pkg:pypi/cryptography",
       "licenses": [
@@ -222,20 +222,20 @@
     {
       "ref": "onecom-dyndns",
       "dependsOn": [
-        "pkg:pypi/requests@2.28.0",
-        "pkg:pypi/acme@2.9.0",
-        "pkg:pypi/josepy@1.14.0",
-        "pkg:pypi/cryptography@41.0.0",
+        "pkg:pypi/requests@2.32.0",
+        "pkg:pypi/acme@5.6.0",
+        "pkg:pypi/josepy@2.0.0",
+        "pkg:pypi/cryptography@50.0.0",
         "container:home-assistant-base-python",
         "app:python@3.11"
       ]
     },
     {
-      "ref": "pkg:pypi/acme@2.9.0",
+      "ref": "pkg:pypi/acme@5.6.0",
       "dependsOn": [
-        "pkg:pypi/josepy@1.14.0",
-        "pkg:pypi/cryptography@41.0.0",
-        "pkg:pypi/requests@2.28.0"
+        "pkg:pypi/josepy@2.0.0",
+        "pkg:pypi/cryptography@50.0.0",
+        "pkg:pypi/requests@2.32.0"
       ]
     },
     {

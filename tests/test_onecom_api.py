@@ -2,10 +2,11 @@
 Unit tests for the One.com API module.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-import sys
 import os
+import sys
+from unittest.mock import Mock, patch
+
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -405,8 +406,9 @@ class TestDynDNSUpdater:
 
     def test_get_public_ip_failure(self):
         """Test IP detection failure."""
-        from run import DynDNSUpdater
         import requests
+
+        from run import DynDNSUpdater
 
         updater = DynDNSUpdater(self.options)
         updater._http_session.get = Mock(

@@ -11,16 +11,16 @@ import os
 import socket
 import ssl
 import threading
-import time
 import traceback
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Callable, Dict, Any, List
+from collections.abc import Callable
+from datetime import datetime, timezone
+from typing import Any
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
-from onecom_api import OneComAPI, OneComAPIError
 from acme_manager import ACMEManager, ACMEManagerError
+from onecom_api import OneComAPI, OneComAPIError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +32,6 @@ DEFAULT_KEY_PATH = "/ssl/privkey.pem"
 
 class CertificateManagerError(Exception):
     """Exception raised for Certificate Manager errors."""
-    pass
 
 
 class CertificateManager:
@@ -44,14 +43,14 @@ class CertificateManager:
         password: str,
         domain: str,
         email: str,
-        ssl_domains: Optional[List[str]] = None,
+        ssl_domains: list[str] | None = None,
         staging: bool = False,
         cert_path: str = DEFAULT_CERT_PATH,
         key_path: str = DEFAULT_KEY_PATH,
         renewal_days: int = 30,
         check_interval_hours: int = 12,
-        challenge_callback: Optional[Callable[[str, str, str], None]] = None,
-        status_file: Optional[str] = None,
+        challenge_callback: Callable[[str, str, str], None] | None = None,
+        status_file: str | None = None,
     ):
         """Initialize the Certificate Manager.
 
@@ -84,16 +83,16 @@ class CertificateManager:
 
         self._running = False
         self._stop_event = threading.Event()
-        self._thread: Optional[threading.Thread] = None
-        self._last_check: Optional[datetime] = None
-        self._last_renewal: Optional[datetime] = None
-        self._callbacks: List[Callable[[str, Dict[str, Any]], None]] = []
+        self._thread: threading.Thread | None = None
+        self._last_check: datetime | None = None
+        self._last_renewal: datetime | None = None
+        self._callbacks: list[Callable[[str, dict[str, Any]], None]] = []
         self._directories_created = False
 
         # Certificate info cache: avoids re-reading and parsing the PEM
         # file on every state-write cycle.  Invalidated when a new
         # certificate is saved.
-        self._cached_cert_info: Optional[Dict[str, Any]] = None
+        self._cached_cert_info: dict[str, Any] | None = None
 
         _LOGGER.info("Certificate Manager initialized for %s", domain)
         _LOGGER.info("SSL domains: %s", ', '.join(self.ssl_domains))
@@ -113,7 +112,7 @@ class CertificateManager:
                 os.makedirs(directory, exist_ok=True)
         self._directories_created = True
 
-    def add_callback(self, callback: Callable[[str, Dict[str, Any]], None]):
+    def add_callback(self, callback: Callable[[str, dict[str, Any]], None]):
         """Add a callback for certificate events.
 
         Args:
@@ -121,7 +120,7 @@ class CertificateManager:
         """
         self._callbacks.append(callback)
 
-    def _notify(self, event_type: str, data: Dict[str, Any]):
+    def _notify(self, event_type: str, data: dict[str, Any]):
         """Notify all registered callbacks of an event.
 
         Args:
@@ -134,7 +133,7 @@ class CertificateManager:
             except Exception as e:
                 _LOGGER.warning("Callback error: %s", e)
 
-    def get_certificate_info(self) -> Optional[Dict[str, Any]]:
+    def get_certificate_info(self) -> dict[str, Any] | None:
         """Get information about the current certificate.
 
         Returns a cached result if the certificate has not changed since the
@@ -202,7 +201,7 @@ class CertificateManager:
             _LOGGER.error("Failed to read certificate info: %s", e)
             return None
 
-    def _save_status(self, status: Dict[str, Any]):
+    def _save_status(self, status: dict[str, Any]):
         """Save certificate status to file.
 
         Args:
@@ -215,10 +214,10 @@ class CertificateManager:
         try:
             with open(self.status_file, "w") as f:
                 json.dump(status, f, indent=2)
-        except IOError as e:
+        except OSError as e:
             _LOGGER.warning("Failed to save status: %s", e)
 
-    def _load_status(self) -> Dict[str, Any]:
+    def _load_status(self) -> dict[str, Any]:
         """Load certificate status from file.
 
         Returns:
@@ -230,7 +229,7 @@ class CertificateManager:
         try:
             with open(self.status_file, "r") as f:
                 return json.load(f)
-        except (IOError, json.JSONDecodeError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             _LOGGER.warning("Failed to load status: %s", e)
             return {}
 
@@ -424,7 +423,7 @@ class CertificateManager:
         port: int = 443,
         timeout: int = 10,
         ssl_context: ssl.SSLContext = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Verify that a valid certificate is served for a domain.
 
         Args:
@@ -484,7 +483,7 @@ class CertificateManager:
 
                     _LOGGER.info("Online certificate for %s: valid=%s, issuer=%s", domain, domain_covered, issuer.get('organizationName', 'Unknown'))
 
-        except socket.timeout:
+        except TimeoutError:
             result["error"] = "Connection timeout"
             _LOGGER.warning("Certificate check for %s: timeout", domain)
         except socket.gaierror as e:
@@ -503,7 +502,7 @@ class CertificateManager:
 
         return result
 
-    def verify_all_domains(self) -> Dict[str, Dict[str, Any]]:
+    def verify_all_domains(self) -> dict[str, dict[str, Any]]:
         """Verify certificates for all configured domains.
 
         Returns:
@@ -531,7 +530,7 @@ class CertificateManager:
 
         return results
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get the current status of the certificate manager.
 
         Returns:

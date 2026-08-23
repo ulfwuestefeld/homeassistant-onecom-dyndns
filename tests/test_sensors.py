@@ -15,9 +15,9 @@ import json
 import os
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -1323,7 +1323,6 @@ class TestSensorConstants:
 
     def test_attribute_constants_exist(self):
         """Check that new attribute constants are defined in const.py."""
-        import sys
         _ensure_ha_stubs()
 
         import importlib
@@ -2335,7 +2334,6 @@ class TestStateFileMtimeCaching:
         assert result1["current_ip"] == "1.2.3.4"
 
         # Modify file (os.replace changes mtime)
-        import time
         time.sleep(0.05)  # Ensure mtime changes
         state["current_ip"] = "5.6.7.8"
         state_file.write_text(json.dumps(state))

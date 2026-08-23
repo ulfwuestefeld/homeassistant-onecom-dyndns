@@ -4,7 +4,7 @@ requests>=2.32.0
 # SSL/ACME Dependencies
 acme>=3.0.1
 josepy>=2.0.0
-cryptography>=43.0.0
+cryptography>=50.0.0
 
 # Testing Dependencies (dev only)
 pytest>=7.0.0

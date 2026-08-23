@@ -6,8 +6,7 @@ import json
 import os
 import sys
 import tempfile
-import signal
-from unittest.mock import Mock, patch, MagicMock, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -180,7 +179,6 @@ class TestLoadOptions:
 
     def test_load_options_from_file(self):
         """Test loading options from a JSON file."""
-        from run import load_options
         
         test_options = {
             'username': 'test@example.com',
@@ -210,7 +208,6 @@ class TestLoadOptions:
 
     def test_load_options_returns_dict(self):
         """Test that load_options returns a dictionary."""
-        from run import load_options
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             json.dump({'username': 'test', 'password': 'pass', 'domain': 'test.com'}, f)

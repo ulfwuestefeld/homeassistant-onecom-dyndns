@@ -2,16 +2,16 @@
 Unit tests for the ACME Manager module.
 """
 
-import json
 import os
-import tempfile
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
-
-import pytest
 
 # Mock the acme and cryptography imports before importing our module
 import sys
+import tempfile
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
+
 sys.modules['acme'] = MagicMock()
 sys.modules['acme.client'] = MagicMock()
 sys.modules['acme.messages'] = MagicMock()
@@ -20,10 +20,10 @@ sys.modules['acme.errors'] = MagicMock()
 sys.modules['josepy'] = MagicMock()
 
 from acme_manager import (
-    ACMEManager,
-    ACMEManagerError,
     LETSENCRYPT_PRODUCTION,
     LETSENCRYPT_STAGING,
+    ACMEManager,
+    ACMEManagerError,
 )
 
 
@@ -184,7 +184,7 @@ class TestACMEManagerTimezoneHandling:
 
     def test_needs_renewal_with_timezone_aware_expiry(self):
         """Test needs_renewal handles timezone-aware expiry from cryptography."""
-        from datetime import datetime, timedelta, timezone
+        from datetime import timezone
 
         onecom_api = Mock()
         manager = ACMEManager(
@@ -199,7 +199,7 @@ class TestACMEManagerTimezoneHandling:
 
     def test_needs_renewal_with_timezone_aware_expiry_soon(self):
         """Test needs_renewal correctly detects expiring timezone-aware cert."""
-        from datetime import datetime, timedelta, timezone
+        from datetime import timezone
 
         onecom_api = Mock()
         manager = ACMEManager(
@@ -214,7 +214,6 @@ class TestACMEManagerTimezoneHandling:
 
     def test_needs_renewal_with_timezone_naive_expiry(self):
         """Test needs_renewal still works with timezone-naive expiry (fallback)."""
-        from datetime import datetime, timedelta
 
         onecom_api = Mock()
         manager = ACMEManager(
@@ -319,6 +318,7 @@ class TestRetryWithBackoffInterruptible:
     def test_retry_uses_stop_event_for_sleep(self):
         """When _stop_event is set during backoff, retry raises immediately."""
         import threading
+
         from acme_manager import retry_with_backoff
 
         class FakeService:
@@ -338,6 +338,7 @@ class TestRetryWithBackoffInterruptible:
     def test_retry_succeeds_after_failure(self):
         """Retry should succeed when the second attempt works."""
         import threading
+
         from acme_manager import retry_with_backoff
 
         call_count = 0
@@ -367,6 +368,5 @@ class TestRetryWithBackoffInterruptible:
         def standalone_func():
             raise ConnectionError("fail")
 
-        with patch("acme_manager.time.sleep"):
-            with pytest.raises(ConnectionError):
-                standalone_func()
+        with patch("acme_manager.time.sleep"), pytest.raises(ConnectionError):
+            standalone_func()

@@ -4,8 +4,7 @@ Unit tests for the retry_with_backoff decorator in acme_manager.py
 
 import os
 import sys
-import time
-from unittest.mock import Mock, patch, MagicMock, call
+from unittest.mock import patch
 
 import pytest
 import requests
@@ -13,7 +12,7 @@ import requests
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from acme_manager import retry_with_backoff, ACMEManager, ACMEManagerError
+from acme_manager import retry_with_backoff
 
 
 class TestRetryWithBackoffDecorator:

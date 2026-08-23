@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] - 2026-08-24
+
+### Security
+
+- **Dependencies:** Upgraded `cryptography` to `50.0.0` to address a reported
+  Bleichenbacher-style oracle vulnerability (CVE-2026-69247). See SBOM and
+  `requirements.txt` for details.
+
+### Added
+
+- **CI / Security checks:** Added `safety` scan and Dependabot config; enhanced
+  security CI to run `ruff`, `bandit`, `pip-audit` and `safety` and upload reports.
+
+### Changed
+
+- **SBOM & FOSS:** Updated `sbom.json` and `SBOM.md` to reflect component
+  version changes and SBOM version `1.5.4`.
+
+### Version
+
+- Bumped project and integration version to `1.5.4`.
+
 ## [1.5.3] - 2026-06-08
 
 ### Fixed

@@ -1,0 +1,48 @@
+name: Security and Lint CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff bandit pip-audit safety
+
+      - name: Ruff (lint)
+        run: ruff check .
+
+      - name: Bandit (security scan)
+        run: bandit -r . -f json -o bandit_report.json || true
+
+      - name: Pip Audit (vulnerability scan)
+        run: pip-audit -r requirements.txt -f json -o pip_audit.json || true
+
+      - name: Safety (vulnerability DB scan)
+        run: |
+          # Run safety against requirements and save JSON report; non-fatal
+          safety check -r requirements.txt --full-report --output json -o safety_report.json || true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            bandit_report.json
+            pip_audit.json
+            safety_report.json

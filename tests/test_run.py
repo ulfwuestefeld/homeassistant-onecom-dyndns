@@ -6,7 +6,7 @@ import json
 import os
 import sys
 import tempfile
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -14,14 +14,14 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from run import (
-    DynDNSUpdater,
-    get_supervisor_token,
-    send_ha_notification,
-    update_ha_sensor,
-    save_acme_challenge_info,
-    load_options,
     IP_SERVICES,
     LOG_LEVELS,
+    DynDNSUpdater,
+    get_supervisor_token,
+    load_options,
+    save_acme_challenge_info,
+    send_ha_notification,
+    update_ha_sensor,
 )
 
 
@@ -489,7 +489,7 @@ class TestDeployCustomComponent:
         manifest.write_text('{"version": "1.0.0"}')
 
         with patch("run._COMPONENT_SOURCE", str(src)):
-            with patch("builtins.open", side_effect=IOError("permission denied")):
+            with patch("builtins.open", side_effect=OSError("permission denied")):
                 result = deploy_custom_component()
         assert result is False
 
