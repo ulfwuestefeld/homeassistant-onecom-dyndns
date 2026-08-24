@@ -9,7 +9,7 @@ cryptography>=50.0.0
 # Testing Dependencies (dev only)
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
-pytest-cov>=4.0.0
+pytest-cov>=7.1.0
 responses>=0.22.0
 
 # Optional: HA integration tests (test_config_flow.py, test_init.py)
