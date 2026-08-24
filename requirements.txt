@@ -1,5 +1,5 @@
 # One.com DynDNS Updater Dependencies
-requests>=2.32.0
+requests>=2.34.2
 
 # SSL/ACME Dependencies
 acme>=3.0.1
