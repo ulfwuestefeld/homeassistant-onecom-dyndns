@@ -2,7 +2,7 @@
 requests>=2.32.0
 
 # SSL/ACME Dependencies
-acme>=3.0.1
+acme>=5.7.0
 josepy>=2.0.0
 cryptography>=50.0.0
 
