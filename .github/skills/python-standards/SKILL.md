@@ -1,0 +1,42 @@
+---
+name: python-standards
+description: Python coding standards for this repository. Use when editing any Python source file (*.py), including typing, logging, retries, and error handling.
+---
+
+# Python Standards
+
+- Target Python 3.12+; use `from __future__ import annotations` in component files
+- Use `typing.Final` for constants, type hints everywhere
+- Lazy log formatting: `_LOGGER.debug("msg %s", val)` not f-strings
+- Use `threading.Event.wait()` instead of `time.sleep()` in loops (interruptible)
+- One `OneComAPI` login per update cycle, shared across subdomains
+- SSL context created once and reused
+
+```python
+# BAD
+logging.info(f"IP changed to {ip}")
+time.sleep(interval)
+
+# GOOD
+logging.info("IP changed to %s", ip)
+self._stop_event.wait(timeout=interval)
+```
+
+## Error Handling
+
+- Catch specific exceptions first, then generic `Exception` as fallback
+- Always log errors with lazy formatting: `_LOGGER.error("Error: %s", err)`
+- For unexpected errors, log traceback: `_LOGGER.error("Traceback:\n%s", traceback.format_exc())`
+- Save error state to status files when applicable
+- Use `@retry_with_backoff` decorator for network operations (5 retries, exponential delay)
+- Never log passwords or credentials (validated in `test_security.py`)
+
+```python
+# Error handling pattern
+try:
+    result = api.update_record(subdomain, ip)
+except OneComAPIError as e:
+    _LOGGER.warning("API error for %s: %s", subdomain, e)
+except Exception:
+    _LOGGER.error("Unexpected error:\n%s", traceback.format_exc())
+```

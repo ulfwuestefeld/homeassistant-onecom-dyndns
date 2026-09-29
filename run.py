@@ -30,6 +30,9 @@ LOG_LEVELS = {
     "error": logging.ERROR,
 }
 
+# Module logger for non-class functions
+_LOGGER = logging.getLogger("onecom_dyndns")
+
 # IP service endpoints
 IP_SERVICES = {
     "ipify": "https://api.ipify.org",
@@ -85,15 +88,15 @@ def send_ha_notification(title: str, message: str, notification_id: str = None):
         notification_id: Optional ID for the notification (allows updates)
     """
     if not SUPERVISOR_TOKEN:
-        logging.warning("No SUPERVISOR_TOKEN available, cannot send notification")
+        _LOGGER.warning("No SUPERVISOR_TOKEN available, cannot send notification")
         return False
-    
+
     try:
         headers = {
             "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
             "Content-Type": "application/json",
         }
-        
+
         data = {
             "title": title,
             "message": message,
@@ -105,13 +108,13 @@ def send_ha_notification(title: str, message: str, notification_id: str = None):
             f"{HA_API_URL}/services/persistent_notification/create",
             headers=headers,
             json=data,
-            timeout=10
+            timeout=10,
         )
         response.raise_for_status()
-        logging.debug("Notification sent: %s", title)
+        _LOGGER.debug("Notification sent: %s", title)
         return True
     except Exception as e:
-        logging.warning("Failed to send notification: %s", e)
+        _LOGGER.warning("Failed to send notification: %s", e)
         return False
 
 
@@ -132,7 +135,7 @@ def deploy_custom_component():
     the target does not exist yet.
     """
     if not os.path.isdir(_COMPONENT_SOURCE):
-        logging.debug(
+        _LOGGER.debug(
             "Custom component source %s not found, skipping deployment",
             _COMPONENT_SOURCE,
         )
@@ -141,14 +144,14 @@ def deploy_custom_component():
     # Read bundled version
     src_manifest = os.path.join(_COMPONENT_SOURCE, "manifest.json")
     if not os.path.isfile(src_manifest):
-        logging.warning("manifest.json missing in bundled component")
+        _LOGGER.warning("manifest.json missing in bundled component")
         return False
 
     try:
         with open(src_manifest, "r") as f:
             src_version = json.load(f).get("version", "0.0.0")
     except (OSError, json.JSONDecodeError) as exc:
-        logging.warning("Cannot read bundled manifest.json: %s", exc)
+        _LOGGER.warning("Cannot read bundled manifest.json: %s", exc)
         return False
 
     # Read currently installed version (if any)
@@ -162,7 +165,7 @@ def deploy_custom_component():
             tgt_version = None
 
     if tgt_version == src_version:
-        logging.debug(
+        _LOGGER.debug(
             "Custom component %s already installed (v%s)",
             _COMPONENT_TARGET,
             tgt_version,
@@ -178,7 +181,7 @@ def deploy_custom_component():
 
         shutil.copytree(_COMPONENT_SOURCE, _COMPONENT_TARGET)
 
-        logging.info(
+        _LOGGER.info(
             "Custom component deployed to %s (v%s → v%s)",
             _COMPONENT_TARGET,
             tgt_version or "none",
@@ -186,7 +189,7 @@ def deploy_custom_component():
         )
         return True
     except Exception as exc:
-        logging.error("Failed to deploy custom component: %s", exc)
+        _LOGGER.error("Failed to deploy custom component: %s", exc)
         return False
 
 
@@ -219,7 +222,7 @@ def publish_addon_discovery(options: dict, retries: int = 5, delay: int = 10):
     an increasing delay.
     """
     if not SUPERVISOR_TOKEN:
-        logging.warning("No SUPERVISOR_TOKEN, skipping discovery publication")
+        _LOGGER.warning("No SUPERVISOR_TOKEN, skipping discovery publication")
         return False
 
     headers = {
@@ -241,34 +244,30 @@ def publish_addon_discovery(options: dict, retries: int = 5, delay: int = 10):
                 timeout=10,
             )
             if response.ok:
-                logging.info(
+                _LOGGER.info(
                     "Published discovery for onecom_dyndns integration "
                     "(attempt %d/%d)", attempt, retries,
                 )
                 return True
             else:
-                logging.warning(
+                _LOGGER.warning(
                     "Discovery publish attempt %d/%d returned %s: %s",
                     attempt, retries,
                     response.status_code,
                     response.text,
                 )
         except Exception as exc:
-            logging.warning(
+            _LOGGER.warning(
                 "Discovery publish attempt %d/%d failed: %s",
                 attempt, retries, exc,
             )
 
         if attempt < retries:
             wait = delay * attempt
-            logging.info(
-                "Retrying discovery publication in %ds …", wait,
-            )
+            _LOGGER.info("Retrying discovery publication in %ds …", wait)
             time.sleep(wait)
 
-    logging.error(
-        "Could not publish discovery after %d attempts", retries,
-    )
+    _LOGGER.error("Could not publish discovery after %d attempts", retries)
     return False
 
 
@@ -281,7 +280,7 @@ def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
         attributes: Optional dictionary of attributes
     """
     if not SUPERVISOR_TOKEN:
-        logging.debug("No SUPERVISOR_TOKEN available, cannot update sensor")
+        _LOGGER.debug("No SUPERVISOR_TOKEN available, cannot update sensor")
         return False
     
     try:
@@ -314,13 +313,13 @@ def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
             f"{HA_API_URL}/states/{entity_id}",
             headers=headers,
             json=data,
-            timeout=10
+            timeout=10,
         )
         response.raise_for_status()
-        logging.debug("Sensor updated: %s = %s", entity_id, state)
+        _LOGGER.debug("Sensor updated: %s = %s", entity_id, state)
         return True
     except Exception as e:
-        logging.warning("Failed to update sensor %s: %s", entity_id, e)
+        _LOGGER.warning("Failed to update sensor %s: %s", entity_id, e)
         return False
 
 
@@ -344,9 +343,9 @@ def save_acme_challenge_info(domain: str, txt_name: str, txt_value: str):
     try:
         with open(ACME_CHALLENGE_FILE, "w") as f:
             json.dump(challenge_info, f, indent=2)
-        logging.info("ACME challenge info saved to %s", ACME_CHALLENGE_FILE)
+        _LOGGER.info("ACME challenge info saved to %s", ACME_CHALLENGE_FILE)
     except Exception as e:
-        logging.warning("Failed to save ACME challenge info: %s", e)
+        _LOGGER.warning("Failed to save ACME challenge info: %s", e)
     
     # Send Home Assistant notification
     notification_message = (
@@ -452,7 +451,7 @@ class DynDNSUpdater:
             handlers=[logging.StreamHandler(sys.stdout)],
         )
 
-        self._logger = logging.getLogger("onecom_dyndns")
+        self._logger = _LOGGER
         self._logger.setLevel(log_level)
 
     def _load_last_ip(self):
@@ -703,8 +702,8 @@ class DynDNSUpdater:
         if self._cert_manager:
             try:
                 cert_info = self._cert_manager.get_certificate_info()
-            except Exception:
-                pass
+            except Exception as exc:
+                self._logger.debug("Could not get certificate info: %s", exc)
 
         # Use in-memory ACME challenge cache (populated by
         # _save_acme_challenge which is used as the challenge_callback).
@@ -738,7 +737,7 @@ class DynDNSUpdater:
             os.replace(tmp_path, ADDON_STATE_FILE)
             self._logger.debug("State file written: %s", ADDON_STATE_FILE)
         except Exception as exc:
-            self._logger.debug("Failed to write state file: %s", exc)
+            self._logger.warning("Failed to write state file: %s", exc)
 
     def _check_commands(self):
         """Check for and execute commands from the custom component.

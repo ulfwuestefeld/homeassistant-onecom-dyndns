@@ -2,7 +2,7 @@
 
 **Project:** One.com DynDNS Updater  
 **Version:** 1.5.4  
-**Date:** 2026-08-24  
+**Date:** 2026-09-29  
 **License:** MIT  
 
 ## Overview
@@ -39,8 +39,8 @@ This document provides a complete inventory of all software components used in t
 
 | Package | Version | License | Purpose |
 |---------|---------|---------|---------|
-| acme | ==2.9.0 | Apache-2.0 | Let's Encrypt ACME protocol |
-| josepy | ==1.14.0 | Apache-2.0 | JOSE/JWK cryptographic operations |
+| acme | 5.6.0 | Apache-2.0 | Let's Encrypt ACME protocol |
+| josepy | 2.0.0 | Apache-2.0 | JOSE/JWK cryptographic operations |
 
 > `requests` and `cryptography` are provided by Home Assistant Core but the add-on pins/declares compatible versions for the bundled environment.
 
@@ -110,19 +110,19 @@ This document provides a complete inventory of all software components used in t
 ## Dependency Graph
 
 ```
-One.com DynDNS Updater (1.5.3)
+One.com DynDNS Updater (1.5.4)
 ├── Python 3.11
 │   └── Alpine Linux 3.18
 │       ├── openssl
 │       ├── libffi
 │       └── musl
-├── requests (>=2.28.0)
+├── requests (>=2.32.0)
 │   ├── urllib3
 │   ├── certifi
 │   └── charset-normalizer
-├── acme (==2.9.0)
-│   ├── josepy (==1.14.0)
-│   ├── cryptography (>=41.0.0)
+├── acme (>=3.0.1; SBOM: 5.6.0)
+│   ├── josepy (>=2.0.0; SBOM: 2.0.0)
+│   ├── cryptography (>=50.0.0)
 │   │   └── cffi
 │   └── requests
 └── Home Assistant Supervisor API

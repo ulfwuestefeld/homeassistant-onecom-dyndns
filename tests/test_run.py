@@ -44,10 +44,9 @@ class TestGetSupervisorToken:
 
     def test_returns_empty_when_no_token(self):
         """Test that empty string is returned when no token available."""
-        with patch.dict(os.environ, {}, clear=True):
-            with patch("os.path.exists", return_value=False):
-                token = get_supervisor_token()
-                assert token == ""
+        with patch.dict(os.environ, {}, clear=True), patch("os.path.exists", return_value=False):
+            token = get_supervisor_token()
+            assert token == ""
 
 
 class TestSendHaNotification:
@@ -181,9 +180,8 @@ class TestSaveAcmeChallengeInfo:
     @patch("run.update_ha_sensor")
     def test_sends_notification(self, mock_sensor, mock_notification):
         """Test that notification is sent."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.ACME_CHALLENGE_FILE", os.path.join(tmpdir, "acme.json")):
-                save_acme_challenge_info("example.com", "_acme.example.com", "token")
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.ACME_CHALLENGE_FILE", os.path.join(tmpdir, "acme.json")):
+            save_acme_challenge_info("example.com", "_acme.example.com", "token")
 
         mock_notification.assert_called_once()
         call_args = mock_notification.call_args
@@ -192,11 +190,9 @@ class TestSaveAcmeChallengeInfo:
     @patch("run.send_ha_notification")
     def test_does_not_call_update_ha_sensor(self, mock_notification):
         """Test that save_acme_challenge_info no longer calls update_ha_sensor (state file replaces it)."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.ACME_CHALLENGE_FILE", os.path.join(tmpdir, "acme.json")):
-                with patch("run.update_ha_sensor") as mock_sensor:
-                    save_acme_challenge_info("example.com", "_acme.example.com", "token")
-                    mock_sensor.assert_not_called()
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.ACME_CHALLENGE_FILE", os.path.join(tmpdir, "acme.json")), patch("run.update_ha_sensor") as mock_sensor:
+            save_acme_challenge_info("example.com", "_acme.example.com", "token")
+            mock_sensor.assert_not_called()
 
 
 class TestLoadOptions:
@@ -389,20 +385,19 @@ class TestDynDNSUpdaterAdvanced:
 
     def test_ssl_event_callback_renewed(self):
         """Test SSL event callback for renewal."""
-        with patch("run.send_ha_notification") as mock_notify:
-            with patch("run.update_ha_sensor"):
-                updater = DynDNSUpdater(self.options)
-                updater._ssl_event_callback("renewed", {
-                    "domains": ["example.com"],
-                    "certificate": {
-                        "not_valid_after": "2026-04-30",
-                        "days_remaining": 89,
-                    }
-                })
+        with patch("run.send_ha_notification") as mock_notify, patch("run.update_ha_sensor"):
+            updater = DynDNSUpdater(self.options)
+            updater._ssl_event_callback("renewed", {
+                "domains": ["example.com"],
+                "certificate": {
+                    "not_valid_after": "2026-04-30",
+                    "days_remaining": 89,
+                }
+            })
 
-                mock_notify.assert_called_once()
-                call_args = mock_notify.call_args
-                assert "Certificate Renewed" in call_args[1]["title"]
+            mock_notify.assert_called_once()
+            call_args = mock_notify.call_args
+            assert "Certificate Renewed" in call_args[1]["title"]
 
     def test_ssl_event_callback_error(self):
         """Test SSL event callback for error."""

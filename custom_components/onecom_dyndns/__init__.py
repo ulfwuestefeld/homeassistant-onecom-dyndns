@@ -57,12 +57,12 @@ async def _async_detect_addon(hass: HomeAssistant) -> str | None:
                 "Detected running add-on via state file %s", state_path
             )
             return ADDON_SLUG
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:  # Log unexpected errors when detecting add-on
+        _LOGGER.exception("Add-on detection error")
     return None
 
 
-async def _async_remove_standalone_device(
+def _async_remove_standalone_device(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> None:
     """Remove the old standalone device after switching to add-on mode.
@@ -87,8 +87,6 @@ async def _async_remove_standalone_device(
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up One.com DynDNS from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
-
     # If the entry was created manually (no addon_slug), try to detect the
     # running add-on so the entities attach to the add-on device and the
     # coordinator reads data from the state file instead of polling.
@@ -104,7 +102,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 entry.entry_id,
             )
             # Remove the old standalone device so we don't leave orphans
-            await _async_remove_standalone_device(hass, entry)
+            _async_remove_standalone_device(hass, entry)
 
     # Create coordinator
     coordinator = OneComDynDNSCoordinator(hass, entry)
@@ -112,16 +110,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Fetch initial data
     await coordinator.async_config_entry_first_refresh()
 
-    hass.data[DOMAIN][entry.entry_id] = {
-        "coordinator": coordinator,
-        "config": entry.data,
-    }
+    entry.runtime_data = coordinator
 
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Register services
-    await async_setup_services(hass)
+    async_setup_services(hass)
 
     # Register update listener for options
     entry.async_on_unload(entry.add_update_listener(async_update_options))
@@ -134,10 +129,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
+        remaining_entries = [
+            other_entry
+            for other_entry in hass.config_entries.async_entries(DOMAIN)
+            if other_entry.entry_id != entry.entry_id and not other_entry.disabled_by
+        ]
+    else:
+        remaining_entries = [entry]
 
-    # Remove services if no entries left
-    if not hass.data[DOMAIN]:
+    # Remove services if no configured entries remain.
+    if unload_ok and not remaining_entries:
         for service in [SERVICE_UPDATE_DNS, SERVICE_RENEW_CERTIFICATE, SERVICE_CHECK_IP]:
             if hass.services.has_service(DOMAIN, service):
                 hass.services.async_remove(DOMAIN, service)
@@ -150,25 +151,25 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_setup_services(hass: HomeAssistant) -> None:
+def async_setup_services(hass: HomeAssistant) -> None:
     """Set up services for One.com DynDNS."""
 
     async def handle_update_dns(call: ServiceCall) -> None:
         """Handle the update DNS service call."""
-        for _entry_id, data in hass.data[DOMAIN].items():
-            coordinator: OneComDynDNSCoordinator = data["coordinator"]
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            coordinator: OneComDynDNSCoordinator = entry.runtime_data
             await coordinator.async_force_update_dns()
 
     async def handle_renew_certificate(call: ServiceCall) -> None:
         """Handle the renew certificate service call."""
-        for _entry_id, data in hass.data[DOMAIN].items():
-            coordinator: OneComDynDNSCoordinator = data["coordinator"]
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            coordinator: OneComDynDNSCoordinator = entry.runtime_data
             await coordinator.async_force_renew_certificate()
 
     async def handle_check_ip(call: ServiceCall) -> None:
         """Handle the check IP service call."""
-        for _entry_id, data in hass.data[DOMAIN].items():
-            coordinator: OneComDynDNSCoordinator = data["coordinator"]
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            coordinator: OneComDynDNSCoordinator = entry.runtime_data
             await coordinator.async_refresh()
 
     if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_DNS):
@@ -282,8 +283,8 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
             )
             if data is not None:
                 return data
-        except Exception as err:
-            _LOGGER.debug("Could not read add-on state file: %s", err)
+        except Exception:
+            _LOGGER.exception("Could not read add-on state file")
 
         # State file not yet available – return safe defaults
         return {
@@ -371,8 +372,8 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
                 response.raise_for_status()
                 ip = (await response.text()).strip()
                 return ip
-        except Exception as err:
-            _LOGGER.error("Failed to get public IP: %s", err)
+        except Exception:
+            _LOGGER.exception("Failed to get public IP")
             raise
 
     async def _async_update_dns(self, ip: str) -> bool:
@@ -413,12 +414,12 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
         except OneComAPIError as err:
             if "Invalid credentials" in str(err):
                 raise ConfigEntryAuthFailed(str(err)) from err
-            _LOGGER.error("DNS update failed: %s", err)
+            _LOGGER.exception("DNS update failed")
             return False
         except ConfigEntryAuthFailed:
             raise
         except Exception as err:
-            _LOGGER.error("DNS update failed: %s", err)
+            _LOGGER.exception("DNS update failed")
             return False
         finally:
             await self.hass.async_add_executor_job(api.logout)

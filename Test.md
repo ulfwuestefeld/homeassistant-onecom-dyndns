@@ -35,6 +35,7 @@ Before running the tests, you need to install the following:
    ```bash
    pip install pytest-homeassistant-custom-component
    ```
+   The CI runs these tests against Home Assistant Core 2026.9 on Python 3.14.2.
 
 ### Optional Tools
 

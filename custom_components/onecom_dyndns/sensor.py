@@ -30,6 +30,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+PARALLEL_UPDATES = 0
+
 SENSOR_TYPES: Final[tuple[SensorEntityDescription, ...]] = (
     SensorEntityDescription(
         key="current_ip",
@@ -88,7 +90,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up One.com DynDNS sensors."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data
     domain = entry.data[CONF_DOMAIN]
 
     ssl_only_sensors = {"certificate_expiry", "last_certificate_renewal", "acme_challenge"}

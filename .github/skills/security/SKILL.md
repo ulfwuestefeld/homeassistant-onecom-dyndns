@@ -1,0 +1,36 @@
+---
+name: security
+description: Security conventions for credentials, API sessions, files, and network traffic. Use when handling secrets, authentication, external calls, or sensitive files in Python code.
+---
+
+# Security Conventions
+
+## Credential Handling
+
+- **Never log passwords**: Use lazy formatting; never include passwords in log messages
+- **Password masking**: Validated by `test_security.py` — passwords must not appear in logs
+- **Config flow**: Passwords stored in `ConfigEntry.data` (encrypted by HA)
+- **Add-on options**: Passwords in `/data/options.json` (file permissions managed by Supervisor)
+- **One.com API credentials**: Used only to obtain a session; session token used for subsequent calls
+
+## API Security
+
+- **Session management**: Always call `api.logout()` after operations
+- **One login per cycle**: Share `OneComAPI` instance across subdomains in a single update
+- **Error messages**: Never expose sensitive details in user-facing errors
+- **DNS API credentials**: Keep scoped to DNS operations only; do not expose full account access
+
+## File Permissions
+
+- **State/command files**: Written to `/config/` (accessible by HA Core)
+- **SSL certificates**: Stored in `/ssl/` (mapped volume, readable by NGINX/HA proxy)
+- **ACME data**: Stored in `/data/acme/` (add-on private — account key, challenge data)
+- **Certificate status**: Stored in `/data/ssl/cert_status.json` (add-on private)
+
+## Network Security
+
+- All external API calls use HTTPS
+- Default `requests` SSL verification (certificates validated)
+- Retry logic with exponential backoff prevents accidental DoS
+- Let's Encrypt rate limits must be respected (see the `acme-ssl` skill)
+- Always use staging environment (`ssl_staging: true`) during development and testing

@@ -1,0 +1,69 @@
+---
+name: ha-integration
+description: Home Assistant custom component conventions. Use when editing custom_components/onecom_dyndns, config flows, coordinators, entities, services, or translations.
+---
+
+# HA Integration Conventions
+
+- Domain: `onecom_dyndns`; integration name: "One.com DynDNS Updater"
+- `manifest.json` must have `"after_dependencies": ["hassio"]`
+- Config flow: `async_step_hassio()` auto-creates entry, no user confirmation
+- Coordinator reads state file in add-on mode; polls IP directly in standalone mode
+- Translations in `strings.json`, `translations/en.json`, `translations/de.json`
+- Entity categories: Diagnostic for `last_update` / `acme_challenge`; Config for buttons
+- SSL-only entities gated by `ssl_enabled` flag in coordinator data
+
+## Device Info
+
+`get_device_info()` in `const.py` provides **full metadata in both modes**:
+
+- **Add-on mode** (`addon_slug` set): `identifiers={('hassio', addon_slug)}` plus
+  `name="One.com DynDNS Updater"`, `manufacturer`, `model`, `configuration_url`
+  (fallback for when the Supervisor device doesn't exist yet)
+- **Standalone mode**: `identifiers={(DOMAIN, entry_id)}` with full standalone metadata
+
+## Add-on Mode Detection & Cleanup
+
+In `async_setup_entry()`:
+1. If no `CONF_ADDON_SLUG`, check for state file via `_async_detect_addon()`
+2. If found, update entry data with `hass.config_entries.async_update_entry(entry, data=new_data)`
+   — **Note**: this is a synchronous method despite the `async_` prefix, no `await` needed
+3. Call `_async_remove_standalone_device()` to delete the orphaned device from the registry
+
+## Adding New Sensors
+
+1. Add `SensorEntityDescription` to `SENSOR_TYPES` in `sensor.py`
+2. Set `key`, `translation_key`, `icon`; optional: `device_class`, `entity_category`
+3. Implement value logic in `OneComDynDNSSensor.native_value`
+4. Add `extra_state_attributes` if needed
+5. Add translation keys to `strings.json` → `entity.sensor.<key>.name`
+6. Copy translations to `translations/en.json` and `translations/de.json`
+7. For SSL-only sensors, add `key` to `ssl_only_sensors` set in `async_setup_entry`
+
+Binary sensors follow the same pattern with `BINARY_SENSOR_TYPES` and `is_on`.
+
+## Adding New Buttons
+
+1. Add `OneComButtonEntityDescription` to `BUTTON_TYPES` in `button.py`
+2. Set `key`, `translation_key`, `icon`, `entity_category=EntityCategory.CONFIG`
+3. Set `method` to the coordinator method name (e.g. `"async_force_update_dns"`)
+4. Implement the method in `OneComDynDNSCoordinator`
+   - Add-on mode: write command file
+   - Standalone mode: execute directly
+5. Add translations to all three translation files
+
+## Adding New Services
+
+1. Define service in `services.yaml`
+2. Add constant `SERVICE_<NAME>` in `const.py`
+3. Register in `__init__.py` → `async_setup_services()`
+4. Add translations to `strings.json` → `services.<name>.name` / `.description`
+
+## Translation Management
+
+Two translation systems exist:
+
+- **Component** (`custom_components/onecom_dyndns/translations/`): JSON files (`en.json`, `de.json`) — config flow, entities, services, errors
+- **Add-on** (`translations/`): YAML files (`en.yaml`, `de.yaml`) — add-on UI
+
+Always update `strings.json` first (English source of truth), then sync to `translations/en.json` and translate in `translations/de.json`.

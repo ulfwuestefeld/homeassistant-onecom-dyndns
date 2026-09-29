@@ -23,6 +23,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    ADDON_SLUG,
     CONF_DOMAIN,
     CONF_IP_SERVICE,
     CONF_PASSWORD,
@@ -60,7 +61,7 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._subdomains: list[str] = []
 
     async def async_step_hassio(
-        self, discovery_info: dict[str, Any],
+        self, discovery_info: Any,
     ) -> ConfigFlowResult:
         """Handle Supervisor add-on discovery.
 
@@ -68,17 +69,13 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         info via the Supervisor API.  The config entry is created
         immediately so the user sees entities on the add-on device
         without any manual setup.
-        """      
-        # Prüfen, ob es das neue HassioServiceInfo-Objekt (oder ein Mock davon) ist, 
-        # das das Attribut 'config' besitzt.
-        if hasattr(discovery_info, "config") and not isinstance(discovery_info, dict):
-            config = discovery_info.config
-        # Falls es ein altes Dictionary ist (oder im Test so übergeben wird)
-        elif isinstance(discovery_info, dict):
-            config = discovery_info.get("config", discovery_info)
+        """
+        if isinstance(discovery_info, dict):
+            config = dict(discovery_info.get("config", discovery_info) or {})
+            addon_slug = discovery_info.get("addon", ADDON_SLUG)
         else:
-            # Fallback für alle Fälle
-            config = discovery_info
+            config = dict(getattr(discovery_info, "config", {}) or {})
+            addon_slug = getattr(discovery_info, "addon", None) or ADDON_SLUG
         
         domain = config.get("domain", "")
 
@@ -90,9 +87,7 @@ class OneComDynDNSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured(updates=config)
 
         # Store the add-on slug so entities can attach to its device
-        config["addon_slug"] = discovery_info.get(
-            "addon", "homeassistant-onecom-dyndns"
-        )
+        config["addon_slug"] = addon_slug
 
         # Auto-create the entry -- no user confirmation required because
         # all configuration is already provided by the add-on.

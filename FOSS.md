@@ -6,10 +6,13 @@ machine-readable Software Bill of Materials.
 
 Core components:
 
-- `requests` — Apache-2.0
-- `acme` — Apache-2.0
-- `josepy` — Apache-2.0
-- `cryptography` — Apache-2.0 / BSD-3-Clause
+- `requests >=2.32.0` — Apache-2.0
+- `acme >=3.0.1` (SBOM: 5.6.0) — Apache-2.0
+- `josepy >=2.0.0` (SBOM: 2.0.0) — Apache-2.0
+- `cryptography >=50.0.0` — Apache-2.0 / BSD-3-Clause
+- Home Assistant Base Python / Supervisor API — Apache-2.0
+- Python 3.11 — PSF-2.0
+- Alpine Linux, musl and libffi — various / MIT
 
 Development & testing:
 
@@ -17,6 +20,11 @@ Development & testing:
 - `ruff` — MIT
 - `bandit` — BSD-3-Clause
 - `safety` — BSD-3-Clause
+
+The declared runtime dependency versions are also recorded in `sbom.json`.
+The checked-in `pip_audit.json` is an environment report and currently records
+`cryptography 48.0.0`; regenerate it after installing the declared
+`cryptography >=50.0.0` requirement.
 
 License for this project: MIT
 

@@ -1,0 +1,35 @@
+---
+name: quality-checklist
+description: Post-change quality and release checklist for this repository. Apply after every significant change and before releasing a version.
+---
+
+# Quality Checklist
+
+After each significant change, verify:
+
+- [ ] CHANGELOG.md updated with version and changes
+- [ ] Version in config.yaml, manifest.json, sbom.json, SBOM.md matches CHANGELOG
+- [ ] Documentation (DOCS.md, README.md) is current
+- [ ] Test documentation (Test.md) is current (Python version, test count)
+- [ ] Tests pass and cover new functionality (`pytest tests/ -q`)
+- [ ] SBOM (sbom.json, SBOM.md) reflects dependencies and date
+- [ ] .gitignore covers IDE and build artifacts
+
+## Version Bump Process
+
+When releasing a new version, update **all** of these files:
+
+1. `config.yaml` → `version: "X.Y.Z"`
+2. `custom_components/onecom_dyndns/manifest.json` → `"version": "X.Y.Z"`
+3. `sbom.json` → `"version": "X.Y.Z"` and `"serialNumber": "...vX.Y.Z"`
+4. `SBOM.md` → Version string, table row, dependency graph
+5. `CHANGELOG.md` → New `## [X.Y.Z] - YYYY-MM-DD` section; update "Custom component" range
+6. `Test.md` → Python version requirement if changed, test count if changed
+
+Verify with: `grep -r "old.version"` to find any missed occurrences.
+
+## Resources
+
+- Home Assistant Developer Docs: https://developers.home-assistant.io/
+- Let's Encrypt: https://letsencrypt.org/docs/
+- GitHub: https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns

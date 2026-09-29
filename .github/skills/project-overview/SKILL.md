@@ -1,0 +1,34 @@
+---
+name: project-overview
+description: Project architecture, components, runtime, and deployment context for the One.com DynDNS Home Assistant add-on. Use before planning or making cross-cutting changes.
+---
+
+# One.com DynDNS Updater
+
+- Home Assistant Add-on + Custom Integration for dynamic DNS at One.com with automatic SSL
+- Language: Python 3.12+ (CI tests on 3.12 and 3.13; HA Core requires 3.13 since 2024.12)
+- Key technologies: One.com API, Let's Encrypt (ACME), DNS-01 challenge
+
+## Architecture
+
+- **Add-on** (`run.py`): Single source of truth for IP checks, DNS updates, SSL.
+  Writes state → `/config/.onecom_dyndns_state.json`; reads commands ← `/config/.onecom_dyndns_commands.json`.
+- **Custom Component** (`custom_components/onecom_dyndns/`): Reads state file via
+  `DataUpdateCoordinator` (30 s). Buttons/services write command file.
+  Entities attach to Supervisor device via `identifiers={('hassio', addon_slug)}`.
+- **Discovery**: Add-on publishes `POST /discovery` with retries (5 attempts, increasing delay);
+  integration also auto-detects the add-on via state file at startup.
+- **Standalone mode**: Without the add-on the integration polls IP services directly.
+- **Add-on mode switch**: When the integration detects the add-on state file, it switches
+  automatically to add-on mode and removes the orphaned standalone device.
+- **Device info**: `get_device_info()` provides full metadata (`name`, `manufacturer`,
+  `model`, `configuration_url`) in both add-on and standalone modes.
+
+## Build & Deployment
+
+- **Docker**: Base image `ghcr.io/home-assistant/{arch}-base-python` (Alpine)
+- **Architectures**: aarch64, amd64 (configured in `build.yaml`)
+- **Add-on startup**: `run.py` → deploys custom component to `/config/custom_components/`,
+  publishes discovery, then enters main loop
+- **CI**: GitHub Actions (`.github/workflows/test.yml`) — pytest matrix (3.12 + 3.13),
+  flake8 lint (3.13), Codecov coverage upload

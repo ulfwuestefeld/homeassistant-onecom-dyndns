@@ -63,33 +63,31 @@ class TestE2EDynDNSFlow:
         mock_api_class.return_value = mock_api
 
         # Create updater with no previous IP
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")), \
-                 patch("run.ADDON_STATE_FILE", os.path.join(tmpdir, "state.json")):
-                updater = DynDNSUpdater(mock_options)
-                updater._http_session.get = Mock(return_value=mock_response)
-                
-                # Run check and update
-                updater.check_and_update()
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")), patch("run.ADDON_STATE_FILE", os.path.join(tmpdir, "state.json")):
+            updater = DynDNSUpdater(mock_options)
+            updater._http_session.get = Mock(return_value=mock_response)
 
-                # Verify IP was detected
-                updater._http_session.get.assert_called()
-                
-                # Verify DNS was updated
-                mock_api.login.assert_called_once()
-                mock_api.update_all_subdomains.assert_called_once_with(
-                    ["www", "api", ""],
-                    "1.2.3.4"
-                )
-                mock_api.logout.assert_called_once()
+            # Run check and update
+            updater.check_and_update()
 
-                # Verify state file was written (replaces update_ha_sensor)
-                state_file = os.path.join(tmpdir, "state.json")
-                assert os.path.isfile(state_file)
-                with open(state_file) as f:
-                    state = json.load(f)
-                assert state["current_ip"] == "1.2.3.4"
-                assert state["dns_status"] == "ok"
+            # Verify IP was detected
+            updater._http_session.get.assert_called()
+
+            # Verify DNS was updated
+            mock_api.login.assert_called_once()
+            mock_api.update_all_subdomains.assert_called_once_with(
+                ["www", "api", ""],
+                "1.2.3.4",
+            )
+            mock_api.logout.assert_called_once()
+
+            # Verify state file was written (replaces update_ha_sensor)
+            state_file = os.path.join(tmpdir, "state.json")
+            assert os.path.isfile(state_file)
+            with open(state_file) as f:
+                state = json.load(f)
+            assert state["current_ip"] == "1.2.3.4"
+            assert state["dns_status"] == "ok"
 
     @patch("run.OneComAPI")
     @patch("run.update_ha_sensor")
@@ -106,7 +104,6 @@ class TestE2EDynDNSFlow:
             last_ip_file = os.path.join(tmpdir, "last_ip.txt")
             with open(last_ip_file, "w") as f:
                 f.write("1.2.3.4")
-
             with patch("run.LAST_IP_FILE", last_ip_file):
                 updater = DynDNSUpdater(mock_options)
                 updater._http_session.get = Mock(return_value=mock_response)
@@ -138,7 +135,6 @@ class TestE2EDynDNSFlow:
             last_ip_file = os.path.join(tmpdir, "last_ip.txt")
             with open(last_ip_file, "w") as f:
                 f.write("1.2.3.4")  # Old IP
-
             with patch("run.LAST_IP_FILE", last_ip_file):
                 updater = DynDNSUpdater(mock_options)
                 updater._http_session.get = Mock(return_value=mock_response)

@@ -239,7 +239,7 @@ class OneComAPI:
                 self._logged_in = True
                 return True
         except Exception as e:
-            _LOGGER.debug("Verification request failed: %s", e)
+            _LOGGER.exception("Verification request failed")
 
         _LOGGER.warning("Login status uncertain - proceeding anyway")
         self._logged_in = True
@@ -728,7 +728,7 @@ class OneComAPI:
                             return True
 
             except Exception as e:
-                _LOGGER.debug("DNS check failed: %s", e)
+                _LOGGER.exception("DNS check failed")
 
             _LOGGER.debug("Record not yet visible, waiting %ss...", interval)
             if stop_event is not None:

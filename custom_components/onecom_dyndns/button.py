@@ -26,6 +26,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+PARALLEL_UPDATES = 1
+
 
 @dataclass(frozen=True, kw_only=True)
 class OneComButtonEntityDescription(ButtonEntityDescription):
@@ -65,7 +67,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up One.com DynDNS buttons."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data
     domain = entry.data[CONF_DOMAIN]
 
     entities = []

@@ -25,6 +25,8 @@ from .const import (
     get_device_info,
 )
 
+PARALLEL_UPDATES = 0
+
 BINARY_SENSOR_TYPES: Final[tuple[BinarySensorEntityDescription, ...]] = (
     BinarySensorEntityDescription(
         key="dns_status",
@@ -47,7 +49,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up One.com DynDNS binary sensors."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data
     domain = entry.data[CONF_DOMAIN]
 
     entities = []

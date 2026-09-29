@@ -399,7 +399,7 @@ class ACMEManager:
             try:
                 self.challenge_callback(domain, full_txt_name, validation)
             except Exception as e:
-                _LOGGER.warning("Challenge callback failed: %s", e)
+                _LOGGER.exception("Challenge callback failed")
 
         record_id = None
         try:
@@ -428,9 +428,9 @@ class ACMEManager:
             # Answer the challenge (needs the full ChallengeBody with .url)
             self._client.answer_challenge(challenge_body, response)
 
-            # Poll for authorization status
-            deadline = datetime.now() + timedelta(minutes=5)
-            while datetime.now() < deadline:
+            # Poll for authorization status (use timezone-aware now)
+            deadline = datetime.now(timezone.utc) + timedelta(minutes=5)
+            while datetime.now(timezone.utc) < deadline:
                 # poll() returns (updated_authz, response) tuple in acme 2.x
                 poll_result = self._client.poll(authz)
                 
@@ -465,7 +465,7 @@ class ACMEManager:
             return False
 
         except Exception as e:
-            _LOGGER.error("Challenge failed: %s", e)
+            _LOGGER.exception("Challenge failed")
             return False
 
         finally:
@@ -662,7 +662,11 @@ class ACMEManager:
         if expiry.tzinfo is not None:
             days_remaining = (expiry - datetime.now(timezone.utc)).days
         else:
-            days_remaining = (expiry - datetime.now()).days
+            # If expiry is naive, treat it as UTC to allow safe comparisons
+            if getattr(expiry, "tzinfo", None) is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            days_remaining = (expiry - now).days
         _LOGGER.info("Certificate expires in %s days", days_remaining)
 
         if days_remaining <= days_before_expiry:

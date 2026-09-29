@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.4] - 2026-08-24
+## [1.5.4] - 2026-09-29
+
+### Changed
+
+- Updated Home Assistant integration compatibility for current Hassio discovery
+  objects and `ConfigEntry.runtime_data`.
+- Added explicit platform parallel-update limits and Home Assistant Core 2026.9
+  integration tests on Python 3.14.2.
 
 ### Security
 

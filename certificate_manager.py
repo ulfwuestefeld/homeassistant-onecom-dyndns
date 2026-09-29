@@ -131,7 +131,7 @@ class CertificateManager:
             try:
                 callback(event_type, data)
             except Exception as e:
-                _LOGGER.warning("Callback error: %s", e)
+                _LOGGER.exception("Callback error")
 
     def get_certificate_info(self) -> dict[str, Any] | None:
         """Get information about the current certificate.
@@ -177,10 +177,13 @@ class CertificateManager:
                 valid_from = cert.not_valid_before_utc
                 now = datetime.now(timezone.utc)
             except AttributeError:
-                # Fallback for older cryptography versions
+                # Fallback for older cryptography versions (naive datetimes)
                 expiry = cert.not_valid_after
                 valid_from = cert.not_valid_before
-                now = datetime.now()
+                # If expiry is naive, treat it as UTC for consistent comparisons
+                if getattr(expiry, "tzinfo", None) is None:
+                    expiry = expiry.replace(tzinfo=timezone.utc)
+                now = datetime.now(timezone.utc)
 
             days_remaining = (expiry - now).days
 
@@ -198,7 +201,7 @@ class CertificateManager:
             return info
 
         except Exception as e:
-            _LOGGER.error("Failed to read certificate info: %s", e)
+            _LOGGER.exception("Failed to read certificate info")
             return None
 
     def _save_status(self, status: dict[str, Any]):
@@ -209,13 +212,13 @@ class CertificateManager:
         """
         self._ensure_directories()
 
-        status["last_updated"] = datetime.now().isoformat()
+        status["last_updated"] = datetime.now(timezone.utc).isoformat()
 
         try:
             with open(self.status_file, "w") as f:
                 json.dump(status, f, indent=2)
         except OSError as e:
-            _LOGGER.warning("Failed to save status: %s", e)
+            _LOGGER.exception("Failed to save status")
 
     def _load_status(self) -> dict[str, Any]:
         """Load certificate status from file.
@@ -230,7 +233,8 @@ class CertificateManager:
             with open(self.status_file, "r") as f:
                 return json.load(f)
         except (OSError, json.JSONDecodeError) as e:
-            _LOGGER.warning("Failed to load status: %s", e)
+            _LOGGER.exception("Failed to load status")
+            return {}
             return {}
 
     def request_certificate(self, force: bool = False) -> bool:
@@ -276,7 +280,7 @@ class CertificateManager:
 
             # Obtain certificate
             if acme.obtain_and_save_certificate(self.ssl_domains):
-                self._last_renewal = datetime.now()
+                self._last_renewal = datetime.now(timezone.utc)
 
                 # Invalidate cached cert info so the next read picks up the
                 # freshly saved certificate.
@@ -334,7 +338,7 @@ class CertificateManager:
 
     def _check_and_renew(self):
         """Check certificate and renew if needed."""
-        self._last_check = datetime.now()
+        self._last_check = datetime.now(timezone.utc)
         _LOGGER.debug("Checking certificate status...")
 
         cert_info = self.get_certificate_info()

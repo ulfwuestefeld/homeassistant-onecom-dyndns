@@ -6,6 +6,7 @@ Skipped automatically when the package is not available.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -278,6 +279,30 @@ async def test_hassio_discovery_no_domain_aborts(hass: HomeAssistant) -> None:
     assert result["reason"] == "no_domain"
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
+async def test_hassio_discovery_accepts_service_info_object(
+    hass: HomeAssistant,
+) -> None:
+    """Test add-on discovery with the current Home Assistant object shape."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_HASSIO},
+        data=SimpleNamespace(
+            addon="homeassistant-onecom-dyndns",
+            config={
+                "domain": "object.example.com",
+                "username": "test@example.com",
+                "password": "secret",
+                "subdomains": ["www"],
+            },
+        ),
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"]["domain"] == "object.example.com"
+    assert result["data"]["addon_slug"] == "homeassistant-onecom-dyndns"
+
+
 # ---------------------------------------------------------------------------
 # Options flow tests
 # ---------------------------------------------------------------------------
@@ -429,3 +454,52 @@ async def test_reauth_flow_success(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
     assert entry.data[CONF_PASSWORD] == "new_password"
+
+
+@pytest.mark.usefixtures("enable_custom_integrations")
+async def test_reconfigure_flow_updates_domain_and_subdomains(
+    hass: HomeAssistant,
+) -> None:
+    """Test that reconfiguration stores the selected DNS target."""
+    from homeassistant.config_entries import ConfigEntry
+
+    entry = ConfigEntry(
+        version=1,
+        minor_version=1,
+        domain=DOMAIN,
+        title="One.com DynDNS Updater - example.com",
+        data={
+            CONF_USERNAME: "test@example.com",
+            CONF_PASSWORD: "password",
+            CONF_DOMAIN: "example.com",
+            "subdomains": ["www"],
+            "update_interval": 5,
+            "ip_service": "ipify",
+            "ssl_enabled": False,
+        },
+        source=config_entries.SOURCE_USER,
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+
+    with patch(
+        "custom_components.onecom_dyndns.config_flow.async_validate_credentials",
+        new_callable=AsyncMock,
+        return_value={**VALID_CREDS_RESULT, "domains": ["new.example.com"]},
+    ), patch(
+        "custom_components.onecom_dyndns.async_setup_entry",
+        return_value=True,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={
+                CONF_DOMAIN: "new.example.com",
+                "subdomains": ["api"],
+            },
+        )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_DOMAIN] == "new.example.com"
+    assert entry.data["subdomains"] == ["api"]

@@ -80,9 +80,7 @@ async def test_setup_entry_creates_coordinator(hass: HomeAssistant) -> None:
         result = await hass.config_entries.async_setup(entry.entry_id)
 
     assert result is True
-    assert DOMAIN in hass.data
-    assert entry.entry_id in hass.data[DOMAIN]
-    assert "coordinator" in hass.data[DOMAIN][entry.entry_id]
+    assert entry.runtime_data is not None
 
 
 @pytest.mark.usefixtures("enable_custom_integrations")
@@ -106,12 +104,11 @@ async def test_unload_entry_cleans_up(hass: HomeAssistant) -> None:
         await hass.config_entries.async_setup(entry.entry_id)
 
     # Verify entry is loaded
-    assert entry.entry_id in hass.data[DOMAIN]
+    assert entry.runtime_data is not None
 
     # Unload
     result = await hass.config_entries.async_unload(entry.entry_id)
     assert result is True
-    assert entry.entry_id not in hass.data[DOMAIN]
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +161,7 @@ async def test_service_update_dns(hass: HomeAssistant) -> None:
     ):
         await hass.config_entries.async_setup(entry.entry_id)
 
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data
 
     with patch.object(
         coordinator, "async_force_update_dns", new_callable=AsyncMock,
@@ -195,7 +192,7 @@ async def test_service_check_ip(hass: HomeAssistant) -> None:
     ):
         await hass.config_entries.async_setup(entry.entry_id)
 
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data
 
     with patch.object(
         coordinator, "async_refresh", new_callable=AsyncMock,
@@ -226,7 +223,7 @@ async def test_service_renew_certificate(hass: HomeAssistant) -> None:
     ):
         await hass.config_entries.async_setup(entry.entry_id)
 
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data
 
     with patch.object(
         coordinator, "async_force_renew_certificate", new_callable=AsyncMock,

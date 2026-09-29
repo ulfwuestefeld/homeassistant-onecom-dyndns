@@ -5,7 +5,7 @@ Tests for SSL certificate operations and validation.
 import os
 import sys
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,8 +18,8 @@ class TestCertificateExpiry:
         """Test calculation of days until certificate expires."""
         
         # Certificate expires in 30 days
-        expiry_date = datetime.now() + timedelta(days=30)
-        days_until_expiry = (expiry_date - datetime.now()).days
+        expiry_date = datetime.now(timezone.utc) + timedelta(days=30)
+        days_until_expiry = (expiry_date - datetime.now(timezone.utc)).days
         
         # Due to timing, this could be 29 or 30
         assert days_until_expiry >= 29 and days_until_expiry <= 30
@@ -28,8 +28,8 @@ class TestCertificateExpiry:
         """Test detection of expired certificate."""
         
         # Certificate expired 5 days ago
-        expiry_date = datetime.now() - timedelta(days=5)
-        days_until_expiry = (expiry_date - datetime.now()).days
+        expiry_date = datetime.now(timezone.utc) - timedelta(days=5)
+        days_until_expiry = (expiry_date - datetime.now(timezone.utc)).days
         
         assert days_until_expiry < 0
 
@@ -37,8 +37,8 @@ class TestCertificateExpiry:
         """Test detection of certificate expiring within threshold."""
         
         renewal_threshold = 30  # days
-        expiry_date = datetime.now() + timedelta(days=15)
-        days_until_expiry = (expiry_date - datetime.now()).days
+        expiry_date = datetime.now(timezone.utc) + timedelta(days=15)
+        days_until_expiry = (expiry_date - datetime.now(timezone.utc)).days
         
         needs_renewal = days_until_expiry <= renewal_threshold
         assert needs_renewal
@@ -47,8 +47,8 @@ class TestCertificateExpiry:
         """Test certificate not expiring within threshold."""
         
         renewal_threshold = 30  # days
-        expiry_date = datetime.now() + timedelta(days=60)
-        days_until_expiry = (expiry_date - datetime.now()).days
+        expiry_date = datetime.now(timezone.utc) + timedelta(days=60)
+        days_until_expiry = (expiry_date - datetime.now(timezone.utc)).days
         
         needs_renewal = days_until_expiry <= renewal_threshold
         assert not needs_renewal
