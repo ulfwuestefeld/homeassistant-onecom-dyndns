@@ -37,7 +37,7 @@ class TestCredentialHandling:
         logger.setLevel(logging.DEBUG)
 
         try:
-            api = OneComAPI("test@example.com", "super_secret_password_123", "example.com")
+            OneComAPI("test@example.com", "super_secret_password_123", "example.com")
             
             log_output = log_capture.getvalue()
             

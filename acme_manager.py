@@ -398,7 +398,7 @@ class ACMEManager:
         if self.challenge_callback:
             try:
                 self.challenge_callback(domain, full_txt_name, validation)
-            except Exception as e:
+            except Exception:
                 _LOGGER.exception("Challenge callback failed")
 
         record_id = None
@@ -464,7 +464,7 @@ class ACMEManager:
             _LOGGER.error("  Value: %s", validation)
             return False
 
-        except Exception as e:
+        except Exception:
             _LOGGER.exception("Challenge failed")
             return False
 

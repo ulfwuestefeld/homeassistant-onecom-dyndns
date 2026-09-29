@@ -21,7 +21,6 @@ from .const import (
     CONF_ADDON_SLUG,
     CONF_DOMAIN,
     CONF_SSL_ENABLED,
-    DOMAIN,
     get_device_info,
 )
 

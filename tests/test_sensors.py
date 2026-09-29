@@ -79,7 +79,7 @@ def _make_sensor(key, coordinator_data, domain="example.com", ssl_enabled=False)
 
     # We need stubs for homeassistant modules that the sensor module imports.
     # Build minimal mocks so the import succeeds.
-    ha_modules = _ensure_ha_stubs()
+    _ensure_ha_stubs()
 
     # Now import the sensor module
     import importlib
@@ -897,7 +897,7 @@ class TestCoordinatorACMEChallenge:
         return coord, init_mod
 
     def test_set_acme_challenge(self):
-        coord, init_mod = self._make_coordinator()
+        coord, _init_mod = self._make_coordinator()
         coord.set_acme_challenge(
             domain="example.com",
             txt_name="_acme-challenge.example.com",
@@ -910,13 +910,13 @@ class TestCoordinatorACMEChallenge:
         assert "timestamp" in coord._acme_challenge
 
     def test_clear_acme_challenge(self):
-        coord, init_mod = self._make_coordinator()
+        coord, _init_mod = self._make_coordinator()
         coord._acme_challenge = {"domain": "x", "txt_name": "y", "txt_value": "z"}
         coord.clear_acme_challenge()
         assert coord._acme_challenge is None
 
     def test_set_then_clear(self):
-        coord, init_mod = self._make_coordinator()
+        coord, _init_mod = self._make_coordinator()
         coord.set_acme_challenge("example.com", "_acme-challenge.example.com", "val")
         assert coord._acme_challenge is not None
         coord.clear_acme_challenge()

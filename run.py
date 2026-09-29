@@ -79,7 +79,7 @@ SUPERVISOR_TOKEN = get_supervisor_token()
 HA_API_URL = "http://supervisor/core/api"
 
 
-def send_ha_notification(title: str, message: str, notification_id: str = None):
+def send_ha_notification(title: str, message: str, notification_id: str | None = None):
     """Send a persistent notification to Home Assistant.
     
     Args:
@@ -271,7 +271,7 @@ def publish_addon_discovery(options: dict, retries: int = 5, delay: int = 10):
     return False
 
 
-def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
+def update_ha_sensor(entity_id: str, state: str, attributes: dict | None = None):
     """Update a Home Assistant sensor entity.
     
     Args:

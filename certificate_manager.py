@@ -130,7 +130,7 @@ class CertificateManager:
         for callback in self._callbacks:
             try:
                 callback(event_type, data)
-            except Exception as e:
+            except Exception:
                 _LOGGER.exception("Callback error")
 
     def get_certificate_info(self) -> dict[str, Any] | None:
@@ -200,7 +200,7 @@ class CertificateManager:
             self._cached_cert_info = info
             return info
 
-        except Exception as e:
+        except Exception:
             _LOGGER.exception("Failed to read certificate info")
             return None
 
@@ -217,7 +217,7 @@ class CertificateManager:
         try:
             with open(self.status_file, "w") as f:
                 json.dump(status, f, indent=2)
-        except OSError as e:
+        except OSError:
             _LOGGER.exception("Failed to save status")
 
     def _load_status(self) -> dict[str, Any]:
@@ -232,7 +232,7 @@ class CertificateManager:
         try:
             with open(self.status_file, "r") as f:
                 return json.load(f)
-        except (OSError, json.JSONDecodeError) as e:
+        except (OSError, json.JSONDecodeError):
             _LOGGER.exception("Failed to load status")
             return {}
             return {}
@@ -250,13 +250,12 @@ class CertificateManager:
 
         # Check if renewal is needed
         cert_info = self.get_certificate_info()
-        if cert_info and not force:
-            if not cert_info["needs_renewal"]:
-                _LOGGER.info(
-                    "Certificate still valid for %s days, skipping renewal",
-                    cert_info['days_remaining'],
-                )
-                return True
+        if cert_info and not force and not cert_info["needs_renewal"]:
+            _LOGGER.info(
+                "Certificate still valid for %s days, skipping renewal",
+                cert_info['days_remaining'],
+            )
+            return True
 
         api = None
         try:
@@ -426,7 +425,7 @@ class CertificateManager:
         domain: str,
         port: int = 443,
         timeout: int = 10,
-        ssl_context: ssl.SSLContext = None,
+        ssl_context: ssl.SSLContext | None = None,
     ) -> dict[str, Any]:
         """Verify that a valid certificate is served for a domain.
 

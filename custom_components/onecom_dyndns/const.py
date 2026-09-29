@@ -6,9 +6,6 @@ from typing import TYPE_CHECKING, Final
 
 from homeassistant.const import (
     Platform,
-    CONF_USERNAME,
-    CONF_PASSWORD,
-    CONF_DOMAIN,
 )
 
 if TYPE_CHECKING:

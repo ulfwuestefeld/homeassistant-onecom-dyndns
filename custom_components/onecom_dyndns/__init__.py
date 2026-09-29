@@ -418,7 +418,7 @@ class OneComDynDNSCoordinator(DataUpdateCoordinator):
             return False
         except ConfigEntryAuthFailed:
             raise
-        except Exception as err:
+        except Exception:
             _LOGGER.exception("DNS update failed")
             return False
         finally:

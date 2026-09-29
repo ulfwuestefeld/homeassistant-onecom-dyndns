@@ -238,7 +238,7 @@ class OneComAPI:
                 _LOGGER.info("Successfully logged into One.com (verified)")
                 self._logged_in = True
                 return True
-        except Exception as e:
+        except Exception:
             _LOGGER.exception("Verification request failed")
 
         _LOGGER.warning("Login status uncertain - proceeding anyway")
@@ -727,7 +727,7 @@ class OneComAPI:
                             _LOGGER.info("DNS propagation complete for '%s'", full_domain)
                             return True
 
-            except Exception as e:
+            except Exception:
                 _LOGGER.exception("DNS check failed")
 
             _LOGGER.debug("Record not yet visible, waiting %ss...", interval)

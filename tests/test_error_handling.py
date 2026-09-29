@@ -430,7 +430,7 @@ class TestErrorLogging:
             except OneComAPIError:
                 pass
 
-            log_output = log_capture.getvalue()
+            log_capture.getvalue()
             # Error should be logged (exact message may vary)
         finally:
             logger.handlers = original_handlers

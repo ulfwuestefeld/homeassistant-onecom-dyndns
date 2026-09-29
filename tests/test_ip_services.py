@@ -149,7 +149,7 @@ class TestIPServiceFallback:
     @patch('requests.get')
     def test_all_services_return_same_format(self, mock_get):
         """Test that all services return IP in same format."""
-        for service, url in IP_SERVICES.items():
+        for url in IP_SERVICES.values():
             mock_response = Mock()
             mock_response.text = "91.51.131.49"
             mock_response.raise_for_status = Mock()

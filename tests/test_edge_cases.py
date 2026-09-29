@@ -235,7 +235,7 @@ class TestUnicodeHandling:
         from onecom_api import OneComAPI
 
         # IDN domains should be handled
-        api = OneComAPI("test@example.com", "pass", "example.com")
+        OneComAPI("test@example.com", "pass", "example.com")
         # Actual IDN handling would require punycode conversion
 
 
@@ -427,7 +427,7 @@ class TestFileSystemEdgeCases:
             )
 
             # Should handle permission error gracefully
-            info = manager.get_certificate_info()
+            manager.get_certificate_info()
             
             # Restore permissions for cleanup
             if os.name != 'nt':

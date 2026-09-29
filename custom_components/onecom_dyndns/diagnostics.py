@@ -8,8 +8,6 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
-
 # Keys that contain sensitive data and must be redacted
 TO_REDACT = {
     "password",
