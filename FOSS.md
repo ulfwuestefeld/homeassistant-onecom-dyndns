@@ -4,6 +4,8 @@ This project and distribution include the following notable Open Source
 components and their licenses. See `SBOM.md` and `sbom.json` for the full
 machine-readable Software Bill of Materials.
 
+Release: 1.5.5 (2026-10-05)
+
 Core components:
 
 - `requests >=2.32.0` — Apache-2.0

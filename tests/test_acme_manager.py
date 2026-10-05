@@ -19,7 +19,7 @@ sys.modules['acme.challenges'] = MagicMock()
 sys.modules['acme.errors'] = MagicMock()
 sys.modules['josepy'] = MagicMock()
 
-from acme_manager import (
+from acme_manager import (  # noqa: E402
     LETSENCRYPT_PRODUCTION,
     LETSENCRYPT_STAGING,
     ACMEManager,

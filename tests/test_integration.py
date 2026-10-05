@@ -89,16 +89,15 @@ class TestOneComAPIAndDynDNSIntegration:
         mock_session.patch.return_value = mock_update_response
         mock_session_class.return_value = mock_session
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(mock_options)
-                updater._http_session.get = Mock(return_value=mock_ip_response)
-                
-                # This should detect IP and update DNS
-                updater.check_and_update()
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(mock_options)
+            updater._http_session.get = Mock(return_value=mock_ip_response)
 
-                # Verify IP was detected
-                assert updater._http_session.get.called
+            # This should detect IP and update DNS
+            updater.check_and_update()
+
+            # Verify IP was detected
+            assert updater._http_session.get.called
 
 
 class TestCertificateManagerAndOneComAPIIntegration:
@@ -186,25 +185,27 @@ class TestSensorUpdatesIntegration:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state_file = os.path.join(tmpdir, "state.json")
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")), \
-                 patch("run.ADDON_STATE_FILE", state_file):
-                with patch("run.OneComAPI") as mock_api_class:
-                    mock_api = Mock()
-                    mock_api.update_all_subdomains.return_value = {
-                        "www": {"success": True}
-                    }
-                    mock_api_class.return_value = mock_api
+            with (
+                patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")),
+                patch("run.ADDON_STATE_FILE", state_file),
+                patch("run.OneComAPI") as mock_api_class,
+            ):
+                mock_api = Mock()
+                mock_api.update_all_subdomains.return_value = {
+                    "www": {"success": True}
+                }
+                mock_api_class.return_value = mock_api
 
-                    updater = DynDNSUpdater(mock_options)
-                    updater._http_session.get = Mock(return_value=mock_ip_response)
-                    updater.check_and_update()
+                updater = DynDNSUpdater(mock_options)
+                updater._http_session.get = Mock(return_value=mock_ip_response)
+                updater.check_and_update()
 
-                    # Verify state file was written with correct data
-                    assert os.path.isfile(state_file)
-                    with open(state_file) as f:
-                        state = json.load(f)
-                    assert state["current_ip"] == "1.2.3.4"
-                    assert state["dns_status"] == "ok"
+                # Verify state file was written with correct data
+                assert os.path.isfile(state_file)
+                with open(state_file) as f:
+                    state = json.load(f)
+                assert state["current_ip"] == "1.2.3.4"
+                assert state["dns_status"] == "ok"
 
 
 class TestCallbackIntegration:
@@ -299,16 +300,15 @@ class TestErrorPropagationIntegration:
         mock_api.login.side_effect = OneComAPIError("Authentication failed")
         mock_api_class.return_value = mock_api
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(mock_options)
-                updater._http_session.get = Mock(return_value=mock_ip_response)
-                
-                # Should not raise - error should be handled gracefully
-                updater.check_and_update()
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(mock_options)
+            updater._http_session.get = Mock(return_value=mock_ip_response)
 
-                # Updater should still be running
-                assert updater._running is True
+            # Should not raise - error should be handled gracefully
+            updater.check_and_update()
+
+            # Updater should still be running
+            assert updater._running is True
 
 
 class TestThreadSafetyIntegration:

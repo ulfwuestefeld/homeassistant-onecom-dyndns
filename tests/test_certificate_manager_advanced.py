@@ -23,7 +23,7 @@ sys.modules['acme.challenges'] = MagicMock()
 sys.modules['acme.errors'] = MagicMock()
 sys.modules['josepy'] = MagicMock()
 
-from certificate_manager import (
+from certificate_manager import (  # noqa: E402
     CertificateManager,
 )
 

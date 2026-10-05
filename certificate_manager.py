@@ -323,7 +323,7 @@ class CertificateManager:
             self._notify("error", {"error": error_msg})
             return False
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             error_msg = f"Unexpected error ({type(e).__name__}): {e}"
             _LOGGER.error(error_msg)
             _LOGGER.error("Traceback:\n%s", traceback.format_exc())
@@ -449,42 +449,44 @@ class CertificateManager:
 
         try:
             context = ssl_context or ssl.create_default_context()
-            with socket.create_connection((domain, port), timeout=timeout) as sock:
-                with context.wrap_socket(sock, server_hostname=domain) as ssock:
-                    result["reachable"] = True
-                    cert = ssock.getpeercert()
+            with (
+                socket.create_connection((domain, port), timeout=timeout) as sock,
+                context.wrap_socket(sock, server_hostname=domain) as ssock,
+            ):
+                result["reachable"] = True
+                cert = ssock.getpeercert()
 
-                    # Extract certificate info
-                    subject = dict(x[0] for x in cert.get("subject", []))
-                    issuer = dict(x[0] for x in cert.get("issuer", []))
-                    sans = [x[1] for x in cert.get("subjectAltName", [])]
+                # Extract certificate info
+                subject = dict(x[0] for x in cert.get("subject", []))
+                issuer = dict(x[0] for x in cert.get("issuer", []))
+                sans = [x[1] for x in cert.get("subjectAltName", [])]
 
-                    # Parse dates
-                    not_after_str = cert.get("notAfter", "")
-                    not_before_str = cert.get("notBefore", "")
+                # Parse dates
+                not_after_str = cert.get("notAfter", "")
+                not_before_str = cert.get("notBefore", "")
 
-                    result["certificate"] = {
-                        "subject": subject.get("commonName", ""),
-                        "issuer": issuer.get("organizationName", ""),
-                        "issuer_cn": issuer.get("commonName", ""),
-                        "not_before": not_before_str,
-                        "not_after": not_after_str,
-                        "sans": sans,
-                    }
+                result["certificate"] = {
+                    "subject": subject.get("commonName", ""),
+                    "issuer": issuer.get("organizationName", ""),
+                    "issuer_cn": issuer.get("commonName", ""),
+                    "not_before": not_before_str,
+                    "not_after": not_after_str,
+                    "sans": sans,
+                }
 
-                    # Check if domain is covered
-                    domain_covered = domain in sans
-                    if not domain_covered:
-                        # Check for wildcard
-                        parts = domain.split(".", 1)
-                        if len(parts) == 2:
-                            wildcard = f"*.{parts[1]}"
-                            domain_covered = wildcard in sans
+                # Check if domain is covered
+                domain_covered = domain in sans
+                if not domain_covered:
+                    # Check for wildcard
+                    parts = domain.split(".", 1)
+                    if len(parts) == 2:
+                        wildcard = f"*.{parts[1]}"
+                        domain_covered = wildcard in sans
 
-                    result["domain_covered"] = domain_covered
-                    result["valid"] = domain_covered
+                result["domain_covered"] = domain_covered
+                result["valid"] = domain_covered
 
-                    _LOGGER.info("Online certificate for %s: valid=%s, issuer=%s", domain, domain_covered, issuer.get('organizationName', 'Unknown'))
+                _LOGGER.info("Online certificate for %s: valid=%s, issuer=%s", domain, domain_covered, issuer.get('organizationName', 'Unknown'))
 
         except TimeoutError:
             result["error"] = "Connection timeout"
@@ -499,7 +501,7 @@ class CertificateManager:
         except ConnectionRefusedError:
             result["error"] = "Connection refused - no HTTPS server"
             _LOGGER.warning("Certificate check for %s: connection refused", domain)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             result["error"] = f"{type(e).__name__}: {e}"
             _LOGGER.error("Certificate check for %s: %s", domain, e)
 

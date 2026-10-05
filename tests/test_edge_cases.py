@@ -299,27 +299,26 @@ class TestConcurrentOperations:
             "ssl_enabled": False,
         }
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(options)
-                updater._http_session.get = Mock(return_value=mock_response)
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(options)
+            updater._http_session.get = Mock(return_value=mock_response)
 
-                errors = []
+            errors = []
 
-                def run_check():
-                    try:
-                        updater.check_and_update()
-                    except Exception as e:
-                        errors.append(e)
+            def run_check():
+                try:
+                    updater.check_and_update()
+                except Exception as e:  # noqa: BLE001
+                    errors.append(e)
 
-                threads = [threading.Thread(target=run_check) for _ in range(5)]
-                for t in threads:
-                    t.start()
-                for t in threads:
-                    t.join(timeout=5)
+            threads = [threading.Thread(target=run_check) for _ in range(5)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=5)
 
-                # No exceptions should have occurred
-                assert len(errors) == 0
+            # No exceptions should have occurred
+            assert len(errors) == 0
 
 
 class TestNetworkEdgeCases:

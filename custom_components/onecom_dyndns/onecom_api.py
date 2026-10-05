@@ -210,7 +210,7 @@ class OneComAPI:
                 _LOGGER.info("Successfully logged into One.com (verified)")
                 self._logged_in = True
                 return True
-        except Exception as e:
+        except requests.RequestException as e:
             _LOGGER.debug("Verification request failed: %s", e)
 
         _LOGGER.warning("Login status uncertain - proceeding anyway")
@@ -273,7 +273,7 @@ class OneComAPI:
                     domains.append(domain_name)
 
             return domains
-        except Exception as e:
+        except (requests.RequestException, ValueError, TypeError, AttributeError) as e:
             _LOGGER.warning("Could not fetch domains: %s", e)
             return []
 
@@ -643,7 +643,7 @@ class OneComAPI:
                             _LOGGER.info("DNS propagation complete for '%s'", full_domain)
                             return True
 
-            except Exception as e:
+            except (requests.RequestException, ValueError, TypeError, AttributeError) as e:
                 _LOGGER.debug("DNS check failed: %s", e)
 
             _LOGGER.debug("Record not yet visible, waiting %ss...", interval)
@@ -695,16 +695,18 @@ async def async_validate_credentials(
             # Try to get domains
             try:
                 result["domains"] = api.get_domains()
-            except Exception:
-                pass
+            except OneComAPIError as e:
+                _LOGGER.warning("Could not fetch domains during validation: %s", e)
 
             # If domain specified, get subdomains
             if domain:
                 api.domain = domain
                 try:
                     result["subdomains"] = api.get_subdomains()
-                except Exception:
-                    pass
+                except OneComAPIError as e:
+                    _LOGGER.warning(
+                        "Could not fetch subdomains during validation: %s", e
+                    )
 
             api.logout()
             return result

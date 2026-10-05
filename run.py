@@ -19,7 +19,7 @@ import time
 
 import requests
 
-from certificate_manager import CertificateManager
+from certificate_manager import CertificateManager, CertificateManagerError
 from onecom_api import OneComAPI, OneComAPIError
 
 # Configure logging
@@ -70,8 +70,8 @@ def get_supervisor_token():
                     token = f.read().strip()
                     if token:
                         return token
-        except Exception:
-            pass
+        except OSError as exc:
+            _LOGGER.debug("Could not read Supervisor token from %s: %s", path, exc)
     
     return ""
 
@@ -113,7 +113,7 @@ def send_ha_notification(title: str, message: str, notification_id: str | None =
         response.raise_for_status()
         _LOGGER.debug("Notification sent: %s", title)
         return True
-    except Exception as e:
+    except requests.RequestException as e:
         _LOGGER.warning("Failed to send notification: %s", e)
         return False
 
@@ -188,7 +188,7 @@ def deploy_custom_component():
             src_version,
         )
         return True
-    except Exception as exc:
+    except (OSError, shutil.Error) as exc:
         _LOGGER.error("Failed to deploy custom component: %s", exc)
         return False
 
@@ -256,7 +256,7 @@ def publish_addon_discovery(options: dict, retries: int = 5, delay: int = 10):
                     response.status_code,
                     response.text,
                 )
-        except Exception as exc:
+        except requests.RequestException as exc:
             _LOGGER.warning(
                 "Discovery publish attempt %d/%d failed: %s",
                 attempt, retries, exc,
@@ -318,7 +318,7 @@ def update_ha_sensor(entity_id: str, state: str, attributes: dict | None = None)
         response.raise_for_status()
         _LOGGER.debug("Sensor updated: %s = %s", entity_id, state)
         return True
-    except Exception as e:
+    except requests.RequestException as e:
         _LOGGER.warning("Failed to update sensor %s: %s", entity_id, e)
         return False
 
@@ -344,7 +344,7 @@ def save_acme_challenge_info(domain: str, txt_name: str, txt_value: str):
         with open(ACME_CHALLENGE_FILE, "w") as f:
             json.dump(challenge_info, f, indent=2)
         _LOGGER.info("ACME challenge info saved to %s", ACME_CHALLENGE_FILE)
-    except Exception as e:
+    except (OSError, TypeError) as e:
         _LOGGER.warning("Failed to save ACME challenge info: %s", e)
     
     # Send Home Assistant notification
@@ -702,7 +702,7 @@ class DynDNSUpdater:
         if self._cert_manager:
             try:
                 cert_info = self._cert_manager.get_certificate_info()
-            except Exception as exc:
+            except CertificateManagerError as exc:
                 self._logger.debug("Could not get certificate info: %s", exc)
 
         # Use in-memory ACME challenge cache (populated by
@@ -736,7 +736,7 @@ class DynDNSUpdater:
             # Atomic replace to avoid partial reads
             os.replace(tmp_path, ADDON_STATE_FILE)
             self._logger.debug("State file written: %s", ADDON_STATE_FILE)
-        except Exception as exc:
+        except (OSError, TypeError) as exc:
             self._logger.warning("Failed to write state file: %s", exc)
 
     def _check_commands(self):
@@ -787,7 +787,7 @@ class DynDNSUpdater:
                         self._logger.info("Forced certificate renewal succeeded")
                     else:
                         self._logger.error("Forced certificate renewal failed")
-                except Exception as exc:
+                except CertificateManagerError as exc:
                     self._logger.error("Certificate renewal error: %s", exc)
                 self._write_state_file(
                     current_ip=self._last_ip, dns_status="ok"
@@ -821,7 +821,7 @@ class DynDNSUpdater:
             with open(ACME_CHALLENGE_FILE, "w") as f:
                 json.dump(challenge_info, f, indent=2)
             self._logger.info("ACME challenge info saved to %s", ACME_CHALLENGE_FILE)
-        except Exception as e:
+        except (OSError, TypeError) as e:
             self._logger.warning("Failed to save ACME challenge info: %s", e)
 
         # Send Home Assistant notification
@@ -937,7 +937,7 @@ class DynDNSUpdater:
             # Write initial state so custom component can show cert info
             self._write_state_file(current_ip=self._last_ip, dns_status="ok")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self._logger.error("Failed to start SSL certificate manager: %s", e)
 
     def _stop_ssl_manager(self):

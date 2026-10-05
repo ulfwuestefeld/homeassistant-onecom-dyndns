@@ -321,7 +321,7 @@ class ACMEManager:
             # Network errors after all retries failed
             raise ACMEManagerError(f"Network error during account registration: {e}")
                 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             _LOGGER.error("Exception type: %s", type(e).__name__)
             _LOGGER.error("Exception args: %s", e.args)
             _LOGGER.error("Traceback: %s", traceback.format_exc())
@@ -566,7 +566,7 @@ class ACMEManager:
 
         except acme_errors.Error as e:
             raise ACMEManagerError(f"ACME error: {e}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise ACMEManagerError(f"Failed to obtain certificate: {e}")
 
     def save_certificate(self, cert_pem: str, key_pem: str):
@@ -638,7 +638,7 @@ class ACMEManager:
             except AttributeError:
                 return cert.not_valid_after
 
-        except Exception as e:
+        except (OSError, ValueError, TypeError) as e:
             _LOGGER.warning("Failed to read certificate expiry: %s", e)
             return None
 

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.5.5] - 2026-10-05
+
+### Fixed
+
+- Resolved Ruff lint findings with explicit error handling and consolidated
+  nested test context managers.
+
+### Changed
+
+- Updated Security CI to `actions/setup-python@v6` and pinned GitHub runners to
+  Ubuntu 24.04 to avoid Node.js 20 deprecation warnings.
+
+### Version
+
+- Bumped add-on and custom integration version to `1.5.5`.
+
 ## [1.5.4] - 2026-09-29
 
 ### Changed

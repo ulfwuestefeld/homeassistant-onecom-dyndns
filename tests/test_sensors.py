@@ -1016,24 +1016,23 @@ class TestAddonLastIPUpdateSensor:
         """Test that no sensor update happens if IP is unchanged."""
         from run import DynDNSUpdater
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                mock_response = Mock()
-                mock_response.text = "1.2.3.4"
-                mock_response.raise_for_status = Mock()
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            mock_response = Mock()
+            mock_response.text = "1.2.3.4"
+            mock_response.raise_for_status = Mock()
 
-                with patch("run.update_ha_sensor") as mock_sensor:
-                    updater = DynDNSUpdater(self.options)
-                    updater._http_session.get = Mock(return_value=mock_response)
-                    updater._last_ip = "1.2.3.4"
-                    updater.check_and_update()
+            with patch("run.update_ha_sensor") as mock_sensor:
+                updater = DynDNSUpdater(self.options)
+                updater._http_session.get = Mock(return_value=mock_response)
+                updater._last_ip = "1.2.3.4"
+                updater.check_and_update()
 
-                    # Should NOT have a last_ip_update sensor call
-                    sensor_calls = [
-                        c for c in mock_sensor.call_args_list
-                        if c[0][0] == "sensor.onecom_dyndns_last_ip_update"
-                    ]
-                    assert len(sensor_calls) == 0
+                # Should NOT have a last_ip_update sensor call
+                sensor_calls = [
+                    c for c in mock_sensor.call_args_list
+                    if c[0][0] == "sensor.onecom_dyndns_last_ip_update"
+                ]
+                assert len(sensor_calls) == 0
 
 
 class TestAddonLastCertificateRenewalSensor:

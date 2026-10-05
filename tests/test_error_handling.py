@@ -257,17 +257,19 @@ class TestFileIOErrors:
             with open(options_file, "w") as f:
                 f.write("{ invalid json }")
 
-            with patch("run.OPTIONS_FILE", options_file):
-                with patch.dict(os.environ, {
+            with (
+                patch("run.OPTIONS_FILE", options_file),
+                patch.dict(os.environ, {
                     "ONECOM_USERNAME": "fallback@example.com",
                     "ONECOM_PASSWORD": "fallback",
                     "ONECOM_DOMAIN": "fallback.com",
                     "ONECOM_SUBDOMAINS": "",
-                }):
-                    options = load_options()
+                }),
+            ):
+                options = load_options()
 
-                    # Should fall back to environment variables
-                    assert options["username"] == "fallback@example.com"
+                # Should fall back to environment variables
+                assert options["username"] == "fallback@example.com"
 
 
 class TestHAIntegrationErrors:
@@ -316,17 +318,16 @@ class TestGracefulDegradation:
             "log_level": "error",
         }
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(options)
-                updater._http_session.get = Mock(
-                    side_effect=requests.exceptions.ConnectionError("Service down")
-                )
-                
-                # Should not raise - just log and continue
-                updater.check_and_update()
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(options)
+            updater._http_session.get = Mock(
+                side_effect=requests.exceptions.ConnectionError("Service down")
+            )
 
-                assert updater._running is True
+            # Should not raise - just log and continue
+            updater.check_and_update()
+
+            assert updater._running is True
 
 
 class TestRecoveryScenarios:
@@ -361,17 +362,16 @@ class TestRecoveryScenarios:
             "log_level": "error",
         }
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(options)
-                
-                # First attempt - should fail
-                result1 = updater.update_dns("1.2.3.4")
-                assert result1 is False
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(options)
 
-                # Second attempt - should succeed
-                result2 = updater.update_dns("1.2.3.4")
-                assert result2 is True
+            # First attempt - should fail
+            result1 = updater.update_dns("1.2.3.4")
+            assert result1 is False
+
+            # Second attempt - should succeed
+            result2 = updater.update_dns("1.2.3.4")
+            assert result2 is True
 
 
 class TestExceptionTypes:

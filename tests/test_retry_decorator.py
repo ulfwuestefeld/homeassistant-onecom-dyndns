@@ -96,9 +96,8 @@ class TestRetryWithBackoffDecorator:
             call_count += 1
             raise requests.exceptions.ConnectionError("Always fails")
         
-        with patch('time.sleep'):
-            with pytest.raises(requests.exceptions.ConnectionError):
-                always_failing()
+        with patch('time.sleep'), pytest.raises(requests.exceptions.ConnectionError):
+            always_failing()
         
         # MAX_RETRIES is 5, so it should be called 5 times
         assert call_count == 5
@@ -129,9 +128,8 @@ class TestRetryWithBackoffDecorator:
         def mock_sleep(seconds):
             sleep_times.append(seconds)
         
-        with patch('time.sleep', side_effect=mock_sleep):
-            with pytest.raises(requests.exceptions.ConnectionError):
-                always_failing()
+        with patch('time.sleep', side_effect=mock_sleep), pytest.raises(requests.exceptions.ConnectionError):
+            always_failing()
         
         # With 5 retries, there should be 4 sleep calls (between attempts)
         assert len(sleep_times) == 4

@@ -187,22 +187,21 @@ class TestE2ESSLCertificateFlow:
         }
         mock_cert_manager.return_value = mock_cert
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(ssl_options)
-                updater._start_ssl_manager()
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(ssl_options)
+            updater._start_ssl_manager()
 
-                # Verify CertificateManager was created
-                mock_cert_manager.assert_called_once()
-                call_kwargs = mock_cert_manager.call_args[1]
-                
-                assert call_kwargs["email"] == "ssl@example.com"
-                assert call_kwargs["staging"] is True
-                assert "example.com" in call_kwargs["ssl_domains"]
-                assert "www.example.com" in call_kwargs["ssl_domains"]
+            # Verify CertificateManager was created
+            mock_cert_manager.assert_called_once()
+            call_kwargs = mock_cert_manager.call_args[1]
 
-                # Verify manager was started
-                mock_cert.start.assert_called_once()
+            assert call_kwargs["email"] == "ssl@example.com"
+            assert call_kwargs["staging"] is True
+            assert "example.com" in call_kwargs["ssl_domains"]
+            assert "www.example.com" in call_kwargs["ssl_domains"]
+
+            # Verify manager was started
+            mock_cert.start.assert_called_once()
 
     @patch("run.CertificateManager")
     @patch("run.update_ha_sensor")
@@ -221,13 +220,12 @@ class TestE2ESSLCertificateFlow:
 
         ssl_options["ssl_force_renewal"] = True
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(ssl_options)
-                updater._start_ssl_manager()
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(ssl_options)
+            updater._start_ssl_manager()
 
-                # Verify force renewal was called
-                mock_cert.request_certificate.assert_called_once_with(force=True)
+            # Verify force renewal was called
+            mock_cert.request_certificate.assert_called_once_with(force=True)
 
 
 class TestE2EErrorRecovery:
@@ -254,22 +252,21 @@ class TestE2EErrorRecovery:
 
         from run import DynDNSUpdater
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(mock_options)
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(mock_options)
 
-                # First call fails, second succeeds
-                updater._http_session.get = Mock(side_effect=[
-                    requests.RequestException("Service unavailable"),
-                    Mock(text="1.2.3.4", raise_for_status=Mock()),
-                ])
-                
-                # First check - should fail gracefully
-                updater.check_and_update()
-                
-                # Manually call again to simulate retry
-                ip = updater.get_public_ip()
-                assert ip == "1.2.3.4"
+            # First call fails, second succeeds
+            updater._http_session.get = Mock(side_effect=[
+                requests.RequestException("Service unavailable"),
+                Mock(text="1.2.3.4", raise_for_status=Mock()),
+            ])
+
+            # First check - should fail gracefully
+            updater.check_and_update()
+
+            # Manually call again to simulate retry
+            ip = updater.get_public_ip()
+            assert ip == "1.2.3.4"
 
     @patch("run.OneComAPI")
     @patch("run.update_ha_sensor")
@@ -314,13 +311,12 @@ class TestE2EErrorRecovery:
         }
         mock_api_class.return_value = mock_api
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(mock_options)
-                result = updater.update_dns("1.2.3.4")
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(mock_options)
+            result = updater.update_dns("1.2.3.4")
 
-                # Should return False because not all updates succeeded
-                assert result is False
+            # Should return False because not all updates succeeded
+            assert result is False
 
 
 class TestE2EGracefulShutdown:
@@ -349,32 +345,31 @@ class TestE2EGracefulShutdown:
         mock_response.text = "1.2.3.4"
         mock_response.raise_for_status = Mock()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(mock_options)
-                updater._http_session.get = Mock(return_value=mock_response)
-                
-                # Start in a thread
-                def run_updater():
-                    try:
-                        updater.run()
-                    except SystemExit:
-                        pass
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(mock_options)
+            updater._http_session.get = Mock(return_value=mock_response)
 
-                thread = threading.Thread(target=run_updater)
-                thread.daemon = True
-                thread.start()
+            # Start in a thread
+            def run_updater():
+                try:
+                    updater.run()
+                except SystemExit:
+                    pass
 
-                # Let it run briefly
-                time.sleep(0.5)
+            thread = threading.Thread(target=run_updater)
+            thread.daemon = True
+            thread.start()
 
-                # Stop gracefully
-                updater.stop()
+            # Let it run briefly
+            time.sleep(0.5)
 
-                # Wait for thread to finish
-                thread.join(timeout=2)
+            # Stop gracefully
+            updater.stop()
 
-                assert updater._running is False
+            # Wait for thread to finish
+            thread.join(timeout=2)
+
+            assert updater._running is False
 
     @patch("run.CertificateManager")
     @patch("run.update_ha_sensor")
@@ -389,16 +384,15 @@ class TestE2EGracefulShutdown:
         mock_cert.get_certificate_info.return_value = None
         mock_cert_manager.return_value = mock_cert
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(mock_options)
-                updater._start_ssl_manager()
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(mock_options)
+            updater._start_ssl_manager()
 
-                # Stop updater
-                updater.stop()
+            # Stop updater
+            updater.stop()
 
-                # Verify SSL manager was stopped
-                mock_cert.stop.assert_called_once()
+            # Verify SSL manager was stopped
+            mock_cert.stop.assert_called_once()
 
 
 class TestE2EMultipleSubdomains:
@@ -431,16 +425,15 @@ class TestE2EMultipleSubdomains:
         }
         mock_api_class.return_value = mock_api
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
-                updater = DynDNSUpdater(options)
-                result = updater.update_dns("1.2.3.4")
+        with tempfile.TemporaryDirectory() as tmpdir, patch("run.LAST_IP_FILE", os.path.join(tmpdir, "last_ip.txt")):
+            updater = DynDNSUpdater(options)
+            result = updater.update_dns("1.2.3.4")
 
-                assert result is True
-                mock_api.update_all_subdomains.assert_called_once_with(
-                    ["www", "api", "mail", "ftp", ""],
-                    "1.2.3.4"
-                )
+            assert result is True
+            mock_api.update_all_subdomains.assert_called_once_with(
+                ["www", "api", "mail", "ftp", ""],
+                "1.2.3.4"
+            )
 
 
 class TestE2EConfigurationValidation:

@@ -42,12 +42,11 @@ class TestMainFunction:
         mock_updater_class.return_value = mock_updater
         
         # Mock signal handlers
-        with patch('signal.signal'):
-            with patch.object(mock_updater, 'start', side_effect=KeyboardInterrupt):
-                try:
-                    main()
-                except (KeyboardInterrupt, SystemExit):
-                    pass
+        with patch('signal.signal'), patch.object(mock_updater, 'start', side_effect=KeyboardInterrupt):
+            try:
+                main()
+            except (KeyboardInterrupt, SystemExit):
+                pass
         
         mock_load_options.assert_called_once()
 
@@ -253,12 +252,11 @@ class TestSignalHandlers:
         def capture_signal(sig, handler):
             signal_handlers[sig] = handler
         
-        with patch('signal.signal', side_effect=capture_signal):
-            with patch.object(mock_updater, 'start', side_effect=KeyboardInterrupt):
-                try:
-                    main()
-                except (KeyboardInterrupt, SystemExit):
-                    pass
+        with patch('signal.signal', side_effect=capture_signal), patch.object(mock_updater, 'start', side_effect=KeyboardInterrupt):
+            try:
+                main()
+            except (KeyboardInterrupt, SystemExit):
+                pass
         
         # Verify signal handlers were registered
         # (SIGTERM and SIGINT should be registered)
@@ -286,7 +284,7 @@ class TestApplicationLifecycle:
             
             # Verify updater can be stopped even if not started
             updater.stop()
-            assert updater._running == False
+            assert not updater._running
 
     @patch('run.OneComAPI')
     def test_updater_multiple_stop_calls(self, mock_api):
@@ -309,4 +307,4 @@ class TestApplicationLifecycle:
             updater.stop()
             updater.stop()
             updater.stop()
-            assert updater._running == False
+            assert not updater._running
