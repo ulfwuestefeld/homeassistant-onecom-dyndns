@@ -27,7 +27,7 @@ description: Project architecture, components, runtime, and deployment context f
 ## Build & Deployment
 
 - **Docker**: Base image `ghcr.io/home-assistant/{arch}-base-python` (Alpine)
-- **Architectures**: aarch64, amd64 (configured in `build.yaml`)
+- **Architectures**: aarch64, amd64 (configured in `config.yaml`; base image selected in `Dockerfile`)
 - **Add-on startup**: `run.py` → deploys custom component to `/config/custom_components/`,
   publishes discovery, then enters main loop
 - **CI**: GitHub Actions (`.github/workflows/test.yml`) — pytest matrix (3.12 + 3.13),

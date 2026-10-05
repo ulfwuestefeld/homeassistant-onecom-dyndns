@@ -11,7 +11,7 @@ description: File placement and naming conventions for this repository. Use when
   - `run.py` — Main add-on entry point
   - `acme_manager.py`, `certificate_manager.py`, `onecom_api.py` — Core modules
   - `config.yaml` — Add-on configuration schema
-  - `Dockerfile`, `build.yaml` — Build configuration
+  - `Dockerfile` — Build configuration and architecture-specific base image
   - `requirements.txt` — Python dependencies (production + dev)
   - `translations/` — Add-on UI translations (`en.yaml`, `de.yaml`)
 

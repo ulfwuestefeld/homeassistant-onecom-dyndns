@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.6] - 2026-10-05
+
+### Fixed
+
+- Moved architecture-specific base image selection and image labels from
+  deprecated `build.yaml` into the Dockerfile.
+
+### Version
+
+- Bumped add-on and custom integration version to `1.5.6`.
+
 ## [1.5.5] - 2026-10-05
 
 ### Fixed

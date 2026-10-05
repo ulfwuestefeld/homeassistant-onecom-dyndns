@@ -1,5 +1,17 @@
-ARG BUILD_FROM
-FROM ${BUILD_FROM}
+ARG BUILD_ARCH=amd64
+FROM ghcr.io/home-assistant/${BUILD_ARCH}-base-python:3.11-alpine3.18
+
+ARG BUILD_ARCH
+ARG BUILD_VERSION
+
+LABEL \
+    org.opencontainers.image.title="One.com DynDNS Updater" \
+    org.opencontainers.image.description="Dynamic DNS updater for One.com domains" \
+    org.opencontainers.image.source="https://github.com/ulfwuestefeld/homeassistant-onecom-dyndns" \
+    org.opencontainers.image.licenses="MIT" \
+    io.hass.type="app" \
+    io.hass.version="${BUILD_VERSION}" \
+    io.hass.arch="${BUILD_ARCH}"
 
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
