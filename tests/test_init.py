@@ -14,6 +14,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.onecom_dyndns.const import (
     CONF_DOMAIN,
@@ -62,7 +63,7 @@ def _mock_coordinator_update():
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_setup_entry_creates_coordinator(hass: HomeAssistant) -> None:
     """Test that async_setup_entry creates a coordinator and forwards platforms."""
-    entry = config_entries.ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -90,7 +91,7 @@ async def test_setup_entry_creates_coordinator(hass: HomeAssistant) -> None:
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_unload_entry_cleans_up(hass: HomeAssistant) -> None:
     """Test that async_unload_entry removes data and services."""
-    entry = config_entries.ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -127,7 +128,7 @@ async def test_unload_entry_cleans_up(hass: HomeAssistant) -> None:
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_services_registered(hass: HomeAssistant) -> None:
     """Test that services are registered after setup."""
-    entry = config_entries.ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -156,7 +157,7 @@ async def test_services_registered(hass: HomeAssistant) -> None:
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_service_update_dns(hass: HomeAssistant) -> None:
     """Test calling the update_dns service."""
-    entry = config_entries.ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -191,7 +192,7 @@ async def test_service_update_dns(hass: HomeAssistant) -> None:
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_service_check_ip(hass: HomeAssistant) -> None:
     """Test calling the check_ip service."""
-    entry = config_entries.ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -226,7 +227,7 @@ async def test_service_check_ip(hass: HomeAssistant) -> None:
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_service_renew_certificate(hass: HomeAssistant) -> None:
     """Test calling the renew_certificate service."""
-    entry = config_entries.ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -266,7 +267,7 @@ async def test_service_renew_certificate(hass: HomeAssistant) -> None:
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_services_removed_after_unload(hass: HomeAssistant) -> None:
     """Test that services are removed when all entries are unloaded."""
-    entry = config_entries.ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -304,7 +305,7 @@ async def test_services_removed_after_unload(hass: HomeAssistant) -> None:
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_options_update_triggers_reload(hass: HomeAssistant) -> None:
     """Test that changing options triggers an entry reload."""
-    entry = config_entries.ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,

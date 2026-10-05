@@ -16,6 +16,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.onecom_dyndns.const import (
     CONF_DOMAIN,
@@ -311,9 +312,7 @@ async def test_hassio_discovery_accepts_service_info_object(
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_options_flow_shows_form(hass: HomeAssistant) -> None:
     """Test that the options flow shows the form with current values."""
-    from homeassistant.config_entries import ConfigEntry
-
-    entry = ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -343,9 +342,7 @@ async def test_options_flow_shows_form(hass: HomeAssistant) -> None:
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_options_flow_saves(hass: HomeAssistant) -> None:
     """Test that the options flow saves new values."""
-    from homeassistant.config_entries import ConfigEntry
-
-    entry = ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -392,9 +389,7 @@ async def test_options_flow_saves(hass: HomeAssistant) -> None:
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_reauth_flow_shows_form(hass: HomeAssistant) -> None:
     """Test that the reauth flow shows a credential form."""
-    from homeassistant.config_entries import ConfigEntry
-
-    entry = ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -425,9 +420,7 @@ async def test_reauth_flow_shows_form(hass: HomeAssistant) -> None:
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_reauth_flow_success(hass: HomeAssistant) -> None:
     """Test that reauth updates the entry on success."""
-    from homeassistant.config_entries import ConfigEntry
-
-    entry = ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -477,9 +470,7 @@ async def test_reconfigure_flow_updates_domain_and_subdomains(
     hass: HomeAssistant,
 ) -> None:
     """Test that reconfiguration stores the selected DNS target."""
-    from homeassistant.config_entries import ConfigEntry
-
-    entry = ConfigEntry(
+    entry = MockConfigEntry(
         version=1,
         minor_version=1,
         domain=DOMAIN,
