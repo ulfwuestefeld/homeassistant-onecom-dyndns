@@ -293,7 +293,9 @@ class TestE2EErrorRecovery:
                 updater.check_and_update()
 
                 # IP should NOT be saved because DNS update failed
-                assert not os.path.exists(last_ip_file) or open(last_ip_file).read() != "1.2.3.4"
+                if os.path.exists(last_ip_file):
+                    with open(last_ip_file) as last_ip:
+                        assert last_ip.read() != "1.2.3.4"
 
     @patch("run.OneComAPI")
     @patch("run.update_ha_sensor")

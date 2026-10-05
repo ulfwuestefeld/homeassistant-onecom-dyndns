@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 One.com DynDNS Updater for Home Assistant
 

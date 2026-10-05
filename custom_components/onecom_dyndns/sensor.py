@@ -97,9 +97,11 @@ async def async_setup_entry(
     entities = []
     for description in SENSOR_TYPES:
         # Skip certificate-related sensors if SSL not enabled
-        if description.key in ssl_only_sensors:
-            if not entry.data.get(CONF_SSL_ENABLED, False):
-                continue
+        if (
+            description.key in ssl_only_sensors
+            and not entry.data.get(CONF_SSL_ENABLED, False)
+        ):
+            continue
 
         entities.append(OneComDynDNSSensor(coordinator, entry, description, domain))
 

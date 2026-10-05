@@ -247,9 +247,10 @@ class OneComAPI:
                 attributes = record.get("attributes", {})
                 prefix = attributes.get("prefix", "")
 
-                if prefix == target_prefix or (not subdomain and prefix in ["", "@"]):
-                    if attributes.get("type") == "A":
-                        return (record.get("id"), record_type)
+                if (
+                    prefix == target_prefix or (not subdomain and prefix in ["", "@"])
+                ) and attributes.get("type") == "A":
+                    return (record.get("id"), record_type)
 
         return None
 

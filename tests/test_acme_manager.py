@@ -5,9 +5,10 @@ Unit tests for the ACME Manager module.
 import os
 
 # Mock the acme and cryptography imports before importing our module
+import importlib
 import sys
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -19,12 +20,11 @@ sys.modules['acme.challenges'] = MagicMock()
 sys.modules['acme.errors'] = MagicMock()
 sys.modules['josepy'] = MagicMock()
 
-from acme_manager import (  # noqa: E402
-    LETSENCRYPT_PRODUCTION,
-    LETSENCRYPT_STAGING,
-    ACMEManager,
-    ACMEManagerError,
-)
+_acme_manager = importlib.import_module("acme_manager")
+LETSENCRYPT_PRODUCTION = _acme_manager.LETSENCRYPT_PRODUCTION
+LETSENCRYPT_STAGING = _acme_manager.LETSENCRYPT_STAGING
+ACMEManager = _acme_manager.ACMEManager
+ACMEManagerError = _acme_manager.ACMEManagerError
 
 
 class TestACMEManagerInit:
@@ -222,7 +222,7 @@ class TestACMEManagerTimezoneHandling:
         )
 
         # Simulate a timezone-naive expiry (as returned by older cryptography versions)
-        future_expiry = datetime.now() + timedelta(days=60)
+        future_expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=60)
         with patch.object(manager, 'get_certificate_expiry', return_value=future_expiry):
             assert manager.needs_renewal(days_before_expiry=30) is False
 

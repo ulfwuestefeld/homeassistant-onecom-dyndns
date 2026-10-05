@@ -290,12 +290,17 @@ class OneComAPI:
             _LOGGER.debug("Found record: type=%s, prefix='%s', dns_type=%s", record_type, prefix, dns_type)
 
             # Accept both dns_service_records and dns_custom_records
-            if record_type in ["dns_service_records", "dns_custom_records"]:
-                # Match subdomain or root domain (@)
-                if prefix == target_prefix or (not subdomain and prefix in ["", "@"]):
-                    if dns_type == "A":
-                        _LOGGER.debug("Match found! Record ID: %s, type: %s", record.get('id'), record_type)
-                        return (record.get("id"), record_type)
+            # Match subdomain or root domain (@) and A records.
+            if (
+                record_type in ["dns_service_records", "dns_custom_records"]
+                and (
+                    prefix == target_prefix
+                    or (not subdomain and prefix in ["", "@"])
+                )
+                and dns_type == "A"
+            ):
+                _LOGGER.debug("Match found! Record ID: %s, type: %s", record.get('id'), record_type)
+                return (record.get("id"), record_type)
 
         _LOGGER.debug("No matching record found for '%s'", target_prefix)
         return None

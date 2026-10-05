@@ -72,9 +72,11 @@ async def async_setup_entry(
     entities = []
     for description in BUTTON_TYPES:
         # Skip certificate button if SSL not enabled
-        if description.key == "renew_certificate":
-            if not entry.data.get(CONF_SSL_ENABLED, False):
-                continue
+        if (
+            description.key == "renew_certificate"
+            and not entry.data.get(CONF_SSL_ENABLED, False)
+        ):
+            continue
 
         entities.append(OneComDynDNSButton(coordinator, entry, description, domain))
 

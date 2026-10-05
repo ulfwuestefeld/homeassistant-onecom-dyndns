@@ -6,6 +6,7 @@ Tests for online verification, renewal logic, and edge cases.
 import os
 import socket
 import ssl
+import importlib
 import sys
 import tempfile
 from unittest.mock import MagicMock, Mock, patch
@@ -23,9 +24,7 @@ sys.modules['acme.challenges'] = MagicMock()
 sys.modules['acme.errors'] = MagicMock()
 sys.modules['josepy'] = MagicMock()
 
-from certificate_manager import (  # noqa: E402
-    CertificateManager,
-)
+CertificateManager = importlib.import_module("certificate_manager").CertificateManager
 
 
 class TestOnlineCertificateVerification:

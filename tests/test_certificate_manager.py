@@ -3,6 +3,7 @@ Unit tests for the Certificate Manager module.
 """
 
 # Mock the dependencies before importing
+import importlib
 import sys
 import tempfile
 from unittest.mock import MagicMock, Mock, patch
@@ -14,10 +15,9 @@ sys.modules['acme.challenges'] = MagicMock()
 sys.modules['acme.errors'] = MagicMock()
 sys.modules['josepy'] = MagicMock()
 
-from certificate_manager import (  # noqa: E402
-    CertificateManager,
-    CertificateManagerError,
-)
+_certificate_manager = importlib.import_module("certificate_manager")
+CertificateManager = _certificate_manager.CertificateManager
+CertificateManagerError = _certificate_manager.CertificateManagerError
 
 
 class TestCertificateManagerInit:

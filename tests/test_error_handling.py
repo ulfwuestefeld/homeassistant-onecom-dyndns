@@ -209,7 +209,7 @@ class TestCertificateManagerErrors:
         )
 
         def failing_callback(event, data):
-            raise Exception("Callback crashed!")
+            raise RuntimeError("Callback crashed!")
 
         def working_callback(event, data):
             pass
