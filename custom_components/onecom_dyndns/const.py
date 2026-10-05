@@ -4,20 +4,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final
 
-from homeassistant.const import (
-    Platform,
-)
+from homeassistant.const import Platform
 
 if TYPE_CHECKING:
     from homeassistant.helpers.entity import DeviceInfo
 
 DOMAIN: Final = "onecom_dyndns"
+CONF_DOMAIN: Final = "domain"
+CONF_PASSWORD: Final = "password"
+CONF_USERNAME: Final = "username"
 
 # Add-on slug (used for Supervisor device attachment)
 ADDON_SLUG: Final = "homeassistant-onecom-dyndns"
 CONF_ADDON_SLUG: Final = "addon_slug"
 
-# Configuration keys (CONF_USERNAME, CONF_PASSWORD, CONF_DOMAIN imported above)
+# Configuration keys
 CONF_SUBDOMAINS: Final = "subdomains"
 CONF_UPDATE_INTERVAL: Final = "update_interval"
 CONF_IP_SERVICE: Final = "ip_service"
