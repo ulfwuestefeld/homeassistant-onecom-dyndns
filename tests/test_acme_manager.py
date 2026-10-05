@@ -2,10 +2,9 @@
 Unit tests for the ACME Manager module.
 """
 
-import os
-
 # Mock the acme and cryptography imports before importing our module
 import importlib
+import os
 import sys
 import tempfile
 from datetime import datetime, timedelta, timezone

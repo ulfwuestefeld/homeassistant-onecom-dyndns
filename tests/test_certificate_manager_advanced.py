@@ -3,10 +3,10 @@ Advanced unit tests for the Certificate Manager module.
 Tests for online verification, renewal logic, and edge cases.
 """
 
+import importlib
 import os
 import socket
 import ssl
-import importlib
 import sys
 import tempfile
 from unittest.mock import MagicMock, Mock, patch
