@@ -327,6 +327,10 @@ async def test_options_flow_shows_form(hass: HomeAssistant) -> None:
             "ssl_enabled": False,
         },
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
@@ -355,6 +359,10 @@ async def test_options_flow_saves(hass: HomeAssistant) -> None:
             "ssl_enabled": False,
         },
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
@@ -401,6 +409,10 @@ async def test_reauth_flow_shows_form(hass: HomeAssistant) -> None:
             "ssl_enabled": False,
         },
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
@@ -430,6 +442,10 @@ async def test_reauth_flow_success(hass: HomeAssistant) -> None:
             "ssl_enabled": False,
         },
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
@@ -478,6 +494,10 @@ async def test_reconfigure_flow_updates_domain_and_subdomains(
             "ssl_enabled": False,
         },
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 

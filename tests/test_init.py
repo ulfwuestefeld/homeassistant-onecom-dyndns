@@ -69,6 +69,10 @@ async def test_setup_entry_creates_coordinator(hass: HomeAssistant) -> None:
         title="One.com DynDNS Updater - example.com",
         data=MOCK_DATA,
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
@@ -93,6 +97,10 @@ async def test_unload_entry_cleans_up(hass: HomeAssistant) -> None:
         title="One.com DynDNS Updater - example.com",
         data=MOCK_DATA,
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
@@ -126,6 +134,10 @@ async def test_services_registered(hass: HomeAssistant) -> None:
         title="One.com DynDNS Updater - example.com",
         data=MOCK_DATA,
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
@@ -151,6 +163,10 @@ async def test_service_update_dns(hass: HomeAssistant) -> None:
         title="One.com DynDNS Updater - example.com",
         data=MOCK_DATA,
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
@@ -182,6 +198,10 @@ async def test_service_check_ip(hass: HomeAssistant) -> None:
         title="One.com DynDNS Updater - example.com",
         data=MOCK_DATA,
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
@@ -213,6 +233,10 @@ async def test_service_renew_certificate(hass: HomeAssistant) -> None:
         title="One.com DynDNS Updater - example.com",
         data=MOCK_DATA,
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
@@ -249,6 +273,10 @@ async def test_services_removed_after_unload(hass: HomeAssistant) -> None:
         title="One.com DynDNS Updater - example.com",
         data=MOCK_DATA,
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
@@ -283,6 +311,10 @@ async def test_options_update_triggers_reload(hass: HomeAssistant) -> None:
         title="One.com DynDNS Updater - example.com",
         data=MOCK_DATA,
         source=config_entries.SOURCE_USER,
+        discovery_keys=None,
+        options={},
+        subentries_data={},
+        unique_id=None,
     )
     entry.add_to_hass(hass)
 
